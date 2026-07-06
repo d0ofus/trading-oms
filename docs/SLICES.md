@@ -36,7 +36,7 @@ Completion evidence:
 
 ## Slice 002 — backend/frontend skeleton with real verification
 
-status: `approved_for_autonomous_run`
+status: `ready_for_human_review`
 
 branch: `slice-002-backend-frontend-skeleton`
 
@@ -66,16 +66,16 @@ Non-goals:
 - risk engine.
 
 Acceptance criteria:
-- [ ] Backend skeleton exists.
-- [ ] Frontend skeleton exists.
-- [ ] Health endpoint exists.
-- [ ] Config defaults to `APP_MODE=paper`.
-- [ ] `LIVE_TRADING_ENABLED` defaults to `false`.
-- [ ] `make verify` runs real checks where practical.
-- [ ] CI can run `make verify`.
-- [ ] No code path can transmit broker orders.
-- [ ] No secrets are introduced.
-- [ ] Docs are updated if setup changes.
+- [x] Backend skeleton exists.
+- [x] Frontend skeleton exists.
+- [x] Health endpoint exists.
+- [x] Config defaults to `APP_MODE=paper`.
+- [x] `LIVE_TRADING_ENABLED` defaults to `false`.
+- [x] `make verify` runs real checks where practical.
+- [x] CI can run `make verify`.
+- [x] No code path can transmit broker orders.
+- [x] No secrets are introduced.
+- [x] Docs are updated if setup changes.
 
 Verification commands:
 

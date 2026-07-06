@@ -4,9 +4,9 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial repository scaffold.
+Initial application scaffold.
 
-No trading logic exists yet.
+No trading logic, broker integration, market data, strategy engine, OMS, or order submission exists yet.
 
 ## Safety posture
 
@@ -18,6 +18,18 @@ No trading logic exists yet.
 - IBKR integration will come later as paper-only first.
 
 ## Local verification
+
+Install backend dependencies:
+
+```bash
+python -m pip install -r backend/requirements-dev.txt
+```
+
+Install frontend dependencies:
+
+```bash
+npm install --prefix frontend
+```
 
 On systems with `make`:
 
@@ -47,6 +59,8 @@ On Windows without `make`:
 
 - `AGENTS.md`: permanent repo instructions for Codex.
 - `PLANS.md`: ExecPlan format.
+- `backend/`: minimal FastAPI backend.
+- `frontend/`: minimal React TypeScript frontend.
 - `.codex/config.toml`: project-scoped Codex defaults.
 - `.codex/prompts/`: reusable Codex prompts.
 - `docs/ROADMAP.md`: staged roadmap.

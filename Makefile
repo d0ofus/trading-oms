@@ -1,19 +1,25 @@
 .PHONY: format lint typecheck test test-integration test-replay test-chaos test-e2e security-check verify
 
 PYTHON ?= python
+NPM ?= npm
+BACKEND_DIR ?= backend
+FRONTEND_DIR ?= frontend
 
 format:
-	@echo "format: placeholder until backend/frontend skeleton exists"
+	@$(PYTHON) -m ruff format --check $(BACKEND_DIR)/src $(BACKEND_DIR)/tests
 
 lint:
-	@echo "lint: placeholder until backend/frontend skeleton exists"
 	@$(PYTHON) scripts/verify_repo.py
+	@$(PYTHON) -m ruff check $(BACKEND_DIR)/src $(BACKEND_DIR)/tests
+	@$(NPM) --prefix $(FRONTEND_DIR) run lint
 
 typecheck:
-	@echo "typecheck: placeholder until backend/frontend skeleton exists"
+	@$(PYTHON) -m compileall -q $(BACKEND_DIR)/src $(BACKEND_DIR)/tests
+	@$(NPM) --prefix $(FRONTEND_DIR) run typecheck
 
 test:
-	@echo "test: placeholder until backend/frontend skeleton exists"
+	@$(PYTHON) -m pytest $(BACKEND_DIR)/tests
+	@$(NPM) --prefix $(FRONTEND_DIR) run test
 
 test-integration:
 	@echo "test-integration: placeholder until integration tests exist"
