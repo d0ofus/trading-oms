@@ -93,10 +93,39 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 
 ## Slice 003 — safe configuration hardening
 
-status: `not_started`
+status: `ready_for_human_review`
+
+branch: `slice-003-safe-configuration-hardening`
 
 Goal:
 Create a strict application configuration layer with validated safe defaults, explicit app mode, and hard failure for unsafe live-trading settings.
+
+Scope:
+- strict backend settings model for safety-relevant config values;
+- validated defaults for paper/simulation mode;
+- hard failures for live trading, live IBKR account mode, public IBKR host, invalid booleans, invalid ports, and unsafe production combinations;
+- tests for safe defaults and unsafe settings;
+- docs for configuration behavior.
+
+Non-goals:
+- broker integration;
+- order submission;
+- IBKR connectivity;
+- secrets;
+- strategy engine;
+- OMS;
+- risk engine.
+
+Acceptance criteria:
+- [x] Config defaults to paper mode with live trading disabled.
+- [x] Unsafe live trading settings fail fast.
+- [x] IBKR account mode must be paper.
+- [x] IBKR host must be localhost-only.
+- [x] Invalid config values fail with clear errors.
+- [x] Health endpoint exposes only non-secret safety posture.
+- [x] Verification passes.
+- [x] No code path can transmit broker orders.
+- [x] No secrets are introduced.
 
 ---
 

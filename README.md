@@ -63,5 +63,6 @@ On Windows without `make`:
 - `frontend/`: minimal React TypeScript frontend.
 - `.codex/config.toml`: project-scoped Codex defaults.
 - `.codex/prompts/`: reusable Codex prompts.
+- `docs/CONFIGURATION.md`: safe configuration defaults and validation rules.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.

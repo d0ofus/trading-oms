@@ -12,6 +12,9 @@ def healthz() -> dict[str, str | bool]:
     settings = get_settings()
     return {
         "status": "ok",
+        "app_env": settings.app_env,
         "app_mode": settings.app_mode,
         "live_trading_enabled": settings.live_trading_enabled,
+        "ibkr_account_mode": settings.ibkr_account_mode,
+        "broker_connectivity": "not_configured",
     }

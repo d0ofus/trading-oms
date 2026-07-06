@@ -1,0 +1,28 @@
+# Configuration
+
+The application configuration layer is safety-first. Defaults must keep the system in a non-live posture.
+
+## Safe defaults
+
+- `APP_ENV=development`
+- `APP_MODE=paper`
+- `LIVE_TRADING_ENABLED=false`
+- `IBKR_HOST=127.0.0.1`
+- `IBKR_PORT=7497`
+- `IBKR_ACCOUNT_MODE=paper`
+
+## Validation rules
+
+- `APP_ENV` must be `development`, `test`, or `production`.
+- `APP_MODE` must be `paper` or `simulation`.
+- `LIVE_TRADING_ENABLED` must parse as a boolean and must remain `false`.
+- `IBKR_ACCOUNT_MODE` must be `paper`.
+- `IBKR_HOST` must be localhost-only: `127.0.0.1`, `localhost`, or `::1`.
+- `IBKR_PORT` must be an integer TCP port from `1` through `65535`.
+- `APP_ENV=production` requires `APP_MODE=simulation`.
+
+These checks are startup safety checks only. They do not add broker connectivity, order submission, OMS behavior, or live trading.
+
+## Secret handling
+
+Do not commit real secrets. Keep `.env.example` limited to placeholders and safe defaults. Use local secret files or a secret manager for private values, and keep those files out of git.
