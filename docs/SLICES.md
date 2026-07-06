@@ -131,7 +131,7 @@ Acceptance criteria:
 
 ## Slice 004 — append-only event journal
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-004-append-only-event-journal`
 
@@ -170,10 +170,40 @@ Acceptance criteria:
 
 ## Slice 005 — deterministic market-data replay format
 
-status: `not_started`
+status: `approved_for_autonomous_run`
+
+branch: `slice-005-deterministic-market-data-replay`
 
 Goal:
 Create the deterministic replay data format and basic replay reader.
+
+Scope:
+- backend replay domain model for market-data events;
+- deterministic JSONL replay file reader;
+- validation for required event fields and event ordering;
+- tests proving stable replay order and validation failures;
+- docs for replay format and current limitations.
+
+Non-goals:
+- live market-data ingestion;
+- broker integration;
+- order submission;
+- strategy execution;
+- bar building;
+- risk engine;
+- UI.
+
+Acceptance criteria:
+- [ ] Replay module exists.
+- [ ] Replay events include sequence, timestamp, symbol, event type, and payload.
+- [ ] Replay reader returns events in deterministic file order.
+- [ ] Invalid replay records fail validation.
+- [ ] Out-of-order or duplicate sequences fail validation.
+- [ ] Tests cover replay readback and validation failures.
+- [ ] Verification passes.
+- [ ] No live market-data source is added.
+- [ ] No code path can transmit broker orders.
+- [ ] No secrets are introduced.
 
 ---
 
