@@ -1,0 +1,50 @@
+# Project-scoped Codex configuration for this repo.
+# User-specific auth, provider, and machine-local settings belong in ~/.codex/config.toml.
+
+# Use your account/default model unless you intentionally set one.
+# model = "gpt-5.5"
+
+# Conservative defaults for local application work.
+approval_policy = "on-request"
+approvals_reviewer = "user"
+sandbox_mode = "workspace-write"
+
+# Prefer more reasoning for planning; keep implementation output practical.
+model_reasoning_effort = "medium"
+plan_mode_reasoning_effort = "high"
+model_verbosity = "medium"
+personality = "pragmatic"
+
+# Cached search can help Codex reason about docs without granting command-level network access.
+# Use "disabled" if you want completely offline Codex reasoning.
+web_search = "cached"
+
+# Keep command network access off unless explicitly approved for dependency installation.
+[sandbox_workspace_write]
+writable_roots = []
+network_access = false
+exclude_tmpdir_env_var = false
+exclude_slash_tmp = false
+
+# Avoid forwarding common secret-bearing variables into spawned commands.
+[shell_environment_policy]
+inherit = "all"
+ignore_default_excludes = false
+exclude = [
+  "*TOKEN*",
+  "*SECRET*",
+  "*PASSWORD*",
+  "*PRIVATE*",
+  "*KEY*",
+  "IBKR_*",
+  "TELEGRAM_*",
+  "OPENAI_API_KEY",
+  "GITHUB_TOKEN",
+]
+set = {}
+include_only = []
+experimental_use_profile = false
+
+# Native Windows sandbox recommendation.
+[windows]
+sandbox = "elevated"
