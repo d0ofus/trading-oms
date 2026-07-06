@@ -36,7 +36,7 @@ Completion evidence:
 
 ## Slice 002 — backend/frontend skeleton with real verification
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-002-backend-frontend-skeleton`
 
@@ -93,7 +93,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 
 ## Slice 003 — safe configuration hardening
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-003-safe-configuration-hardening`
 
@@ -131,10 +131,40 @@ Acceptance criteria:
 
 ## Slice 004 — append-only event journal
 
-status: `not_started`
+status: `approved_for_autonomous_run`
+
+branch: `slice-004-append-only-event-journal`
 
 Goal:
 Add an append-only event journal foundation for auditability.
+
+Scope:
+- backend event journal domain model for audit records;
+- append-only JSONL journal writer and reader;
+- deterministic sequence handling suitable for replay;
+- validation for required event fields;
+- tests proving append-only behavior and readback order;
+- docs for journal guarantees and current limitations.
+
+Non-goals:
+- database migrations;
+- broker integration;
+- order submission;
+- live trading;
+- full OMS integration;
+- alerts;
+- UI.
+
+Acceptance criteria:
+- [ ] Event journal module exists.
+- [ ] Journal records include type, timestamp, payload, and sequence metadata.
+- [ ] Appending preserves existing records and never rewrites prior entries.
+- [ ] Journal readback is deterministic and ordered.
+- [ ] Invalid journal records fail validation.
+- [ ] Tests cover append/read behavior and append-only guarantees.
+- [ ] Verification passes.
+- [ ] No code path can transmit broker orders.
+- [ ] No secrets are introduced.
 
 ---
 
