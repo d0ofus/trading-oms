@@ -131,7 +131,7 @@ Acceptance criteria:
 
 ## Slice 004 — append-only event journal
 
-status: `approved_for_autonomous_run`
+status: `ready_for_human_review`
 
 branch: `slice-004-append-only-event-journal`
 
@@ -156,15 +156,15 @@ Non-goals:
 - UI.
 
 Acceptance criteria:
-- [ ] Event journal module exists.
-- [ ] Journal records include type, timestamp, payload, and sequence metadata.
-- [ ] Appending preserves existing records and never rewrites prior entries.
-- [ ] Journal readback is deterministic and ordered.
-- [ ] Invalid journal records fail validation.
-- [ ] Tests cover append/read behavior and append-only guarantees.
-- [ ] Verification passes.
-- [ ] No code path can transmit broker orders.
-- [ ] No secrets are introduced.
+- [x] Event journal module exists.
+- [x] Journal records include type, timestamp, payload, and sequence metadata.
+- [x] Appending preserves existing records and never rewrites prior entries.
+- [x] Journal readback is deterministic and ordered.
+- [x] Invalid journal records fail validation.
+- [x] Tests cover append/read behavior and append-only guarantees.
+- [x] Verification passes.
+- [x] No code path can transmit broker orders.
+- [x] No secrets are introduced.
 
 ---
 
