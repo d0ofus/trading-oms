@@ -170,7 +170,7 @@ Acceptance criteria:
 
 ## Slice 005 — deterministic market-data replay format
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-005-deterministic-market-data-replay`
 
