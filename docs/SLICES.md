@@ -170,7 +170,7 @@ Acceptance criteria:
 
 ## Slice 005 — deterministic market-data replay format
 
-status: `approved_for_autonomous_run`
+status: `ready_for_human_review`
 
 branch: `slice-005-deterministic-market-data-replay`
 
@@ -194,16 +194,16 @@ Non-goals:
 - UI.
 
 Acceptance criteria:
-- [ ] Replay module exists.
-- [ ] Replay events include sequence, timestamp, symbol, event type, and payload.
-- [ ] Replay reader returns events in deterministic file order.
-- [ ] Invalid replay records fail validation.
-- [ ] Out-of-order or duplicate sequences fail validation.
-- [ ] Tests cover replay readback and validation failures.
-- [ ] Verification passes.
-- [ ] No live market-data source is added.
-- [ ] No code path can transmit broker orders.
-- [ ] No secrets are introduced.
+- [x] Replay module exists.
+- [x] Replay events include sequence, timestamp, symbol, event type, and payload.
+- [x] Replay reader returns events in deterministic file order.
+- [x] Invalid replay records fail validation.
+- [x] Out-of-order or duplicate sequences fail validation.
+- [x] Tests cover replay readback and validation failures.
+- [x] Verification passes.
+- [x] No live market-data source is added.
+- [x] No code path can transmit broker orders.
+- [x] No secrets are introduced.
 
 ---
 

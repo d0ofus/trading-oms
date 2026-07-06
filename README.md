@@ -65,5 +65,6 @@ On Windows without `make`:
 - `.codex/prompts/`: reusable Codex prompts.
 - `docs/CONFIGURATION.md`: safe configuration defaults and validation rules.
 - `docs/EVENT_JOURNAL.md`: append-only audit journal format and guarantees.
+- `docs/MARKET_DATA_REPLAY.md`: deterministic local market-data replay format.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.
