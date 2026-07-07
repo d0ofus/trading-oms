@@ -4,9 +4,9 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, and local approval tickets.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, and local no-op alerts.
 
-No live broker integration, production strategy engine, alerts, UI trading workflow, or live order submission exists yet.
+No live broker integration, production strategy engine, real alert delivery, UI trading workflow, or live order submission exists yet.
 
 ## Safety posture
 
@@ -17,6 +17,7 @@ No live broker integration, production strategy engine, alerts, UI trading workf
 - Fake broker behavior is local simulation only.
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
+- Alert behavior is local no-op recording and formatting only.
 - Default mode is paper/simulation.
 - IBKR integration will come later as paper-only first.
 
@@ -75,5 +76,6 @@ On Windows without `make`:
 - `docs/FAKE_BROKER.md`: simulation-only fake broker behavior.
 - `docs/OMS_STATE_MACHINE.md`: explicit OMS lifecycle states and transitions.
 - `docs/APPROVAL_TICKETS.md`: semi-automatic approval ticket behavior.
+- `docs/ALERTS.md`: local alert intent, no-op dispatch, and formatting behavior.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.

@@ -473,7 +473,7 @@ Acceptance criteria:
 
 ## Slice 012 — alerts
 
-status: `not_started`
+status: `ready_for_human_review`
 
 branch: `slice-012-alerts`
 
@@ -502,12 +502,12 @@ Non-goals:
 - incident automation or escalation workflows.
 
 Acceptance criteria:
-- [ ] Alert module exists.
-- [ ] Alerts represent informational, warning, critical, and emergency severities explicitly.
-- [ ] Alert intents and dispatch outcomes are journaled.
-- [ ] Telegram-compatible formatting exists without token handling or network transport.
-- [ ] Alert payloads reject or redact credential-shaped fields.
-- [ ] Tests cover creation, formatting, journaling, validation failures, and no secret/no network behavior.
-- [ ] Verification passes.
-- [ ] No live broker connectivity or order submission path is added.
-- [ ] No real Telegram tokens or secrets are introduced.
+- [x] Alert module exists.
+- [x] Alerts represent informational, warning, critical, and emergency severities explicitly.
+- [x] Alert intents and dispatch outcomes are journaled.
+- [x] Telegram-compatible formatting exists without token handling or network transport.
+- [x] Alert payloads reject or redact credential-shaped fields.
+- [x] Tests cover creation, formatting, journaling, validation failures, and no secret/no network behavior.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No real Telegram tokens or secrets are introduced.
