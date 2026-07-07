@@ -209,7 +209,7 @@ Acceptance criteria:
 
 ## Slice 006 — bar builder
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-006-bar-builder`
 
@@ -249,10 +249,45 @@ Acceptance criteria:
 
 ## Slice 007 — first replay-only strategy
 
-status: `not_started`
+status: `ready_for_human_review`
+
+branch: `slice-007-first-replay-only-strategy`
 
 Goal:
 Implement the first strategy in replay mode only.
+
+Scope:
+- backend replay strategy domain model for deterministic bias signals;
+- hard-coded close-vs-simple-moving-average strategy;
+- event journal append for every generated strategy signal;
+- validation for strategy config, bars, signal payloads, symbols, timeframes, timestamps, and prices;
+- tests proving deterministic signals, journal coverage, and validation failures;
+- docs for strategy behavior and current limitations.
+
+Non-goals:
+- live market-data ingestion;
+- broker integration;
+- order intents;
+- order submission;
+- risk engine;
+- approval tickets;
+- OMS integration;
+- alerts;
+- UI;
+- Strategy DSL execution.
+
+Acceptance criteria:
+- [x] Replay-only strategy module exists.
+- [x] Strategy consumes local bars only.
+- [x] Strategy emits deterministic bias signals, not order intents.
+- [x] Every generated signal is journaled.
+- [x] Signal payloads contain no broker, account, order routing, quantity, or submission fields.
+- [x] Invalid strategy inputs fail validation.
+- [x] Tests cover deterministic signal generation, journaling, and validation failures.
+- [x] Verification passes.
+- [x] No live market-data source is added.
+- [x] No code path can transmit broker orders.
+- [x] No secrets are introduced.
 
 ---
 
