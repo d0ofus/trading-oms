@@ -209,10 +209,41 @@ Acceptance criteria:
 
 ## Slice 006 — bar builder
 
-status: `not_started`
+status: `ready_for_human_review`
+
+branch: `slice-006-bar-builder`
 
 Goal:
 Build local bars from replayed tick or quote/trade events.
+
+Scope:
+- backend bar builder domain model for local OHLCV bars;
+- deterministic time-bucketed bar construction from replay events;
+- validation for trade prices, quote-derived prices, sizes, symbols, timestamps, and timeframe duration;
+- tests proving deterministic bars and validation failures;
+- docs for bar builder behavior and current limitations.
+
+Non-goals:
+- live market-data ingestion;
+- broker integration;
+- order submission;
+- strategy execution;
+- risk engine;
+- OMS integration;
+- event journal integration;
+- UI.
+
+Acceptance criteria:
+- [x] Bar builder module exists.
+- [x] Bars include symbol, timeframe, start/end timestamps, OHLC, volume, and event count.
+- [x] Trade replay events build deterministic OHLCV bars.
+- [x] Quote replay events require an explicit configured price source.
+- [x] Invalid or unsupported events fail validation.
+- [x] Tests cover bar readback and validation failures.
+- [x] Verification passes.
+- [x] No live market-data source is added.
+- [x] No code path can transmit broker orders.
+- [x] No secrets are introduced.
 
 ---
 

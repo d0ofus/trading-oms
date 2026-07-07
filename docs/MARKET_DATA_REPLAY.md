@@ -1,8 +1,8 @@
 # Market-Data Replay
 
-Slice 005 introduces a deterministic local market-data replay format and backend reader.
+Slice 005 introduced a deterministic local market-data replay format and backend reader.
 
-It does not add live market-data ingestion, broker connectivity, order submission, strategy execution, bar building, or live trading.
+The replay reader does not add live market-data ingestion, broker connectivity, order submission, strategy execution, or live trading. Bar building is provided separately by `docs/BAR_BUILDER.md`.
 
 ## Record Shape
 
@@ -43,7 +43,7 @@ Fields:
 ## Current Limitations
 
 - No live feed integration.
-- No bar building yet.
+- Bar building is provided separately by `docs/BAR_BUILDER.md`.
 - No strategy execution yet.
 - No event journal integration yet.
 - No concurrent file mutation handling.
