@@ -2,7 +2,7 @@
 
 Slice 008 introduces structured risk checks for proposed risk decisions.
 
-It does not add broker connectivity, order submission, live trading, approval tickets, OMS integration, fake broker execution, alerts, UI, or database migrations.
+It does not add live broker connectivity, order submission, live trading, approval tickets, OMS integration, fake broker execution, alerts, UI, or database migrations.
 
 ## Purpose
 
@@ -83,7 +83,8 @@ The decision payload contains:
 - No position tracking yet.
 - No OMS integration yet.
 - No approval workflow yet.
-- No fake broker integration yet.
+- Fake broker behavior exists separately in `docs/FAKE_BROKER.md`, but the risk engine is not
+  integrated into a broker or OMS workflow yet.
 - No portfolio-level exposure model yet.
 - No persistence beyond the local JSONL event journal.
 - Numeric values currently use Python floats because earlier slices use Python floats.
