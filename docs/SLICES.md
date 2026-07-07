@@ -427,7 +427,7 @@ Acceptance criteria:
 
 ## Slice 011 — approval tickets
 
-status: `not_started`
+status: `ready_for_human_review`
 
 branch: `slice-011-approval-tickets`
 
@@ -457,14 +457,14 @@ Non-goals:
 - full OMS/fake broker orchestration.
 
 Acceptance criteria:
-- [ ] Approval ticket module exists.
-- [ ] Tickets can be created only with passed risk-decision context.
-- [ ] Tickets represent pending, approved, rejected, expired, and cancelled states explicitly.
-- [ ] Approval decisions require an explicit human approval actor/reference.
-- [ ] Approval decisions are idempotent when payloads match and rejected when payloads conflict.
-- [ ] Every ticket creation and decision is journaled.
-- [ ] Approved tickets do not automatically submit orders.
-- [ ] Tests cover create, approve, reject, expire, cancel, idempotency, journaling, and validation failures.
-- [ ] Verification passes.
-- [ ] No live broker connectivity or order submission path is added.
-- [ ] No secrets are introduced.
+- [x] Approval ticket module exists.
+- [x] Tickets can be created only with passed risk-decision context.
+- [x] Tickets represent pending, approved, rejected, expired, and cancelled states explicitly.
+- [x] Approval decisions require an explicit human approval actor/reference.
+- [x] Approval decisions are idempotent when payloads match and rejected when payloads conflict.
+- [x] Every ticket creation and decision is journaled.
+- [x] Approved tickets do not automatically submit orders.
+- [x] Tests cover create, approve, reject, expire, cancel, idempotency, journaling, and validation failures.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No secrets are introduced.
