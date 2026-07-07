@@ -427,7 +427,7 @@ Acceptance criteria:
 
 ## Slice 011 — approval tickets
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-011-approval-tickets`
 
@@ -468,3 +468,46 @@ Acceptance criteria:
 - [x] Verification passes.
 - [x] No live broker connectivity or order submission path is added.
 - [x] No secrets are introduced.
+
+---
+
+## Slice 012 — alerts
+
+status: `not_started`
+
+branch: `slice-012-alerts`
+
+Goal:
+Add a safe alerting foundation for safety-critical workflow events without real credentials or live network delivery.
+
+Scope:
+- backend alert domain model for alert intents and dispatch outcomes;
+- explicit alert severities for informational, warning, critical, and emergency conditions;
+- local/no-op alert dispatcher interface suitable for tests and later adapters;
+- Telegram-compatible payload formatter without tokens, credentials, or network transport;
+- event journal append for every alert intent and dispatch outcome;
+- validation for alert IDs, event references, severity, channel, timestamps, payload fields, and redacted metadata;
+- tests proving alert creation, formatting, journaling, validation failures, and no secret/no network behavior;
+- docs for alert behavior, current limitations, and future adapter boundaries.
+
+Non-goals:
+- real Telegram integration;
+- Telegram bot tokens or chat IDs;
+- network delivery;
+- broker integration;
+- order submission;
+- live trading;
+- UI;
+- database migrations;
+- incident automation or escalation workflows.
+
+Acceptance criteria:
+- [ ] Alert module exists.
+- [ ] Alerts represent informational, warning, critical, and emergency severities explicitly.
+- [ ] Alert intents and dispatch outcomes are journaled.
+- [ ] Telegram-compatible formatting exists without token handling or network transport.
+- [ ] Alert payloads reject or redact credential-shaped fields.
+- [ ] Tests cover creation, formatting, journaling, validation failures, and no secret/no network behavior.
+- [ ] Verification passes.
+- [ ] No live broker connectivity or order submission path is added.
+- [ ] No real Telegram tokens or secrets are introduced.
