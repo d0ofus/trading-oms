@@ -293,7 +293,7 @@ Acceptance criteria:
 
 ## Slice 008 — risk engine
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-008-risk-engine`
 
@@ -336,10 +336,46 @@ Acceptance criteria:
 
 ## Slice 009 — fake broker
 
-status: `not_started`
+status: `ready_for_human_review`
+
+branch: `slice-009-fake-broker`
 
 Goal:
 Implement a fake broker adapter for simulation.
+
+Scope:
+- backend broker adapter protocol for simulation-only order handling;
+- fake broker implementation with deterministic order acknowledgements, fills, cancels, and rejects;
+- event journal append for every fake broker order transition;
+- validation for order intent, quantities, prices, sides, symbols, request IDs, and timestamps;
+- tests proving deterministic transitions, journaling, duplicate prevention, and validation failures;
+- docs for fake broker behavior and current limitations.
+
+Non-goals:
+- live broker integration;
+- real broker credentials;
+- network access;
+- IBKR connectivity;
+- automatic order submission from strategies;
+- approval tickets;
+- full OMS state machine;
+- alerts;
+- UI;
+- database migrations.
+
+Acceptance criteria:
+- [x] Fake broker module exists.
+- [x] Broker adapter interface is simulation-only and broker-agnostic.
+- [x] Fake broker can acknowledge accepted orders deterministically.
+- [x] Fake broker can create deterministic fills for configured fill behavior.
+- [x] Fake broker can cancel open fake orders deterministically.
+- [x] Fake broker can reject invalid or explicitly rejected fake orders deterministically.
+- [x] Duplicate client order IDs are blocked.
+- [x] Every fake broker order transition is journaled.
+- [x] Tests cover accepted, filled, cancelled, rejected, duplicate, journaling, and validation behavior.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No secrets are introduced.
 
 ---
 

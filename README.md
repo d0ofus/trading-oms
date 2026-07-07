@@ -4,9 +4,9 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, and structured risk engine.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, and simulation-only fake broker.
 
-No broker integration, production strategy engine, OMS, approval flow, alerts, UI trading workflow, or order submission exists yet.
+No live broker integration, production strategy engine, OMS, approval flow, alerts, UI trading workflow, or live order submission exists yet.
 
 ## Safety posture
 
@@ -14,6 +14,7 @@ No broker integration, production strategy engine, OMS, approval flow, alerts, U
 - No real broker credentials.
 - No real Telegram tokens.
 - No live order submission path.
+- Fake broker behavior is local simulation only.
 - Default mode is paper/simulation.
 - IBKR integration will come later as paper-only first.
 
@@ -69,5 +70,6 @@ On Windows without `make`:
 - `docs/BAR_BUILDER.md`: deterministic local OHLCV bar builder behavior.
 - `docs/REPLAY_STRATEGY.md`: deterministic replay-only strategy behavior.
 - `docs/RISK_ENGINE.md`: structured risk checks and journaled risk decisions.
+- `docs/FAKE_BROKER.md`: simulation-only fake broker behavior.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.
