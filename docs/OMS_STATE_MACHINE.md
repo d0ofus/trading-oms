@@ -3,7 +3,7 @@
 Slice 010 introduces a deterministic backend OMS state machine.
 
 It does not add live broker integration, IBKR connectivity, network access, real broker
-credentials, fake broker execution orchestration, approval ticket implementation, alerts, UI,
+credentials, fake broker execution orchestration, approval ticket orchestration, alerts, UI,
 database migrations, position tracking, or live trading.
 
 ## Purpose
@@ -141,7 +141,8 @@ This returns `true` when the current order state is `UNKNOWN_REQUIRES_RECONCILIA
 
 - State is in memory only.
 - No database-backed OMS persistence yet.
-- No approval ticket lookup yet.
+- Approval ticket recording exists separately in `docs/APPROVAL_TICKETS.md`, but the OMS does not
+  create, look up, or apply approval tickets yet.
 - No fake broker orchestration yet.
 - No position tracking yet.
 - No reconciliation workflow yet.
