@@ -381,7 +381,7 @@ Acceptance criteria:
 
 ## Slice 010 — OMS state machine
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-010-oms-state-machine`
 
@@ -422,3 +422,49 @@ Acceptance criteria:
 - [x] Verification passes.
 - [x] No live broker connectivity or order submission path is added.
 - [x] No secrets are introduced.
+
+---
+
+## Slice 011 — approval tickets
+
+status: `not_started`
+
+branch: `slice-011-approval-tickets`
+
+Goal:
+Implement semi-automatic human approval tickets before any broker submission workflow.
+
+Scope:
+- backend approval ticket domain model for pending, approved, rejected, expired, and cancelled approval decisions;
+- deterministic ticket creation from passed risk decisions and OMS pending-approval context;
+- explicit approval decision application with idempotency keys;
+- event journal append for every ticket creation and approval decision;
+- validation for ticket IDs, order IDs, client order IDs, risk decision IDs, OMS transition references, timestamps, decision actors, reasons, and expiry timestamps;
+- tests proving ticket creation, approve/reject/expire/cancel decisions, duplicate/idempotent behavior, journaling, and validation failures;
+- docs for approval ticket behavior and current limitations.
+
+Non-goals:
+- live broker integration;
+- real broker credentials;
+- network access;
+- IBKR connectivity;
+- automatic execution after approval;
+- UI approval screens;
+- alert delivery;
+- Telegram integration;
+- database migrations;
+- position tracking;
+- full OMS/fake broker orchestration.
+
+Acceptance criteria:
+- [ ] Approval ticket module exists.
+- [ ] Tickets can be created only with passed risk-decision context.
+- [ ] Tickets represent pending, approved, rejected, expired, and cancelled states explicitly.
+- [ ] Approval decisions require an explicit human approval actor/reference.
+- [ ] Approval decisions are idempotent when payloads match and rejected when payloads conflict.
+- [ ] Every ticket creation and decision is journaled.
+- [ ] Approved tickets do not automatically submit orders.
+- [ ] Tests cover create, approve, reject, expire, cancel, idempotency, journaling, and validation failures.
+- [ ] Verification passes.
+- [ ] No live broker connectivity or order submission path is added.
+- [ ] No secrets are introduced.
