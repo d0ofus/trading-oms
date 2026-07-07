@@ -249,7 +249,7 @@ Acceptance criteria:
 
 ## Slice 007 — first replay-only strategy
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-007-first-replay-only-strategy`
 
@@ -293,10 +293,44 @@ Acceptance criteria:
 
 ## Slice 008 — risk engine
 
-status: `not_started`
+status: `ready_for_human_review`
+
+branch: `slice-008-risk-engine`
 
 Goal:
 Implement structured risk checks before approval or execution.
+
+Scope:
+- backend risk engine domain model for policies, evaluation requests, checks, and decisions;
+- deterministic risk checks for allowed symbols, duplicate request IDs, market-data freshness, broker-state knowledge, quantity limits, notional limits, and protective-order requirements;
+- event journal append for every risk decision;
+- tests proving passed decisions, blocked decisions, journaling, and validation failures;
+- docs for risk engine behavior and current limitations.
+
+Non-goals:
+- broker integration;
+- order submission;
+- live trading;
+- approval tickets;
+- OMS integration;
+- fake broker execution;
+- alerts;
+- UI;
+- database migrations.
+
+Acceptance criteria:
+- [x] Risk engine module exists.
+- [x] Risk decisions include structured check results.
+- [x] Every risk decision is journaled.
+- [x] Stale market data blocks decisions.
+- [x] Unknown broker state blocks risk-increasing decisions.
+- [x] Duplicate request IDs are blocked.
+- [x] Risk-increasing requests require a protective plan or explicitly approved exception.
+- [x] Quantity and notional limits are enforced.
+- [x] Tests cover passed decisions, blocked decisions, journaling, and validation failures.
+- [x] Verification passes.
+- [x] No broker connectivity or order submission path is added.
+- [x] No secrets are introduced.
 
 ---
 

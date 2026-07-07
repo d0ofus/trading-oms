@@ -4,9 +4,9 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, and first replay-only strategy.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, and structured risk engine.
 
-No broker integration, production strategy engine, OMS, risk engine, approval flow, alerts, UI trading workflow, or order submission exists yet.
+No broker integration, production strategy engine, OMS, approval flow, alerts, UI trading workflow, or order submission exists yet.
 
 ## Safety posture
 
@@ -68,5 +68,6 @@ On Windows without `make`:
 - `docs/MARKET_DATA_REPLAY.md`: deterministic local market-data replay format.
 - `docs/BAR_BUILDER.md`: deterministic local OHLCV bar builder behavior.
 - `docs/REPLAY_STRATEGY.md`: deterministic replay-only strategy behavior.
+- `docs/RISK_ENGINE.md`: structured risk checks and journaled risk decisions.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.

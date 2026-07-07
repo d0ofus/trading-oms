@@ -63,7 +63,7 @@ The journal timestamp is the signal bar's `bar_end_timestamp`.
 
 - One hard-coded strategy only.
 - No Strategy DSL integration yet.
-- No risk engine integration yet.
+- Risk checks are provided separately by `docs/RISK_ENGINE.md`.
 - No fake broker or OMS integration yet.
 - No approval workflow yet.
 - No UI yet.
