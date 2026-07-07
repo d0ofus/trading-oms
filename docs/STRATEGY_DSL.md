@@ -16,4 +16,6 @@ The strategy DSL will be a typed JSON/YAML representation of strategy workflows.
 
 Not implemented.
 
-The first strategy should be hard-coded or config-driven before the full DSL is introduced.
+The first replay-only strategy is hard-coded and documented in `docs/REPLAY_STRATEGY.md`.
+
+The full DSL remains deferred.
