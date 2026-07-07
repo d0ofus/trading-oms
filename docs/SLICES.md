@@ -336,7 +336,7 @@ Acceptance criteria:
 
 ## Slice 009 — fake broker
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-009-fake-broker`
 
@@ -381,7 +381,44 @@ Acceptance criteria:
 
 ## Slice 010 — OMS state machine
 
-status: `not_started`
+status: `ready_for_human_review`
+
+branch: `slice-010-oms-state-machine`
 
 Goal:
 Implement explicit order lifecycle states and transitions.
+
+Scope:
+- backend OMS domain model for order lifecycle states and transitions;
+- explicit allowed transition table for initial OMS states;
+- deterministic transition application with idempotency keys;
+- event journal append for every accepted OMS transition;
+- validation for order IDs, symbols, sides, quantities, timestamps, reasons, risk decision IDs, approval references, and broker transition references;
+- tests proving valid transitions, invalid transition blocking, duplicate/idempotent behavior, unknown broker state handling, journaling, and validation failures;
+- docs for OMS state machine behavior and current limitations.
+
+Non-goals:
+- live broker integration;
+- real broker credentials;
+- network access;
+- IBKR connectivity;
+- automatic order submission from strategies;
+- approval ticket implementation;
+- fake broker execution orchestration;
+- alerts;
+- UI;
+- database migrations;
+- position tracking.
+
+Acceptance criteria:
+- [x] OMS state machine module exists.
+- [x] Initial lifecycle states are represented explicitly.
+- [x] Allowed transitions are explicit and invalid transitions fail validation.
+- [x] Every accepted order lifecycle transition is journaled.
+- [x] Duplicate transition IDs are idempotent when payloads match and rejected when payloads conflict.
+- [x] Unknown broker state can be represented as `UNKNOWN_REQUIRES_RECONCILIATION`.
+- [x] Unknown broker state exposes a flag that blocks new risk-increasing decisions.
+- [x] Tests cover valid transitions, invalid transitions, idempotency, unknown state, journaling, and validation failures.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No secrets are introduced.
