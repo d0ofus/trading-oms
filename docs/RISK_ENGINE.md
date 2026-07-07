@@ -81,7 +81,8 @@ The decision payload contains:
 ## Current Limitations
 
 - No position tracking yet.
-- No OMS integration yet.
+- OMS state transition validation exists separately in `docs/OMS_STATE_MACHINE.md`, but the risk
+  engine is not integrated into an approval, broker, or OMS workflow yet.
 - No approval workflow yet.
 - Fake broker behavior exists separately in `docs/FAKE_BROKER.md`, but the risk engine is not
   integrated into a broker or OMS workflow yet.

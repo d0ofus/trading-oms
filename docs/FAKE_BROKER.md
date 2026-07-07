@@ -3,7 +3,7 @@
 Slice 009 introduces a deterministic, simulation-only fake broker adapter.
 
 It does not add live broker integration, IBKR connectivity, network access, real broker
-credentials, approval tickets, OMS integration, alerts, UI, database migrations, or live trading.
+credentials, approval tickets, OMS orchestration, alerts, UI, database migrations, or live trading.
 
 ## Purpose
 
@@ -92,7 +92,8 @@ The transition payload contains:
 - State is in memory only.
 - No partial fills.
 - No order amendments.
-- No persisted OMS state machine yet.
+- OMS state transition validation exists separately in `docs/OMS_STATE_MACHINE.md`, but this fake
+  broker does not orchestrate OMS transitions.
 - No approval ticket lookup yet.
 - No portfolio or position reconciliation yet.
 - Numeric values currently use Python floats because earlier replay, bar, strategy, and risk slices
