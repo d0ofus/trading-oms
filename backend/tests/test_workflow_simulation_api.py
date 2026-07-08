@@ -2,148 +2,127 @@ from __future__ import annotations
 
 import inspect
 import re
-from typing import Any, cast
+from typing import Any
 
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
 from trading_oms_backend import app as app_module
-from trading_oms_backend.app import app, reset_workflow_definition_service
-
-FORBIDDEN_API_AFFORDANCE_KEYS = {
-    "account",
-    "account_id",
-    "api_key",
-    "approve_action",
-    "approve_url",
-    "authorization",
-    "broker_host",
-    "broker_port",
-    "cancel_action",
-    "cancel_url",
-    "certificate",
-    "connect_action",
-    "connect_url",
-    "credential",
-    "host",
-    "password",
-    "place_order_url",
-    "port",
-    "private_key",
-    "reject_action",
-    "reject_url",
-    "route",
-    "secret",
-    "socket",
-    "submit_action",
-    "submit_url",
-    "token",
-    "transmit",
-    "transmit_url",
-}
+from trading_oms_backend.app import (
+    app,
+    reset_workflow_definition_service,
+    reset_workflow_simulation_runner_service,
+)
 
 
-def test_workflow_api_creates_lists_loads_and_updates_safe_workflows(
+def test_workflow_simulation_api_runs_saved_workflow_to_approval_wait(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
     reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
     client = TestClient(app)
 
     created = client.post("/api/workflows", json=_workflow_body())
-    listed = client.get("/api/workflows")
-    loaded = client.get("/api/workflows/workflow-001")
-    updated = client.put(
-        "/api/workflows/workflow-001",
-        json=_workflow_body(
-            description="Updated local visual workflow definition",
-            requested_at="2026-07-08T00:05:00Z",
-        ),
+    response = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(),
     )
 
     assert created.status_code == 200
-    assert listed.status_code == 200
-    assert loaded.status_code == 200
-    assert updated.status_code == 200
-    assert created.json()["version"] == 1
-    assert listed.json() == [created.json()]
-    assert loaded.json() == created.json()
-    assert updated.json()["version"] == 2
-    assert updated.json()["description"] == "Updated local visual workflow definition"
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["workflow_id"] == "workflow-001"
+    assert payload["run_id"] == "workflow-run-001"
+    assert payload["status"] == "waiting_for_approval"
+    assert payload["approval_ticket_id"] == "workflow-run-001-approval-ticket"
+    assert [node["status"] for node in payload["node_statuses"]] == [
+        "completed",
+        "completed",
+        "completed",
+        "passed",
+        "waiting_for_approval",
+        "blocked_waiting_for_approval",
+        "blocked_waiting_for_approval",
+        "blocked_waiting_for_approval",
+        "completed",
+    ]
 
 
-def test_workflow_api_create_and_update_are_idempotent_for_identical_payloads(
+def test_workflow_simulation_api_is_idempotent_for_same_run_payload(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
     reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
     client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
 
-    first_create = client.post("/api/workflows", json=_workflow_body())
-    second_create = client.post("/api/workflows", json=_workflow_body())
-    first_update = client.put(
-        "/api/workflows/workflow-001",
-        json=_workflow_body(
-            description="Updated local visual workflow definition",
-            requested_at="2026-07-08T00:05:00Z",
-        ),
-    )
-    second_update = client.put(
-        "/api/workflows/workflow-001",
-        json=_workflow_body(
-            description="Updated local visual workflow definition",
-            requested_at="2026-07-08T00:05:00Z",
-        ),
-    )
+    first = client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+    second = client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
 
-    assert first_create.status_code == 200
-    assert second_create.status_code == 200
-    assert second_create.json() == first_create.json()
-    assert first_update.status_code == 200
-    assert second_update.status_code == 200
-    assert second_update.json() == first_update.json()
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json() == first.json()
 
 
-def test_workflow_api_rejects_unsafe_documents_and_unknown_workflows(
+def test_workflow_simulation_api_rejects_unknown_or_conflicting_runs(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
     reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
     client = TestClient(app)
-    unsafe = _workflow_body()
-    safety_gates = cast(dict[str, object], unsafe["document"]["safety_gates"])
-    safety_gates["live_trading_enabled"] = True
+    client.post("/api/workflows", json=_workflow_body())
 
-    unsafe_response = client.post("/api/workflows", json=unsafe)
-    unknown_response = client.get("/api/workflows/missing-workflow")
-    mismatch_response = client.put(
-        "/api/workflows/workflow-001",
-        json=_workflow_body(workflow_id="workflow-002"),
+    unknown = client.post("/api/workflows/missing-workflow/simulation-runs", json=_run_body())
+    first = client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+    conflicting = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(evaluated_at="2026-07-08T13:46:00Z"),
     )
 
-    assert unsafe_response.status_code == 400
-    assert "live_trading_enabled" in unsafe_response.json()["detail"]
-    assert unknown_response.status_code == 404
-    assert mismatch_response.status_code == 400
-    assert "path workflow_id must match body" in mismatch_response.json()["detail"]
+    assert unknown.status_code == 404
+    assert first.status_code == 200
+    assert conflicting.status_code == 400
+    assert "conflicting run_id" in conflicting.json()["detail"]
 
 
-def test_workflow_api_does_not_expose_execution_delete_or_broker_secret_affordances(
+def test_workflow_simulation_api_response_excludes_broker_secret_and_execution_affordances(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
     reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
     client = TestClient(app)
-    created = client.post("/api/workflows", json=_workflow_body())
+    client.post("/api/workflows", json=_workflow_body())
 
-    assert created.status_code == 200
-    assert client.delete("/api/workflows/workflow-001").status_code == 405
-    assert client.patch("/api/workflows/workflow-001").status_code == 405
-    assert client.post("/api/workflows/workflow-001/run").status_code == 404
-    assert FORBIDDEN_API_AFFORDANCE_KEYS.isdisjoint(_all_payload_keys(created.json()))
+    response = client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+
+    assert response.status_code == 200
+    forbidden_keys = {
+        "account",
+        "account_id",
+        "api_key",
+        "authorization",
+        "broker_host",
+        "broker_port",
+        "credential",
+        "host",
+        "password",
+        "port",
+        "private_key",
+        "route",
+        "secret",
+        "socket",
+        "submit",
+        "token",
+        "transmit",
+    }
+    assert forbidden_keys.isdisjoint(_all_payload_keys(response.json()))
 
 
-def test_app_module_limits_workflow_mutations_to_save_and_update_routes() -> None:
+def test_app_module_allows_only_known_simulation_mutation_routes() -> None:
     source = inspect.getsource(app_module).lower()
 
     post_routes = set(re.findall(r'@app\.post\("([^"]+)"', source))
@@ -182,6 +161,18 @@ def _workflow_body(**overrides: Any) -> dict[str, Any]:
         "description": "Validated visual simulation workflow",
         "requested_at": "2026-07-08T00:00:00Z",
         "document": _valid_workflow_dsl(),
+    }
+    values.update(overrides)
+    return values
+
+
+def _run_body(**overrides: Any) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "run_id": "workflow-run-001",
+        "requested_at": "2026-07-08T13:29:55Z",
+        "evaluated_at": "2026-07-08T13:45:10Z",
+        "approval_expires_at": "2026-07-08T13:50:10Z",
+        "replay_input_reference": "fixtures/replay/aapl-session.jsonl",
     }
     values.update(overrides)
     return values

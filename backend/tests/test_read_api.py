@@ -113,6 +113,7 @@ def test_app_module_does_not_define_mutation_or_transport_routes() -> None:
         "/api/approval-tickets/{ticket_id}/approve",
         "/api/approval-tickets/{ticket_id}/reject",
         "/api/workflows",
+        "/api/workflows/{workflow_id}/simulation-runs",
     }
     assert put_routes == {"/api/workflows/{workflow_id}"}
 

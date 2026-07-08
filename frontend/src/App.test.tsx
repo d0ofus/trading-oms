@@ -63,6 +63,8 @@ describe("App", () => {
     expect(text).toContain("Simulation workflow DSL");
     expect(text).toContain("Workflow persistence");
     expect(text).toContain("Local definition storage ready");
+    expect(text).toContain("Simulation replay endpoint ready");
+    expect(text).toContain("Manual approval wait only");
     expect(html).toContain("&quot;workflow_id&quot;: &quot;visual-simulation-workflow&quot;");
     expect(html).toContain("&quot;mode&quot;: &quot;simulation&quot;");
     expect(html).toContain("&quot;runtime&quot;: &quot;preview_only&quot;");

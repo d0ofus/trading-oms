@@ -5,6 +5,8 @@ import {
   createWorkflowApiClient,
   type WorkflowDefinitionApiView,
   type WorkflowDefinitionSaveRequest,
+  type WorkflowSimulationRunApiView,
+  type WorkflowSimulationRunRequest,
 } from "./workflowApiClient";
 import type { VisualWorkflowDslDocument } from "./visualWorkflowDsl";
 
@@ -67,6 +69,44 @@ const savedWorkflow: WorkflowDefinitionApiView = {
   updated_at: "2026-07-08T00:00:00Z",
 };
 
+const simulationRunRequest: WorkflowSimulationRunRequest = {
+  run_id: "workflow-run-001",
+  requested_at: "2026-07-08T13:29:55Z",
+  evaluated_at: "2026-07-08T13:45:10Z",
+  approval_expires_at: "2026-07-08T13:50:10Z",
+  replay_input_reference: "fixtures/replay/aapl-session.jsonl",
+};
+
+const simulationRun: WorkflowSimulationRunApiView = {
+  schema_version: 1,
+  workflow_id: "workflow-001",
+  run_id: "workflow-run-001",
+  status: "waiting_for_approval",
+  created_at: "2026-07-08T13:29:55Z",
+  updated_at: "2026-07-08T13:45:10Z",
+  approval_ticket_id: "workflow-run-001-approval-ticket",
+  simulation_run: {
+    schema_version: 1,
+    run_id: "workflow-run-001",
+    status: "completed",
+    created_at: "2026-07-08T13:29:55Z",
+    updated_at: "2026-07-08T13:45:10Z",
+    replay_input_reference: "fixtures/replay/aapl-session.jsonl",
+    journal_references: ["journal_sequence:1"],
+  },
+  node_statuses: [
+    {
+      schema_version: 1,
+      node_id: "approval-ticket",
+      node_type: "approval_ticket",
+      status: "waiting_for_approval",
+      detail: "Manual approval is required before downstream simulation nodes",
+      journal_reference: "journal_sequence:10",
+    },
+  ],
+  journal_references: ["journal_sequence:10"],
+};
+
 describe("workflow API client", () => {
   it("uses safe workflow persistence endpoints with explicit methods", async () => {
     const calls: { input: string; init?: RequestInit }[] = [];
@@ -81,15 +121,28 @@ describe("workflow API client", () => {
     await client.getWorkflow("workflow-001");
     await client.createWorkflow(saveRequest);
     await client.updateWorkflow("workflow-001", saveRequest);
+    await client.startSimulationRun("workflow-001", simulationRunRequest);
 
     expect(calls.map((call) => [call.input, call.init?.method])).toEqual([
       [WORKFLOW_API_ENDPOINTS.workflows, "GET"],
       [`${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001`, "GET"],
       [WORKFLOW_API_ENDPOINTS.workflows, "POST"],
       [`${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001`, "PUT"],
+      [`${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001/simulation-runs`, "POST"],
     ]);
     expect(calls[2].init?.body).toBe(JSON.stringify(saveRequest));
     expect(calls[3].init?.body).toBe(JSON.stringify(saveRequest));
+    expect(calls[4].init?.body).toBe(JSON.stringify(simulationRunRequest));
+  });
+
+  it("loads simulation run responses as approval-wait records", async () => {
+    const client = createWorkflowApiClient({
+      fetchImpl: async () => jsonResponse(simulationRun),
+    });
+
+    await expect(client.startSimulationRun("workflow-001", simulationRunRequest)).resolves.toEqual(
+      simulationRun,
+    );
   });
 
   it("does not expose run, broker, credential, route, or live endpoints", () => {
@@ -106,7 +159,6 @@ describe("workflow API client", () => {
       "password",
       "place_order",
       "route",
-      "run",
       "script",
       "secret",
       "submit",

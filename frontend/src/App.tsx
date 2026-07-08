@@ -359,8 +359,10 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
                 </div>
                 <div className="persistence-grid">
                   <StatusPill tone="good" label="Local definition storage ready" />
+                  <StatusPill tone="good" label="Simulation replay endpoint ready" />
                   <StatusPill tone="neutral" label="Validated DSL required" />
                   <StatusPill tone="neutral" label="Simulation definitions only" />
+                  <StatusPill tone="neutral" label="Manual approval wait only" />
                 </div>
               </div>
 

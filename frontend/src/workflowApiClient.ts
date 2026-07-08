@@ -24,6 +24,45 @@ export type WorkflowDefinitionApiView = {
   document: VisualWorkflowDslDocument;
 };
 
+export type WorkflowSimulationRunRequest = {
+  schema_version?: 1;
+  run_id: string;
+  requested_at: string;
+  evaluated_at: string;
+  approval_expires_at: string;
+  replay_input_reference: string;
+};
+
+export type WorkflowNodeRunStatusApiView = {
+  schema_version: 1;
+  node_id: string;
+  node_type: string;
+  status: string;
+  detail: string;
+  journal_reference: string;
+};
+
+export type WorkflowSimulationRunApiView = {
+  schema_version: 1;
+  workflow_id: string;
+  run_id: string;
+  status: "waiting_for_approval" | "completed";
+  created_at: string;
+  updated_at: string;
+  approval_ticket_id: string | null;
+  simulation_run: {
+    schema_version: 1;
+    run_id: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    replay_input_reference: string;
+    journal_references: string[];
+  };
+  node_statuses: WorkflowNodeRunStatusApiView[];
+  journal_references: string[];
+};
+
 export type WorkflowApiFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export type WorkflowApiClient = {
@@ -34,6 +73,10 @@ export type WorkflowApiClient = {
     workflowId: string,
     request: WorkflowDefinitionSaveRequest,
   ) => Promise<WorkflowDefinitionApiView>;
+  startSimulationRun: (
+    workflowId: string,
+    request: WorkflowSimulationRunRequest,
+  ) => Promise<WorkflowSimulationRunApiView>;
 };
 
 type WorkflowApiClientOptions = {
@@ -74,6 +117,13 @@ export function createWorkflowApiClient(
         fetchImpl,
         buildUrl(baseUrl, workflowPath(workflowId)),
         "PUT",
+        request,
+      ),
+    startSimulationRun: (workflowId, request) =>
+      requestJson<WorkflowSimulationRunApiView>(
+        fetchImpl,
+        buildUrl(baseUrl, `${workflowPath(workflowId)}/simulation-runs`),
+        "POST",
         request,
       ),
   };

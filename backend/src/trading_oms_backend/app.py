@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from trading_oms_backend.config import get_settings
+from trading_oms_backend.event_journal import JsonlEventJournal
 from trading_oms_backend.read_models import OperationsReadModel, build_demo_operations_read_model
 from trading_oms_backend.simulation_approval_service import (
     SimulationApprovalDecisionInput,
@@ -21,6 +22,11 @@ from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionError,
     WorkflowDefinitionSaveRequest,
     WorkflowDefinitionStore,
+)
+from trading_oms_backend.workflow_simulation_runs import (
+    WorkflowSimulationRunError,
+    WorkflowSimulationRunner,
+    WorkflowSimulationRunRequest,
 )
 
 app = FastAPI(title="Trading OMS", version="0.1.0")
@@ -40,6 +46,15 @@ class WorkflowDefinitionBody(BaseModel):
     description: str
     requested_at: str
     document: dict[str, Any]
+    schema_version: int = 1
+
+
+class WorkflowSimulationRunBody(BaseModel):
+    run_id: str
+    requested_at: str
+    evaluated_at: str
+    approval_expires_at: str
+    replay_input_reference: str
     schema_version: int = 1
 
 
@@ -125,6 +140,20 @@ def get_workflow(workflow_id: str) -> dict[str, Any]:
     return record.to_json_dict()
 
 
+@app.post("/api/workflows/{workflow_id}/simulation-runs")
+def start_workflow_simulation_run(
+    workflow_id: str,
+    run: WorkflowSimulationRunBody,
+) -> dict[str, Any]:
+    try:
+        request = _workflow_simulation_run_request(run)
+        record = get_workflow_simulation_runner().start_run(workflow_id, request)
+    except WorkflowSimulationRunError as exc:
+        status_code = 404 if "unknown workflow_id" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
 @app.put("/api/workflows/{workflow_id}")
 def update_workflow(workflow_id: str, definition: WorkflowDefinitionBody) -> dict[str, Any]:
     try:
@@ -161,6 +190,8 @@ def reset_simulation_approval_service() -> None:
 
 _workflow_temp_dir: TemporaryDirectory[str] | None = None
 _workflow_store: WorkflowDefinitionStore | None = None
+_workflow_simulation_temp_dir: TemporaryDirectory[str] | None = None
+_workflow_simulation_runner: WorkflowSimulationRunner | None = None
 
 
 def get_workflow_definition_store() -> WorkflowDefinitionStore:
@@ -171,9 +202,23 @@ def get_workflow_definition_store() -> WorkflowDefinitionStore:
 
 
 def reset_workflow_definition_service() -> WorkflowDefinitionStore:
-    global _workflow_store
+    global _workflow_simulation_runner, _workflow_store
     _workflow_store = _build_workflow_definition_store()
+    _workflow_simulation_runner = None
     return _workflow_store
+
+
+def get_workflow_simulation_runner() -> WorkflowSimulationRunner:
+    global _workflow_simulation_runner
+    if _workflow_simulation_runner is None:
+        _workflow_simulation_runner = _build_workflow_simulation_runner()
+    return _workflow_simulation_runner
+
+
+def reset_workflow_simulation_runner_service() -> WorkflowSimulationRunner:
+    global _workflow_simulation_runner
+    _workflow_simulation_runner = _build_workflow_simulation_runner()
+    return _workflow_simulation_runner
 
 
 def _apply_simulation_approval_decision(
@@ -212,6 +257,19 @@ def _workflow_definition_request(
     )
 
 
+def _workflow_simulation_run_request(
+    run: WorkflowSimulationRunBody,
+) -> WorkflowSimulationRunRequest:
+    return WorkflowSimulationRunRequest(
+        schema_version=run.schema_version,
+        run_id=run.run_id,
+        requested_at=run.requested_at,
+        evaluated_at=run.evaluated_at,
+        approval_expires_at=run.approval_expires_at,
+        replay_input_reference=run.replay_input_reference,
+    )
+
+
 def _build_workflow_definition_store() -> WorkflowDefinitionStore:
     global _workflow_temp_dir
     if _workflow_temp_dir is None:
@@ -220,3 +278,17 @@ def _build_workflow_definition_store() -> WorkflowDefinitionStore:
     if store_path.exists():
         store_path.unlink()
     return WorkflowDefinitionStore(store_path)
+
+
+def _build_workflow_simulation_runner() -> WorkflowSimulationRunner:
+    global _workflow_simulation_temp_dir
+    if _workflow_simulation_temp_dir is None:
+        _workflow_simulation_temp_dir = tempfile.TemporaryDirectory(
+            prefix="trading-oms-workflow-runs-"
+        )
+    journal_path = Path(_workflow_simulation_temp_dir.name) / "workflow-simulation-journal.jsonl"
+    if journal_path.exists():
+        journal_path.unlink()
+    return WorkflowSimulationRunner(
+        get_workflow_definition_store(), JsonlEventJournal(journal_path)
+    )

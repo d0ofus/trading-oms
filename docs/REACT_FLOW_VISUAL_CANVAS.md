@@ -89,6 +89,17 @@ workflow DSL parser before persistence. The endpoints do not run workflows, crea
 submit orders, connect to a broker, or expose live-mode, credential, account, route, import, script,
 or eval fields.
 
+## Saved Workflow Simulation Runs
+
+Slice 038 adds a simulation-only run endpoint for saved workflow definitions:
+
+- `POST /api/workflows/{workflow_id}/simulation-runs`
+
+The endpoint reloads and validates the saved workflow DSL, runs the deterministic local replay path
+through strategy, risk, OMS pending approval, and manual approval-ticket creation, and journals
+per-node statuses. It stops at manual approval wait. Fake broker, position update, and alert nodes
+are marked blocked until approval; they are not executed by this endpoint.
+
 ## Safety Boundary
 
 The canvas must not introduce:
@@ -102,4 +113,5 @@ The canvas must not introduce:
 - live-mode fields;
 - arbitrary JavaScript, scripts, imports, or eval-like fields.
 
-Simulation-only execution remains unavailable until the later approved Gate C run slice.
+Automatic approval, fake broker execution from saved workflow runs, and live trading remain
+unavailable.

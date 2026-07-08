@@ -1532,9 +1532,11 @@ Acceptance criteria:
 
 ## Slice 038 - run saved simulation workflows
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-038-run-saved-simulation-workflows`
 
 Goal:
 Run saved visual workflows against deterministic replay in simulation only.
@@ -1548,6 +1550,17 @@ Non-goals:
 - IBKR paper transport;
 - live trading;
 - production rollout.
+
+Acceptance criteria:
+- [x] Saved workflows can start deterministic local simulation runs.
+- [x] Runs validate saved DSL before orchestration.
+- [x] Runs reach manual approval wait only and do not auto-approve.
+- [x] Node statuses are journaled for replay, bar, strategy, risk, approval, blocked downstream
+  execution nodes, and audit.
+- [x] API and frontend surfaces expose no broker/live/secret/action affordances.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
 
 ---
 
