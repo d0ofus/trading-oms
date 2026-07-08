@@ -31,11 +31,12 @@ run arbitrary code.
 The Gate C React Flow scaffold is fixed to:
 
 ```text
-Replay source -> Bar builder -> Strategy trigger -> Risk check -> Manual approval -> Fake broker -> Audit sink
+Replay source -> Bar builder -> Strategy trigger -> Risk check -> Approval ticket -> Fake broker -> Position update -> Alert -> Audit sink
 ```
 
 The scaffold is non-executing. Slice 033 allows local node movement only; nodes are still not
-connectable and graph layout changes are not persisted.
+connectable and graph layout changes are not persisted. Slice 034 moves the graph definitions into a
+typed node catalog with non-executing simulation workflow nodes.
 
 ## Safe Controls
 

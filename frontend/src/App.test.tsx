@@ -39,8 +39,12 @@ describe("App", () => {
     expect(text).toContain("Bar builder");
     expect(text).toContain("Strategy trigger");
     expect(text).toContain("Risk check");
-    expect(text).toContain("Manual approval");
+    expect(text).toContain("Approval ticket");
     expect(text).toContain("Fake broker");
+    expect(text).toContain("Position update");
+    expect(text).toContain("Applies simulated fills to local positions");
+    expect(text).toContain("Alert");
+    expect(text).toContain("Records local protection and safety alerts");
     expect(text).toContain("Audit sink");
     expect(text).toContain("Editable layout");
     expect(text).toContain("Node movement changes only local canvas positions");

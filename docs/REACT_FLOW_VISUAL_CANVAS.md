@@ -12,7 +12,7 @@ code.
 The first React Flow graph shows:
 
 ```text
-Replay source -> Bar builder -> Strategy trigger -> Risk check -> Manual approval -> Fake broker -> Audit sink
+Replay source -> Bar builder -> Strategy trigger -> Risk check -> Approval ticket -> Fake broker -> Position update -> Alert -> Audit sink
 ```
 
 The graph intentionally keeps the required safe path visible:
@@ -21,8 +21,10 @@ The graph intentionally keeps the required safe path visible:
 - local bar construction;
 - simulation strategy trigger;
 - risk check;
-- manual approval;
+- manual approval ticket;
 - fake broker simulation;
+- local position update;
+- local alert record;
 - append-only audit sink.
 
 ## Local Layout Editing

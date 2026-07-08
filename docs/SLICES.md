@@ -1387,9 +1387,11 @@ Acceptance criteria:
 
 ## Slice 034 - typed visual node catalog
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-034-typed-visual-node-catalog`
 
 Goal:
 Create the safe node catalog for simulation workflows.
@@ -1427,6 +1429,18 @@ Non-goals:
 - execution;
 - broker connectivity;
 - live trading.
+
+Acceptance criteria:
+- [x] Typed visual node catalog exists.
+- [x] Catalog includes replay source, bar builder, strategy trigger, risk check, approval ticket,
+  fake broker, position update, alert, and audit sink nodes.
+- [x] Catalog nodes are non-executing and typed.
+- [x] Canvas renders from the typed catalog.
+- [x] Tests cover catalog shape, required risk-increasing path nodes, fixed edges, and forbidden
+  broker/credential/live/code affordances.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
 
 ---
 
