@@ -23,6 +23,17 @@ The application configuration layer is safety-first. Defaults must keep the syst
 
 These checks are startup safety checks only. They do not add broker connectivity, order submission, OMS behavior, or live trading.
 
+## IBKR paper adapter checks
+
+The Slice 016 IBKR paper adapter adds an adapter-local configuration boundary on top of `Settings`.
+`IbkrPaperAdapterConfig` accepts only known local paper ports:
+
+- `7497`: TWS paper trading API port.
+- `4002`: IB Gateway paper trading API port.
+
+The adapter rejects live trading, non-paper account mode, non-localhost hosts, and non-paper ports.
+It still does not connect to TWS or IB Gateway and does not submit orders.
+
 ## Secret handling
 
 Do not commit real secrets. Keep `.env.example` limited to placeholders and safe defaults. Use local secret files or a secret manager for private values, and keep those files out of git.

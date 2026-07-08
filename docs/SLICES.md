@@ -606,7 +606,7 @@ Acceptance criteria:
 
 ## Slice 015 — Visual workflow builder
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-015-visual-workflow-builder`
 
@@ -649,3 +649,53 @@ Acceptance criteria:
 - [x] Verification passes.
 - [x] No live broker connectivity or order submission path is added.
 - [x] No real credentials, tokens, or secrets are introduced.
+
+---
+
+## Slice 016 — IBKR paper adapter
+
+status: `ready_for_human_review`
+
+branch: `slice-016-ibkr-paper-adapter`
+
+Goal:
+Create the first IBKR paper adapter foundation behind a broker-specific adapter boundary without
+adding a live order path, real IBKR credentials, public IBKR exposure, or network transport.
+
+Scope:
+- backend IBKR paper adapter module with typed paper-only configuration;
+- validation that adapter settings are paper-only, live trading disabled, localhost-only, and limited to known paper TWS/Gateway ports;
+- adapter-local connection state model for disconnected, connected-paper, and unknown/reconciliation-required states;
+- local, non-transmitting paper order plan built from an already risk-passed and approval-referenced `BrokerOrderRequest`;
+- event journal append for adapter connection state records and local paper order plans;
+- tests proving safe defaults, unsafe config rejection, order-plan validation, journal coverage, unknown-state behavior, and absence of account/credential/live-transmission fields;
+- docs for adapter boundaries, current limitations, TWS/Gateway local-only safety posture, and future reconnect/reconciliation work.
+
+Non-goals:
+- live trading;
+- live IBKR account mode;
+- real broker credentials, account IDs, certificates, private keys, passwords, or secrets;
+- public IBKR host or port exposure;
+- IBKR SDK dependency;
+- socket or network transport;
+- connecting to TWS or IB Gateway;
+- submitting, placing, transmitting, cancelling, or modifying real or paper broker orders;
+- market-data subscriptions;
+- contract resolution against IBKR;
+- OMS orchestration;
+- approval workflow orchestration;
+- reconnect/reconciliation/chaos behavior beyond explicit local state representation;
+- UI changes.
+
+Acceptance criteria:
+- [x] IBKR paper adapter module exists.
+- [x] Adapter config validates paper-only mode, live trading disabled, localhost-only host, and known paper ports.
+- [x] Adapter exposes broker-specific behavior behind an isolated adapter boundary.
+- [x] Adapter can record local paper connection state without opening network connections.
+- [x] Adapter can build and journal a local non-transmitting paper order plan from a validated `BrokerOrderRequest`.
+- [x] Unknown IBKR state is represented explicitly and marked as requiring reconciliation.
+- [x] Adapter rejects unsafe settings, unsafe order requests, and non-paper account mode.
+- [x] Tests cover config validation, state journaling, order-plan journaling, unsafe rejection, and no account/credential/live-transmission fields.
+- [x] Verification passes.
+- [x] No IBKR SDK, socket, network transport, live broker connectivity, or order submission path is added.
+- [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.

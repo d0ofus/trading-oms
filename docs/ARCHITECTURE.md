@@ -24,12 +24,14 @@
 - Alerts.
 - API.
 - UI.
+- Strategy DSL.
+- Visual workflow builder.
+- IBKR paper adapter foundation.
 
 ## Later components
 
-- Strategy DSL.
-- React Flow visual builder.
-- IBKR paper adapter.
+- React Flow drag-and-drop visual builder.
+- IBKR paper transport.
 - Reconciliation engine.
 - Chaos test harness.
 - Live-readiness gate.

@@ -2,7 +2,13 @@
 
 ## Status
 
-Not implemented.
+Slice 016 implements the first local IBKR paper adapter foundation in
+`trading_oms_backend.ibkr_paper_adapter`.
+
+The current adapter is intentionally non-transmitting. It validates paper-only local configuration,
+records local connection-state observations, builds local paper order plans from validated
+`BrokerOrderRequest` records, and journals those records. It does not connect to TWS or IB Gateway,
+does not import an IBKR SDK, and does not submit orders.
 
 ## Rules
 
@@ -14,6 +20,17 @@ Not implemented.
 
 ## Expected adapter responsibilities
 
+Current local foundation:
+
+- Validate paper-only, localhost-only adapter configuration.
+- Record local connection-state observations.
+- Represent unknown state as reconciliation-required.
+- Build local non-transmitting paper order plans from validated risk-passed and approval-referenced
+  order requests.
+- Emit structured local events to the event journal.
+
+Future paper transport responsibilities:
+
 - Connect to TWS or IB Gateway.
 - Subscribe to market data.
 - Resolve contracts.
@@ -22,3 +39,6 @@ Not implemented.
 - Receive fills.
 - Reconcile open orders and positions.
 - Emit structured events to the event journal.
+
+Those future responsibilities require explicit approval in later slices and must remain paper-only
+until the live-readiness checklist is complete.

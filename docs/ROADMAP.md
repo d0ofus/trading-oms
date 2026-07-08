@@ -30,7 +30,8 @@ Add Telegram-compatible alert adapter with no secrets in repo.
 
 ## Phase 7: IBKR paper adapter
 
-Add IBKR adapter in paper mode only. No live order path.
+Add IBKR adapter in paper mode only. No live order path. The first foundation is local-only;
+paper transport requires later explicit approval and reconciliation work.
 
 ## Phase 8: Chaos and resilience
 
