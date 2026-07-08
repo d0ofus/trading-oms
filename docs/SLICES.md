@@ -1281,9 +1281,11 @@ Acceptance criteria:
 
 ## Slice 031 - simulation run detail UI
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-031-simulation-run-detail-ui`
 
 Goal:
 Show end-to-end simulation run detail in the UI.
@@ -1297,6 +1299,17 @@ Non-goals:
 - visual workflow editing;
 - IBKR transport;
 - live trading.
+
+Acceptance criteria:
+- [x] UI shows a simulation run timeline.
+- [x] UI shows signal, risk, approval, OMS, fake broker, fill, position, alert, and audit detail
+  sections.
+- [x] UI remains read-only with no buttons, forms, execution controls, broker connect controls,
+  credential fields, or live-trading controls.
+- [x] Frontend tests cover the run detail timeline and safety records.
+- [x] Browser verification at `http://localhost:5173` is complete.
+- [x] Verification passes.
+- [x] No visual workflow editing, IBKR transport, broker connectivity, or live trading are added.
 
 ---
 
