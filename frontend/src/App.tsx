@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  defaultAuditExplorerFilters,
+  filterAuditEvents,
+  safeAuditDisplayText,
+  type AuditExplorerFilterState,
+} from "./auditExplorer";
+import {
   createReadApiClient,
   initialReadApiState,
   loadOperationsSnapshot,
   type AlertApiView,
+  type AuditEventApiView,
   type OperationsApiSnapshot,
   type PositionApiView,
   type ReadApiClient,
@@ -52,6 +59,7 @@ type AppProps = {
 
 const visualBuilderSection = "Visual builder" as const;
 const simulationRunSection = "Simulation run detail" as const;
+const auditExplorerSection = "Audit explorer" as const;
 
 const workflowSections = [
   "Signals",
@@ -64,7 +72,12 @@ const workflowSections = [
 
 type WorkflowSection = (typeof workflowSections)[number];
 
-const shellSections = [visualBuilderSection, simulationRunSection, ...workflowSections] as const;
+const shellSections = [
+  visualBuilderSection,
+  simulationRunSection,
+  auditExplorerSection,
+  ...workflowSections,
+] as const;
 
 const simulationRunTimeline: SimulationRunDetailItem[] = [
   {
@@ -179,6 +192,7 @@ const simulationRunDetailItems: SimulationRunDetailItem[] = [
 
 export function App({ initialReadState, readApiClient }: AppProps = {}) {
   const [builderState, setBuilderState] = useState(defaultStrategyBuilderState);
+  const [auditFilters, setAuditFilters] = useState(defaultAuditExplorerFilters);
   const [readState, setReadState] = useState<ReadApiLoadState>(
     initialReadState ?? initialReadApiState,
   );
@@ -191,6 +205,11 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
   const snapshot = readState.snapshot;
   const summaryPanels = useMemo(() => buildSummaryPanels(snapshot), [snapshot]);
   const workflowRows = useMemo(() => buildWorkflowRows(snapshot), [snapshot]);
+  const auditExplorerEvents = useMemo(
+    () => filterAuditEvents(snapshot.auditEvents, auditFilters),
+    [auditFilters, snapshot.auditEvents],
+  );
+  const selectedAuditEvent = auditExplorerEvents[0] ?? null;
 
   useEffect(() => {
     if (!shouldLoadFromBackend) {
@@ -424,6 +443,113 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
             </div>
           </section>
 
+          <section className="audit-explorer-section" id={sectionId(auditExplorerSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Audit explorer</p>
+                <h2>Filter audit events</h2>
+              </div>
+              <StatusPill tone="neutral" label="Read only" />
+            </div>
+            <div className="audit-explorer-layout">
+              <div className="audit-filter-grid" aria-label="Audit event filters">
+                <AuditFilterInput
+                  label="Run"
+                  name="auditRunId"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, runId: value }))
+                  }
+                  value={auditFilters.runId}
+                />
+                <AuditFilterInput
+                  label="Event type"
+                  name="auditEventType"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, eventType: value }))
+                  }
+                  value={auditFilters.eventType}
+                />
+                <AuditFilterInput
+                  label="Symbol"
+                  name="auditSymbol"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, symbol: value }))
+                  }
+                  value={auditFilters.symbol}
+                />
+                <AuditFilterInput
+                  label="Order ID"
+                  name="auditOrderId"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, orderId: value }))
+                  }
+                  value={auditFilters.orderId}
+                />
+                <AuditFilterInput
+                  label="Ticket ID"
+                  name="auditTicketId"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, ticketId: value }))
+                  }
+                  value={auditFilters.ticketId}
+                />
+                <label>
+                  <span>Severity</span>
+                  <select
+                    aria-label="Audit severity filter"
+                    name="auditSeverity"
+                    onChange={(event) =>
+                      setAuditFilters((current) => ({
+                        ...current,
+                        severity: event.target.value,
+                      }))
+                    }
+                    value={auditFilters.severity}
+                  >
+                    <option value="">Any severity</option>
+                    <option value="informational">Informational</option>
+                    <option value="warning">Warning</option>
+                    <option value="critical">Critical</option>
+                    <option value="emergency">Emergency</option>
+                  </select>
+                </label>
+                <AuditFilterInput
+                  label="Timestamp"
+                  name="auditTimestamp"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, timestamp: value }))
+                  }
+                  value={auditFilters.timestamp}
+                />
+              </div>
+
+              <div className="audit-results" aria-label="Filtered audit events">
+                <div className="section-heading">
+                  <h3>Matching events</h3>
+                  <span>{auditExplorerEvents.length} records</span>
+                </div>
+                {auditExplorerEvents.length === 0 ? (
+                  <p className="empty-state">No matching audit events</p>
+                ) : (
+                  auditExplorerEvents.map((event) => (
+                    <article className="record-row" key={`audit-explorer-${event.sequence}`}>
+                      <div>
+                        <h3>{safeAuditDisplayText(event.event_type)}</h3>
+                        <p>{safeAuditDisplayText(event.summary)}</p>
+                      </div>
+                      <StatusPill
+                        tone={auditSeverityTone(event)}
+                        label={event.severity ?? `sequence ${event.sequence}`}
+                      />
+                    </article>
+                  ))
+                )}
+              </div>
+
+              <AuditEventDetail event={selectedAuditEvent} />
+            </div>
+          </section>
+
           <div className="section-grid">
             {workflowSections.map((section) => {
               const rows = workflowRows[section];
@@ -454,6 +580,66 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+function AuditFilterInput({
+  label,
+  name,
+  onChange,
+  value,
+}: {
+  label: string;
+  name: keyof AuditExplorerFilterState | string;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        aria-label={`Audit ${label.toLowerCase()} filter`}
+        maxLength={80}
+        name={name}
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      />
+    </label>
+  );
+}
+
+function AuditEventDetail({ event }: { event: AuditEventApiView | null }) {
+  if (!event) {
+    return (
+      <article className="audit-detail" aria-label="Audit event detail">
+        <h3>Event detail</h3>
+        <p>No matching audit event selected</p>
+      </article>
+    );
+  }
+
+  return (
+    <article className="audit-detail" aria-label="Audit event detail">
+      <h3>Event detail</h3>
+      <AuditDetailRow label="Sequence" value={`sequence ${event.sequence}`} />
+      <AuditDetailRow label="Type" value={event.event_type} />
+      <AuditDetailRow label="Timestamp" value={event.timestamp} />
+      <AuditDetailRow label="Run" value={event.run_id} />
+      <AuditDetailRow label="Symbol" value={event.symbol} />
+      <AuditDetailRow label="Order" value={event.order_id} />
+      <AuditDetailRow label="Ticket" value={event.ticket_id} />
+      <AuditDetailRow label="Severity" value={event.severity} />
+      <AuditDetailRow label="Summary" value={event.summary} />
+    </article>
+  );
+}
+
+function AuditDetailRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{safeAuditDisplayText(value)}</strong>
     </div>
   );
 }
@@ -635,4 +821,17 @@ function alertTone(alert: AlertApiView): Tone {
     return "warning";
   }
   return "info";
+}
+
+function auditSeverityTone(event: AuditEventApiView): Tone {
+  if (event.severity === "critical" || event.severity === "emergency") {
+    return "critical";
+  }
+  if (event.severity === "warning") {
+    return "warning";
+  }
+  if (event.severity === "informational") {
+    return "info";
+  }
+  return event.event_type.includes("alert") ? "critical" : "info";
 }

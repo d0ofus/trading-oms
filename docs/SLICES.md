@@ -1638,9 +1638,11 @@ Acceptance criteria:
 
 ## Slice 041 - audit explorer UI
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-041-audit-explorer-ui`
 
 Goal:
 Add a UI for filtering and inspecting audit events.
@@ -1654,6 +1656,19 @@ Non-goals:
 - audit deletion;
 - mutable event history;
 - live trading.
+
+Acceptance criteria:
+- [x] UI shows audit filters for run, event type, symbol, order ID, ticket ID, severity, and
+  timestamp.
+- [x] UI shows a read-only audit event detail panel.
+- [x] Frontend filter helper covers each required field.
+- [x] Secret-shaped audit text is redacted before rendering.
+- [x] Audit read models expose optional safe filter metadata fields.
+- [x] UI contains no broker, credential, route, script, import, eval, submit, transmit, or live-mode
+  controls.
+- [x] Verification passes.
+- [x] No audit deletion, mutable history, IBKR transport, broker connectivity, live trading,
+  secrets, or production rollout are added.
 
 ---
 

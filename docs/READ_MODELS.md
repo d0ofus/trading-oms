@@ -34,6 +34,14 @@ The module provides frozen dataclasses for:
 
 Every read model exposes `to_json_dict()` for deterministic JSON-compatible output.
 
+Audit event read models include optional filter metadata for the audit explorer:
+
+- `run_id`
+- `symbol`
+- `order_id`
+- `ticket_id`
+- `severity`
+
 ## Demo Assembler
 
 `build_demo_operations_read_model()` returns a safe local aggregate view for the current read-only
@@ -54,7 +62,8 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
 
 - The aggregate assembler is local demo data only.
 - Slice 021 exposes these models through read-only `GET /api/...` endpoints.
-- No frontend screen consumes these models yet.
-- No database-backed read model persistence exists yet.
+- Frontend screens consume these models for read-only inspection.
+- SQLite persistence exists as a local foundation, but these read models are not yet backed by it at
+  runtime.
 - Position records are inspection summaries only; full simulated position tracking remains a later
   slice.

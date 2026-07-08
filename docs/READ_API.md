@@ -22,6 +22,14 @@ The backend exposes:
 
 Each route returns the matching section from `build_demo_operations_read_model()`.
 
+`GET /api/audit-events` includes optional audit filter metadata fields:
+
+- `run_id`
+- `symbol`
+- `order_id`
+- `ticket_id`
+- `severity`
+
 ## Safety Guarantees
 
 - Only `GET` handlers are implemented for these API views.
@@ -36,7 +44,8 @@ Each route returns the matching section from `build_demo_operations_read_model()
 ## Current Limitations
 
 - The endpoints use safe static demo read-model data.
-- No database-backed read model persistence exists yet.
-- No frontend screen consumes these endpoints yet.
+- SQLite persistence exists as a local foundation, but these endpoints still use safe static demo
+  read-model data.
+- Frontend screens consume these endpoints for read-only inspection and safe fallback rendering.
 - Approval tickets are visible for inspection only; no approval action endpoint exists.
 - Orders are visible for inspection only; no order submission, cancellation, or broker route exists.

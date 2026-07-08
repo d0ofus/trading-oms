@@ -40,6 +40,7 @@ a {
 .top-bar h1,
 .safety-band h2,
 .workflow-section h2,
+.audit-explorer-section h2,
 .builder-section h2,
 .builder-node h3,
 .flow-node-ledger h3,
@@ -209,6 +210,7 @@ dd {
 .summary-panel,
 .builder-section,
 .run-detail-section,
+.audit-explorer-section,
 .workflow-section {
   border: 1px solid #d9ded5;
   border-radius: 8px;
@@ -631,6 +633,104 @@ dd {
   overflow: hidden;
 }
 
+.audit-explorer-section {
+  overflow: hidden;
+}
+
+.audit-explorer-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.85fr) minmax(260px, 1fr) minmax(240px, 0.8fr);
+  gap: 14px;
+  padding: 16px;
+}
+
+.audit-filter-grid {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #f9fbf7;
+  padding: 14px;
+}
+
+.audit-filter-grid label {
+  display: grid;
+  gap: 6px;
+  color: #4d5852;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.audit-filter-grid input,
+.audit-filter-grid select {
+  min-height: 38px;
+  width: 100%;
+  border: 1px solid #cbd6cb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2923;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 7px 9px;
+}
+
+.audit-filter-grid input:focus,
+.audit-filter-grid select:focus {
+  border-color: #6aa56f;
+  outline: 2px solid #d8efdb;
+  outline-offset: 1px;
+}
+
+.audit-results,
+.audit-detail {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.audit-detail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+}
+
+.audit-detail h3 {
+  margin: 0;
+  color: #20282d;
+  font-size: 0.95rem;
+}
+
+.audit-detail p {
+  margin: 0;
+  color: #5e6873;
+}
+
+.audit-detail div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border-left: 3px solid #cbd2d8;
+  padding-left: 10px;
+}
+
+.audit-detail span {
+  color: #65706a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.audit-detail strong {
+  min-width: 0;
+  color: #1f2923;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
 .run-detail-layout {
   display: grid;
   gap: 16px;
@@ -766,6 +866,7 @@ dd {
   .builder-layout,
   .flow-node-ledger,
   .run-detail-grid,
+  .audit-explorer-layout,
   .section-grid {
     grid-template-columns: 1fr;
   }

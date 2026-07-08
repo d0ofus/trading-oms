@@ -66,6 +66,11 @@ class AuditEventReadModel:
     event_type: str
     timestamp: str
     summary: str
+    run_id: str | None = None
+    symbol: str | None = None
+    order_id: str | None = None
+    ticket_id: str | None = None
+    severity: str | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -74,6 +79,18 @@ class AuditEventReadModel:
         _validated_identifier(self.event_type, "event_type")
         _parse_timestamp(self.timestamp, "timestamp")
         _validated_text(self.summary, "summary")
+        _validated_optional_identifier(self.run_id, "run_id")
+        if self.symbol is not None:
+            _validated_symbol(self.symbol)
+        _validated_optional_identifier(self.order_id, "order_id")
+        _validated_optional_identifier(self.ticket_id, "ticket_id")
+        if self.severity is not None and self.severity not in {
+            "informational",
+            "warning",
+            "critical",
+            "emergency",
+        }:
+            raise ReadModelError("severity must be a known alert severity")
         _assert_json_serializable(self.to_json_dict(), "audit event read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -83,6 +100,11 @@ class AuditEventReadModel:
             "event_type": self.event_type,
             "timestamp": self.timestamp,
             "summary": self.summary,
+            "run_id": self.run_id,
+            "symbol": self.symbol,
+            "order_id": self.order_id,
+            "ticket_id": self.ticket_id,
+            "severity": self.severity,
         }
 
 
@@ -431,12 +453,22 @@ def build_demo_operations_read_model(settings: Settings | None = None) -> Operat
                 event_type="strategy.signal.generated",
                 timestamp="2026-07-08T00:00:00Z",
                 summary="Replay strategy signal recorded",
+                run_id="sim-run-001",
+                symbol="AAPL",
+                order_id="order-001",
+                ticket_id="ticket-001",
+                severity="informational",
             ),
             AuditEventReadModel(
                 sequence=2,
                 event_type="risk.decision.evaluated",
                 timestamp="2026-07-08T00:01:00Z",
                 summary="Risk decision available for inspection",
+                run_id="sim-run-001",
+                symbol="AAPL",
+                order_id="order-001",
+                ticket_id="ticket-001",
+                severity="warning",
             ),
         ),
         signals=(
@@ -531,6 +563,12 @@ def _validated_identifier(value: str, field_name: str) -> str:
     if value.strip() != value:
         raise ReadModelError(f"{field_name} must not contain leading or trailing whitespace")
     return value
+
+
+def _validated_optional_identifier(value: str | None, field_name: str) -> str | None:
+    if value is None:
+        return None
+    return _validated_identifier(value, field_name)
 
 
 def _validated_text(value: str, field_name: str) -> str:

@@ -22,6 +22,7 @@ describe("App", () => {
     expect(text).toContain("Trading OMS");
     expect(text).toContain("Visual builder");
     expect(text).toContain("Simulation run detail");
+    expect(text).toContain("Audit explorer");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
     expect(text).toContain("Orders");
@@ -122,6 +123,29 @@ describe("App", () => {
     expect(text).toContain("append only");
   });
 
+  it("renders read-only audit explorer filters and event detail", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Audit explorer");
+    expect(text).toContain("Filter audit events");
+    expect(html).toContain('name="auditRunId"');
+    expect(html).toContain('name="auditEventType"');
+    expect(html).toContain('name="auditSymbol"');
+    expect(html).toContain('name="auditOrderId"');
+    expect(html).toContain('name="auditTicketId"');
+    expect(html).toContain('name="auditSeverity"');
+    expect(html).toContain('name="auditTimestamp"');
+    expect(text).toContain("Matching events");
+    expect(text).toContain("Event detail");
+    expect(text).toContain("backend.audit.event");
+    expect(text).toContain("sim-run-001");
+    expect(text).toContain("TSLA");
+    expect(text).toContain("order-backend-001");
+    expect(text).toContain("ticket-backend-001");
+    expect(text).toContain("informational");
+  });
+
   it("renders a safe fallback when backend read APIs are unavailable", () => {
     const fallbackState: ReadApiLoadState = {
       status: "error",
@@ -192,6 +216,11 @@ const backendSnapshot: OperationsApiSnapshot = {
       event_type: "backend.audit.event",
       timestamp: "2026-07-08T00:00:00Z",
       summary: "Backend audit event rendered from read API",
+      run_id: "sim-run-001",
+      symbol: "TSLA",
+      order_id: "order-backend-001",
+      ticket_id: "ticket-backend-001",
+      severity: "informational",
     },
   ],
   signals: [

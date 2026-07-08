@@ -27,6 +27,11 @@ const sampleSnapshot: OperationsApiSnapshot = {
       event_type: "strategy.signal.generated",
       timestamp: "2026-07-08T00:00:00Z",
       summary: "Replay strategy signal recorded",
+      run_id: "sim-run-001",
+      symbol: "AAPL",
+      order_id: "order-001",
+      ticket_id: "ticket-001",
+      severity: "informational",
     },
   ],
   signals: [

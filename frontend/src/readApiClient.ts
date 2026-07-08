@@ -27,6 +27,11 @@ export type AuditEventApiView = {
   event_type: string;
   timestamp: string;
   summary: string;
+  run_id: string | null;
+  symbol: string | null;
+  order_id: string | null;
+  ticket_id: string | null;
+  severity: "informational" | "warning" | "critical" | "emergency" | null;
 };
 
 export type SignalApiView = {

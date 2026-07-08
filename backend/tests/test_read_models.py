@@ -81,6 +81,11 @@ def test_read_model_json_shapes_are_stable() -> None:
         event_type="risk.decision.evaluated",
         timestamp="2026-07-08T00:00:00Z",
         summary="Risk decision blocked",
+        run_id="sim-run-001",
+        symbol="AAPL",
+        order_id="order-001",
+        ticket_id="ticket-001",
+        severity="warning",
     )
     signal = SignalReadModel(
         signal_id="signal-001",
@@ -155,6 +160,11 @@ def test_read_model_json_shapes_are_stable() -> None:
         "event_type": "risk.decision.evaluated",
         "timestamp": "2026-07-08T00:00:00Z",
         "summary": "Risk decision blocked",
+        "run_id": "sim-run-001",
+        "symbol": "AAPL",
+        "order_id": "order-001",
+        "ticket_id": "ticket-001",
+        "severity": "warning",
     }
     assert signal.to_json_dict()["signal"] == "long_bias"
     assert risk.to_json_dict()["failed_check_names"] == ["market_data_freshness"]
