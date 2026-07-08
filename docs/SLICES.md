@@ -1204,9 +1204,11 @@ Acceptance criteria:
 
 ## Slice 029 - OMS and fake broker simulation orchestration
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-029-oms-fake-broker-orchestration`
 
 Goal:
 Advance approved simulation orders through OMS and fake broker.
@@ -1221,6 +1223,20 @@ Non-goals:
 - IBKR transport;
 - paper account orders;
 - live trading.
+
+Acceptance criteria:
+- [x] Approved simulation orders advance through OMS `APPROVED` and `SUBMITTED`.
+- [x] Fake broker acknowledgement and fill paths are supported.
+- [x] Fake broker cancel path is supported with OMS `CANCEL_REQUESTED` before `CANCELLED`.
+- [x] Fake broker reject path is supported and mirrored to OMS `REJECTED`.
+- [x] Every approval decision, OMS transition, and fake broker transition is journaled.
+- [x] Duplicate execution IDs are idempotent when payloads match.
+- [x] Terminal order states block repeat execution attempts.
+- [x] Tests cover fill, reject, cancel, idempotency, terminal-state blocking, and no
+  transport/order-submission behavior.
+- [x] Verification passes.
+- [x] No IBKR transport, paper account orders, live broker connectivity, HTTP order-execution
+  endpoint, or live trading are added.
 
 ---
 

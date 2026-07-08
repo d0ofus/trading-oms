@@ -5,12 +5,20 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from trading_oms_backend.approval_tickets import (
+    ApprovalDecisionRecord,
+    ApprovalDecisionRequest,
     ApprovalTicket,
     ApprovalTicketBook,
     ApprovalTicketCreateRequest,
 )
 from trading_oms_backend.bar_builder import Bar, BarBuilderConfig, build_time_bars
 from trading_oms_backend.event_journal import JsonlEventJournal
+from trading_oms_backend.fake_broker import (
+    BrokerOrderRequest,
+    BrokerOrderTransition,
+    FakeBroker,
+    FakeBrokerConfig,
+)
 from trading_oms_backend.market_data_replay import MarketDataReplayEvent
 from trading_oms_backend.oms_state_machine import (
     OrderStateMachine,
@@ -47,6 +55,9 @@ from trading_oms_backend.simulation_runs import (
 
 class SimulationOrchestrationError(ValueError):
     """Raised when deterministic simulation orchestration cannot proceed safely."""
+
+
+VALID_BROKER_OUTCOMES = {"acknowledge_only", "fill", "cancel", "reject"}
 
 
 @dataclass(frozen=True)
@@ -110,6 +121,61 @@ class ReplayToApprovalResult:
     approval_ticket: ApprovalTicket | None
 
 
+@dataclass(frozen=True)
+class ApprovedOrderExecutionRequest:
+    execution_id: str
+    order_id: str
+    ticket_id: str
+    decision_id: str
+    decided_at: str
+    actor: str
+    decision_reference: str
+    reason: str
+    broker_outcome: str = "fill"
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise SimulationOrchestrationError("schema_version must be 1")
+        _validated_identifier(self.execution_id, "execution_id")
+        _validated_identifier(self.order_id, "order_id")
+        _validated_identifier(self.ticket_id, "ticket_id")
+        _validated_identifier(self.decision_id, "decision_id")
+        _validated_timestamp(self.decided_at, "decided_at")
+        _validated_identifier(self.actor, "actor")
+        _validated_identifier(self.decision_reference, "decision_reference")
+        _validated_identifier(self.reason, "reason")
+        if self.broker_outcome not in VALID_BROKER_OUTCOMES:
+            raise SimulationOrchestrationError(
+                "broker_outcome must be acknowledge_only, fill, cancel, or reject"
+            )
+
+    def to_payload(self) -> dict[str, str | int]:
+        return {
+            "schema_version": self.schema_version,
+            "execution_id": self.execution_id,
+            "order_id": self.order_id,
+            "ticket_id": self.ticket_id,
+            "decision_id": self.decision_id,
+            "decided_at": self.decided_at,
+            "actor": self.actor,
+            "decision_reference": self.decision_reference,
+            "reason": self.reason,
+            "broker_outcome": self.broker_outcome,
+        }
+
+
+@dataclass(frozen=True)
+class ApprovedOrderExecutionResult:
+    approval_decision: ApprovalDecisionRecord
+    approved_transition: OrderTransitionRecord
+    submitted_transition: OrderTransitionRecord
+    acknowledged_transition: OrderTransitionRecord | None
+    cancel_requested_transition: OrderTransitionRecord | None
+    final_order_transition: OrderTransitionRecord | None
+    broker_transitions: tuple[BrokerOrderTransition, ...]
+
+
 class ReplayToApprovalOrchestrator:
     def __init__(self, journal: JsonlEventJournal) -> None:
         if not isinstance(journal, JsonlEventJournal):
@@ -119,6 +185,10 @@ class ReplayToApprovalOrchestrator:
         self._proposals = OrderIntentProposalBook(journal)
         self._orders = OrderStateMachine(journal)
         self._approval_tickets = ApprovalTicketBook(journal)
+        self._fake_broker = FakeBroker(journal, FakeBrokerConfig(fill_mode="acknowledge_only"))
+        self._order_proposals: dict[str, OrderIntentProposal] = {}
+        self._execution_payloads: dict[str, dict[str, str | int]] = {}
+        self._execution_results: dict[str, ApprovedOrderExecutionResult] = {}
 
     def run(
         self,
@@ -373,7 +443,315 @@ class ReplayToApprovalOrchestrator:
                 risk_decision_id=risk_decision.request_id,
             ),
         )
+        self._order_proposals[config.order_id] = proposal
         return created, pending_approval
+
+    def execute_approved_order(
+        self,
+        request: ApprovedOrderExecutionRequest,
+    ) -> ApprovedOrderExecutionResult:
+        if not isinstance(request, ApprovedOrderExecutionRequest):
+            raise SimulationOrchestrationError("request must be ApprovedOrderExecutionRequest")
+
+        request_payload = request.to_payload()
+        existing_payload = self._execution_payloads.get(request.execution_id)
+        if existing_payload is not None:
+            if existing_payload != request_payload:
+                raise SimulationOrchestrationError("conflicting execution_id")
+            return self._execution_results[request.execution_id]
+
+        snapshot = self._orders.current_snapshot(request.order_id)
+        if snapshot.state != "PENDING_APPROVAL":
+            raise SimulationOrchestrationError("order must be PENDING_APPROVAL before execution")
+        proposal = self._order_proposals.get(request.order_id)
+        if proposal is None:
+            raise SimulationOrchestrationError("order proposal context is missing")
+
+        approval_decision = self._approval_tickets.apply_decision(
+            ApprovalDecisionRequest(
+                decision_id=request.decision_id,
+                ticket_id=request.ticket_id,
+                decision="approved",
+                decided_at=request.decided_at,
+                actor=request.actor,
+                decision_reference=request.decision_reference,
+                reason=request.reason,
+            ),
+        )
+        approved_transition = self._orders.apply_transition(
+            OrderTransitionRequest(
+                transition_id=f"{request.execution_id}-oms-approved",
+                order_id=request.order_id,
+                client_order_id=snapshot.client_order_id,
+                symbol=snapshot.symbol,
+                side=snapshot.side,
+                quantity=snapshot.quantity,
+                risk_intent=snapshot.risk_intent,
+                target_state="APPROVED",
+                occurred_at=request.decided_at,
+                reason="simulation_ticket_approved",
+                risk_decision_id=snapshot.risk_decision_id,
+                approval_reference=request.decision_reference,
+            ),
+        )
+        submitted_transition = self._orders.apply_transition(
+            OrderTransitionRequest(
+                transition_id=f"{request.execution_id}-oms-submitted",
+                order_id=request.order_id,
+                client_order_id=snapshot.client_order_id,
+                symbol=snapshot.symbol,
+                side=snapshot.side,
+                quantity=snapshot.quantity,
+                risk_intent=snapshot.risk_intent,
+                target_state="SUBMITTED",
+                occurred_at=request.decided_at,
+                reason="simulation_order_submitted_to_fake_broker",
+                risk_decision_id=snapshot.risk_decision_id,
+                approval_reference=request.decision_reference,
+            ),
+        )
+
+        broker_order = BrokerOrderRequest(
+            client_order_id=snapshot.client_order_id,
+            symbol=snapshot.symbol,
+            side=snapshot.side,
+            quantity=snapshot.quantity,
+            order_type=proposal.order_type,
+            reference_price=proposal.reference_price,
+            requested_at=request.decided_at,
+            risk_decision_id=snapshot.risk_decision_id,
+            risk_decision_result="passed",
+            approval_reference=request.decision_reference,
+            limit_price=proposal.limit_price,
+        )
+
+        if request.broker_outcome == "reject":
+            result = self._reject_submitted_order(
+                request,
+                snapshot.risk_decision_id,
+                broker_order,
+                approved_transition,
+                submitted_transition,
+                approval_decision,
+            )
+        else:
+            result = self._accept_submitted_order(
+                request,
+                snapshot.risk_decision_id,
+                broker_order,
+                approved_transition,
+                submitted_transition,
+                approval_decision,
+            )
+
+        self._execution_payloads[request.execution_id] = request_payload
+        self._execution_results[request.execution_id] = result
+        return result
+
+    def _reject_submitted_order(
+        self,
+        request: ApprovedOrderExecutionRequest,
+        risk_decision_id: str,
+        broker_order: BrokerOrderRequest,
+        approved_transition: OrderTransitionRecord,
+        submitted_transition: OrderTransitionRecord,
+        approval_decision: ApprovalDecisionRecord,
+    ) -> ApprovedOrderExecutionResult:
+        rejected = self._fake_broker.reject_order(
+            broker_order,
+            rejected_at=request.decided_at,
+            reason="configured_simulation_reject",
+        )
+        rejected_transition = self._orders.apply_transition(
+            self._transition_request(
+                request=request,
+                risk_decision_id=risk_decision_id,
+                target_state="REJECTED",
+                transition_suffix="oms-rejected",
+                reason="fake_broker_rejected_order",
+                broker_transition_reference=_latest_journal_reference(
+                    self._journal,
+                    "fake_broker.order.transitioned",
+                ),
+            ),
+        )
+        return ApprovedOrderExecutionResult(
+            approval_decision=approval_decision,
+            approved_transition=approved_transition,
+            submitted_transition=submitted_transition,
+            acknowledged_transition=None,
+            cancel_requested_transition=None,
+            final_order_transition=rejected_transition,
+            broker_transitions=(rejected,),
+        )
+
+    def _accept_submitted_order(
+        self,
+        request: ApprovedOrderExecutionRequest,
+        risk_decision_id: str,
+        broker_order: BrokerOrderRequest,
+        approved_transition: OrderTransitionRecord,
+        submitted_transition: OrderTransitionRecord,
+        approval_decision: ApprovalDecisionRecord,
+    ) -> ApprovedOrderExecutionResult:
+        acknowledged = self._fake_broker.accept_order(broker_order)[0]
+        acknowledged_transition = self._orders.apply_transition(
+            self._transition_request(
+                request=request,
+                risk_decision_id=risk_decision_id,
+                target_state="ACKNOWLEDGED",
+                transition_suffix="oms-acknowledged",
+                reason="fake_broker_acknowledged_order",
+                broker_transition_reference=_latest_journal_reference(
+                    self._journal,
+                    "fake_broker.order.transitioned",
+                ),
+            ),
+        )
+        if request.broker_outcome == "acknowledge_only":
+            return ApprovedOrderExecutionResult(
+                approval_decision=approval_decision,
+                approved_transition=approved_transition,
+                submitted_transition=submitted_transition,
+                acknowledged_transition=acknowledged_transition,
+                cancel_requested_transition=None,
+                final_order_transition=None,
+                broker_transitions=(acknowledged,),
+            )
+        if request.broker_outcome == "cancel":
+            return self._cancel_acknowledged_order(
+                request,
+                risk_decision_id,
+                acknowledged,
+                approved_transition,
+                submitted_transition,
+                acknowledged_transition,
+                approval_decision,
+            )
+        return self._fill_acknowledged_order(
+            request,
+            risk_decision_id,
+            acknowledged,
+            approved_transition,
+            submitted_transition,
+            acknowledged_transition,
+            approval_decision,
+        )
+
+    def _fill_acknowledged_order(
+        self,
+        request: ApprovedOrderExecutionRequest,
+        risk_decision_id: str,
+        acknowledged: BrokerOrderTransition,
+        approved_transition: OrderTransitionRecord,
+        submitted_transition: OrderTransitionRecord,
+        acknowledged_transition: OrderTransitionRecord,
+        approval_decision: ApprovalDecisionRecord,
+    ) -> ApprovedOrderExecutionResult:
+        filled = self._fake_broker.fill_order(
+            acknowledged.client_order_id,
+            filled_at=request.decided_at,
+            reason="configured_simulation_fill",
+        )
+        filled_transition = self._orders.apply_transition(
+            self._transition_request(
+                request=request,
+                risk_decision_id=risk_decision_id,
+                target_state="FILLED",
+                transition_suffix="oms-filled",
+                reason="fake_broker_filled_order",
+                broker_transition_reference=_latest_journal_reference(
+                    self._journal,
+                    "fake_broker.order.transitioned",
+                ),
+                cumulative_filled_quantity=acknowledged.quantity,
+            ),
+        )
+        return ApprovedOrderExecutionResult(
+            approval_decision=approval_decision,
+            approved_transition=approved_transition,
+            submitted_transition=submitted_transition,
+            acknowledged_transition=acknowledged_transition,
+            cancel_requested_transition=None,
+            final_order_transition=filled_transition,
+            broker_transitions=(acknowledged, filled),
+        )
+
+    def _cancel_acknowledged_order(
+        self,
+        request: ApprovedOrderExecutionRequest,
+        risk_decision_id: str,
+        acknowledged: BrokerOrderTransition,
+        approved_transition: OrderTransitionRecord,
+        submitted_transition: OrderTransitionRecord,
+        acknowledged_transition: OrderTransitionRecord,
+        approval_decision: ApprovalDecisionRecord,
+    ) -> ApprovedOrderExecutionResult:
+        cancel_requested = self._orders.apply_transition(
+            self._transition_request(
+                request=request,
+                risk_decision_id=risk_decision_id,
+                target_state="CANCEL_REQUESTED",
+                transition_suffix="oms-cancel-requested",
+                reason="simulation_cancel_requested",
+            ),
+        )
+        cancelled = self._fake_broker.cancel_order(
+            acknowledged.client_order_id,
+            cancelled_at=request.decided_at,
+            reason="configured_simulation_cancel",
+        )
+        cancelled_transition = self._orders.apply_transition(
+            self._transition_request(
+                request=request,
+                risk_decision_id=risk_decision_id,
+                target_state="CANCELLED",
+                transition_suffix="oms-cancelled",
+                reason="fake_broker_cancelled_order",
+                broker_transition_reference=_latest_journal_reference(
+                    self._journal,
+                    "fake_broker.order.transitioned",
+                ),
+            ),
+        )
+        return ApprovedOrderExecutionResult(
+            approval_decision=approval_decision,
+            approved_transition=approved_transition,
+            submitted_transition=submitted_transition,
+            acknowledged_transition=acknowledged_transition,
+            cancel_requested_transition=cancel_requested,
+            final_order_transition=cancelled_transition,
+            broker_transitions=(acknowledged, cancelled),
+        )
+
+    def _transition_request(
+        self,
+        *,
+        request: ApprovedOrderExecutionRequest,
+        risk_decision_id: str,
+        target_state: str,
+        transition_suffix: str,
+        reason: str,
+        broker_transition_reference: str | None = None,
+        cumulative_filled_quantity: int = 0,
+    ) -> OrderTransitionRequest:
+        snapshot = self._orders.current_snapshot(request.order_id)
+        return OrderTransitionRequest(
+            transition_id=f"{request.execution_id}-{transition_suffix}",
+            order_id=request.order_id,
+            client_order_id=snapshot.client_order_id,
+            symbol=snapshot.symbol,
+            side=snapshot.side,
+            quantity=snapshot.quantity,
+            risk_intent=snapshot.risk_intent,
+            target_state=target_state,
+            occurred_at=request.decided_at,
+            reason=reason,
+            risk_decision_id=risk_decision_id,
+            approval_reference=request.decision_reference,
+            broker_transition_reference=broker_transition_reference,
+            cumulative_filled_quantity=cumulative_filled_quantity,
+        )
 
 
 def _latest_journal_reference(journal: JsonlEventJournal, event_type: str) -> str:
