@@ -37,6 +37,12 @@ import {
   type PositionDetailView,
 } from "./orderPositionDetails";
 import {
+  buildProtectionMonitoringView,
+  safeProtectionMonitoringText,
+  type ProtectionMonitoringView,
+  type ProtectionPositionView,
+} from "./protectionMonitoring";
+import {
   defaultStrategyBuilderState,
   formatStrategyDslPreview,
   updateStrategyBuilderState,
@@ -83,6 +89,7 @@ const approvalInboxSection = "Approval inbox" as const;
 const auditExplorerSection = "Audit explorer" as const;
 const orderDetailSection = "Order detail" as const;
 const positionDetailSection = "Position detail" as const;
+const protectionMonitoringSection = "Protection monitor" as const;
 
 const workflowSections = [
   "Signals",
@@ -102,6 +109,7 @@ const shellSections = [
   auditExplorerSection,
   orderDetailSection,
   positionDetailSection,
+  protectionMonitoringSection,
   ...workflowSections,
 ] as const;
 
@@ -252,6 +260,10 @@ export function App({
   const positionDetail = useMemo(
     () => buildPositionDetailView(snapshot.positions[0], snapshot.auditEvents),
     [snapshot.auditEvents, snapshot.positions],
+  );
+  const protectionMonitoring = useMemo(
+    () => buildProtectionMonitoringView(snapshot.positions, snapshot.alerts, snapshot.auditEvents),
+    [snapshot.alerts, snapshot.auditEvents, snapshot.positions],
   );
   const auditExplorerEvents = useMemo(
     () => filterAuditEvents(snapshot.auditEvents, auditFilters),
@@ -754,6 +766,27 @@ export function App({
             <PositionDetailPanel detail={positionDetail} />
           </section>
 
+          <section
+            className="protection-monitor-section"
+            id={sectionId(protectionMonitoringSection)}
+          >
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Protection monitor</p>
+                <h2>Protection monitoring</h2>
+              </div>
+              <StatusPill
+                tone={protectionMonitoring.emergencyConditions.length > 0 ? "critical" : "good"}
+                label={formatCount(
+                  protectionMonitoring.emergencyConditions.length,
+                  "emergency",
+                  "emergencies",
+                )}
+              />
+            </div>
+            <ProtectionMonitoringDashboard view={protectionMonitoring} />
+          </section>
+
           <div className="section-grid">
             {workflowSections.map((section) => {
               const rows = workflowRows[section];
@@ -997,6 +1030,164 @@ function DetailAuditEvents({
   );
 }
 
+function ProtectionMonitoringDashboard({ view }: { view: ProtectionMonitoringView }) {
+  return (
+    <div className="protection-monitor-layout" aria-label="Protection monitoring dashboard">
+      <div className="protection-summary-grid">
+        <ProtectionSummaryCard
+          label="Expected protection"
+          metric={formatCount(view.summary.protected, "position", "positions")}
+          tone={view.summary.protected > 0 ? "good" : "neutral"}
+        />
+        <ProtectionSummaryCard
+          label="Missing protection"
+          metric={formatCount(view.summary.missingProtection, "position", "positions")}
+          tone={view.summary.missingProtection > 0 ? "critical" : "good"}
+        />
+        <ProtectionSummaryCard
+          label="Exception references"
+          metric={formatCount(view.summary.exceptions, "position", "positions")}
+          tone={view.summary.exceptions > 0 ? "warning" : "neutral"}
+        />
+        <ProtectionSummaryCard
+          label="Critical local alerts"
+          metric={formatCount(view.summary.criticalAlerts, "alert", "alerts")}
+          tone={view.summary.criticalAlerts > 0 ? "critical" : "good"}
+        />
+      </div>
+
+      <article className="protection-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Emergency conditions</p>
+            <h3>Operator-visible protection conditions</h3>
+          </div>
+          <StatusPill
+            tone={view.emergencyConditions.length > 0 ? "critical" : "good"}
+            label={formatCount(view.emergencyConditions.length, "active", "active")}
+          />
+        </div>
+        {view.emergencyConditions.length === 0 ? (
+          <p className="empty-state">No emergency protection conditions</p>
+        ) : (
+          <div className="protection-row-list">
+            {view.emergencyConditions.map((condition) => (
+              <article className="record-row" key={condition}>
+                <div>
+                  <h3>{safeProtectionMonitoringText(condition)}</h3>
+                  <p>Condition remains visible until the source read model changes.</p>
+                </div>
+                <StatusPill tone="critical" label="operator review" />
+              </article>
+            ))}
+          </div>
+        )}
+      </article>
+
+      <article className="protection-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Position protection</p>
+            <h3>Protection state ledger</h3>
+          </div>
+          <StatusPill
+            tone="neutral"
+            label={formatCount(view.positionViews.length, "position", "positions")}
+          />
+        </div>
+        {view.positionViews.length === 0 ? (
+          <p className="empty-state">No position protection records</p>
+        ) : (
+          <div className="protection-position-grid">
+            {view.positionViews.map((positionView) => (
+              <ProtectionPositionCard
+                key={positionView.position.position_id}
+                positionView={positionView}
+              />
+            ))}
+          </div>
+        )}
+      </article>
+
+      <article className="protection-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Alert linkage</p>
+            <h3>Critical and emergency local alerts</h3>
+          </div>
+          <StatusPill
+            tone={view.criticalAlerts.length > 0 ? "critical" : "good"}
+            label={formatCount(view.criticalAlerts.length, "linked", "linked")}
+          />
+        </div>
+        {view.criticalAlerts.length === 0 ? (
+          <p className="empty-state">No critical or emergency local alerts</p>
+        ) : (
+          <div className="protection-row-list">
+            {view.criticalAlerts.map((alert) => (
+              <article className="record-row" key={alert.alert_id}>
+                <div>
+                  <h3>{safeProtectionMonitoringText(alert.title)}</h3>
+                  <p>{safeProtectionMonitoringText(alert.source_event_reference)}</p>
+                </div>
+                <StatusPill tone={alertTone(alert)} label={alert.severity} />
+              </article>
+            ))}
+          </div>
+        )}
+      </article>
+    </div>
+  );
+}
+
+function ProtectionSummaryCard({
+  label,
+  metric,
+  tone,
+}: {
+  label: string;
+  metric: string;
+  tone: Tone;
+}) {
+  return (
+    <article className="protection-summary-card">
+      <div className="panel-heading">
+        <h3>{label}</h3>
+        <span className={`swatch swatch-${tone}`} aria-hidden="true" />
+      </div>
+      <p className="metric">{metric}</p>
+    </article>
+  );
+}
+
+function ProtectionPositionCard({
+  positionView,
+}: {
+  positionView: ProtectionPositionView;
+}) {
+  const { position } = positionView;
+  return (
+    <article className="protection-position-card">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">{safeProtectionMonitoringText(position.symbol)}</p>
+          <h3>{safeProtectionMonitoringText(position.position_id)}</h3>
+        </div>
+        <StatusPill tone={positionTone(position)} label={positionView.statusLabel} />
+      </div>
+      <dl className="detail-facts compact">
+        <PostureItem label="Quantity" value={`${position.quantity}`} />
+        <PostureItem
+          label="Exception"
+          value={safeProtectionMonitoringText(positionView.exceptionReference)}
+        />
+        <PostureItem label="Linked alerts" value={`${positionView.linkedAlerts.length}`} />
+        <PostureItem label="Linked audit" value={`${positionView.linkedAuditEvents.length}`} />
+      </dl>
+    </article>
+  );
+}
+
 function buildSummaryPanels(snapshot: OperationsApiSnapshot): SummaryPanel[] {
   const pendingTickets = snapshot.approvalTickets.filter((ticket) => ticket.status === "pending").length;
   const criticalAlerts = snapshot.alerts.filter((alert) =>
@@ -1095,6 +1286,10 @@ function titleCase(value: string) {
 
 function formatIdentifier(value: string) {
   return value.toLowerCase().replace(/[_-]+/g, " ");
+}
+
+function formatCount(count: number, singular: string, plural: string) {
+  return `${count} ${count === 1 ? singular : plural}`;
 }
 
 function formatApprovalMode(value: string) {

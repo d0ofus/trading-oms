@@ -1746,9 +1746,11 @@ Acceptance criteria:
 
 ## Slice 044 - protection monitoring dashboard
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-044-protection-monitoring-dashboard`
 
 Goal:
 Show expected protection, exceptions, and critical alerts in the UI.
@@ -1762,6 +1764,18 @@ Non-goals:
 - live broker reconciliation;
 - real alert delivery;
 - live trading.
+
+Acceptance criteria:
+- [x] UI shows expected-protection position counts.
+- [x] UI shows missing-protection position counts as critical when present.
+- [x] UI shows exception and review-required references.
+- [x] UI shows critical and emergency local alerts with source linkage.
+- [x] Secret-shaped dashboard text is redacted before rendering.
+- [x] UI contains no broker, credential, route, script, import, eval, submit-order,
+  transmit-order, alert-delivery, reconciliation-action, or live-mode controls.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, real alert delivery, or
+  production rollout are added.
 
 ---
 

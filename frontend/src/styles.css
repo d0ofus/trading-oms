@@ -42,6 +42,7 @@ a {
 .workflow-section h2,
 .audit-explorer-section h2,
 .detail-section h2,
+.protection-monitor-section h2,
 .approval-inbox-section h2,
 .builder-section h2,
 .builder-node h3,
@@ -214,6 +215,7 @@ dd {
 .run-detail-section,
 .audit-explorer-section,
 .detail-section,
+.protection-monitor-section,
 .approval-inbox-section,
 .workflow-section {
   border: 1px solid #d9ded5;
@@ -906,6 +908,52 @@ dd {
   gap: 10px;
 }
 
+.protection-monitor-section {
+  overflow: hidden;
+}
+
+.protection-monitor-layout {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.protection-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.protection-summary-card,
+.protection-card,
+.protection-position-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.protection-summary-card h3,
+.protection-card h3,
+.protection-position-card h3 {
+  margin: 0;
+  color: #20282d;
+  font-size: 0.95rem;
+}
+
+.protection-position-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.protection-row-list {
+  display: grid;
+  gap: 10px;
+}
+
 .run-detail-layout {
   display: grid;
   gap: 16px;
@@ -1038,6 +1086,8 @@ dd {
 
   .posture-grid,
   .summary-grid,
+  .protection-summary-grid,
+  .protection-position-grid,
   .builder-layout,
   .flow-node-ledger,
   .run-detail-grid,

@@ -26,6 +26,7 @@ describe("App", () => {
     expect(text).toContain("Audit explorer");
     expect(text).toContain("Order detail");
     expect(text).toContain("Position detail");
+    expect(text).toContain("Protection monitor");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
     expect(text).toContain("Orders");
@@ -185,6 +186,25 @@ describe("App", () => {
     expect(text).toContain("5 TSLA at 210.5");
     expect(text).toContain("Linked position audit records");
     expect(text).not.toContain("broker amendment");
+  });
+
+  it("renders read-only protection monitoring dashboard", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Protection monitor");
+    expect(text).toContain("Protection monitoring");
+    expect(text).toContain("Emergency conditions");
+    expect(text).toContain("Expected protection");
+    expect(text).toContain("1 position");
+    expect(text).toContain("Missing protection");
+    expect(text).toContain("0 positions");
+    expect(text).toContain("Exception references");
+    expect(text).toContain("Critical local alerts");
+    expect(text).toContain("Backend protection review");
+    expect(text).toContain("position-backend-001");
+    expect(text).toContain("expected protection present");
+    expect(text).not.toContain("external delivery control");
   });
 
   it("renders a safe fallback when backend read APIs are unavailable", () => {
