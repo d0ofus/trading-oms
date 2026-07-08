@@ -1242,9 +1242,11 @@ Acceptance criteria:
 
 ## Slice 030 - simulated positions, protection monitoring, and alerts
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-030-simulated-positions-alerts`
 
 Goal:
 Track simulated positions and raise alerts for missing expected protection.
@@ -1260,6 +1262,20 @@ Non-goals:
 - real alert delivery;
 - broker connectivity;
 - live trading.
+
+Acceptance criteria:
+- [x] Simulated filled fake broker transitions can update local positions.
+- [x] Position protection status is explicit.
+- [x] Missing expected protection creates a critical local alert intent.
+- [x] Missing expected protection records a local no-op alert dispatch.
+- [x] Every accepted position update and alert is journaled.
+- [x] Duplicate position update IDs are idempotent when payloads match.
+- [x] Conflicting duplicate update IDs fail safely.
+- [x] Tests cover protected positions, missing-protection alerts, idempotency, duplicate conflict,
+  validation, payload safety, and no transport/order-submission behavior.
+- [x] Verification passes.
+- [x] No real portfolio reconciliation, real alert delivery, broker connectivity, HTTP position
+  endpoint, or live trading are added.
 
 ---
 
