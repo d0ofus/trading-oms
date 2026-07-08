@@ -473,7 +473,7 @@ Acceptance criteria:
 
 ## Slice 012 — alerts
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-012-alerts`
 
@@ -508,6 +508,49 @@ Acceptance criteria:
 - [x] Telegram-compatible formatting exists without token handling or network transport.
 - [x] Alert payloads reject or redact credential-shaped fields.
 - [x] Tests cover creation, formatting, journaling, validation failures, and no secret/no network behavior.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No real Telegram tokens or secrets are introduced.
+
+---
+
+## Slice 013 — UI shell
+
+status: `ready_for_human_review`
+
+branch: `slice-013-ui-shell`
+
+Goal:
+Create the first frontend UI shell for safely inspecting the local trading workflow state without
+adding live trading, broker connectivity, order submission, or secret-bearing integrations.
+
+Scope:
+- frontend application shell with persistent product header, safety posture, and navigation;
+- static/local sections for signals, approval tickets, orders, positions, audit events, and alerts;
+- clear disabled/default safety state for paper mode, live trading disabled, and no broker connectivity;
+- local demo data only, with no API mutation, broker action, Telegram delivery, or order-submission controls;
+- tests proving safety posture, shell sections, and absence of live trading/order-submission affordances;
+- docs for UI shell behavior, safety constraints, and current limitations.
+
+Non-goals:
+- live trading;
+- broker integration;
+- real broker credentials;
+- Telegram tokens or alert delivery;
+- order submission, cancellation, or approval actions;
+- backend API integration;
+- authentication or authorization;
+- database persistence;
+- Strategy DSL editing;
+- visual workflow builder.
+
+Acceptance criteria:
+- [x] Frontend UI shell exists.
+- [x] Shell shows app mode, live trading disabled, and broker connectivity status.
+- [x] Shell includes sections for signals, approval tickets, orders, positions, audit events, and alerts.
+- [x] UI uses static/local demo data only.
+- [x] UI contains no enabled order submission, broker, live trading, Telegram, or credential controls.
+- [x] Tests cover shell rendering, safety posture, expected sections, and forbidden live-action affordances.
 - [x] Verification passes.
 - [x] No live broker connectivity or order submission path is added.
 - [x] No real Telegram tokens or secrets are introduced.
