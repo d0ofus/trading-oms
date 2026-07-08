@@ -4,9 +4,9 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, and local no-op alerts.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, and a read-only UI shell.
 
-No live broker integration, production strategy engine, real alert delivery, UI trading workflow, or live order submission exists yet.
+No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
 ## Safety posture
 
@@ -18,6 +18,7 @@ No live broker integration, production strategy engine, real alert delivery, UI 
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
 - Alert behavior is local no-op recording and formatting only.
+- UI shell behavior is read-only static inspection only.
 - Default mode is paper/simulation.
 - IBKR integration will come later as paper-only first.
 
@@ -45,6 +46,12 @@ On Windows without `make`:
 
 ```powershell
 .\scripts\verify.ps1
+```
+
+Run the frontend UI shell locally:
+
+```bash
+npm run dev --prefix frontend
 ```
 
 ## Recommended development loop
@@ -77,5 +84,6 @@ On Windows without `make`:
 - `docs/OMS_STATE_MACHINE.md`: explicit OMS lifecycle states and transitions.
 - `docs/APPROVAL_TICKETS.md`: semi-automatic approval ticket behavior.
 - `docs/ALERTS.md`: local alert intent, no-op dispatch, and formatting behavior.
+- `docs/UI_SHELL.md`: read-only frontend operations shell behavior.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.
