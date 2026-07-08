@@ -1,9 +1,10 @@
-# Backend Read-Only API
+# Backend Inspection API
 
 Slice 021 exposes the backend read models through FastAPI inspection endpoints.
 
-This slice does not add mutation endpoints, approval actions, simulation runs, persistence, broker
-connectivity, IBKR transport, order submission, or live trading.
+Slice 021 did not add mutation endpoints, approval actions, simulation runs, persistence, broker
+connectivity, IBKR transport, order submission, or live trading. Slice 028 later added separate
+simulation-only approval decision endpoints documented in `docs/SIMULATION_APPROVAL_API.md`.
 
 ## Endpoints
 

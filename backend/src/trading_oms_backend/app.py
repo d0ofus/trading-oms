@@ -2,12 +2,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 from trading_oms_backend.config import get_settings
 from trading_oms_backend.read_models import OperationsReadModel, build_demo_operations_read_model
+from trading_oms_backend.simulation_approval_service import (
+    SimulationApprovalDecisionInput,
+    get_simulation_approval_service,
+)
+from trading_oms_backend.simulation_approval_service import (
+    reset_simulation_approval_service as _reset_simulation_approval_service,
+)
 
 app = FastAPI(title="Trading OMS", version="0.1.0")
+
+
+class ApprovalDecisionBody(BaseModel):
+    decision_id: str
+    decided_at: str
+    actor: str
+    decision_reference: str
+    reason: str
 
 
 @app.get("/healthz")
@@ -68,5 +84,48 @@ def get_readiness() -> dict[str, Any]:
     return _operations_read_model().readiness.to_json_dict()
 
 
+@app.post("/api/approval-tickets/{ticket_id}/approve")
+def approve_simulation_ticket(
+    ticket_id: str,
+    decision: ApprovalDecisionBody,
+) -> dict[str, Any]:
+    return _apply_simulation_approval_decision(ticket_id, "approved", decision)
+
+
+@app.post("/api/approval-tickets/{ticket_id}/reject")
+def reject_simulation_ticket(
+    ticket_id: str,
+    decision: ApprovalDecisionBody,
+) -> dict[str, Any]:
+    return _apply_simulation_approval_decision(ticket_id, "rejected", decision)
+
+
 def _operations_read_model() -> OperationsReadModel:
     return build_demo_operations_read_model(get_settings())
+
+
+def reset_simulation_approval_service() -> None:
+    _reset_simulation_approval_service()
+
+
+def _apply_simulation_approval_decision(
+    ticket_id: str,
+    action: str,
+    decision: ApprovalDecisionBody,
+) -> dict[str, Any]:
+    service = get_simulation_approval_service()
+    decision_input = SimulationApprovalDecisionInput(
+        decision_id=decision.decision_id,
+        decided_at=decision.decided_at,
+        actor=decision.actor,
+        decision_reference=decision.decision_reference,
+        reason=decision.reason,
+    )
+    try:
+        if action == "approved":
+            record = service.approve(ticket_id, decision_input)
+        else:
+            record = service.reject(ticket_id, decision_input)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return record.to_json_dict()

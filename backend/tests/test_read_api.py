@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -106,8 +107,13 @@ def test_read_only_api_responses_exclude_action_broker_network_and_secret_afford
 def test_app_module_does_not_define_mutation_or_transport_routes() -> None:
     source = inspect.getsource(app_module).lower()
 
+    post_routes = set(re.findall(r'@app\.post\("([^"]+)"', source))
+    assert post_routes == {
+        "/api/approval-tickets/{ticket_id}/approve",
+        "/api/approval-tickets/{ticket_id}/reject",
+    }
+
     forbidden_source_tokens = [
-        "@app.post",
         "@app.put",
         "@app.patch",
         "@app.delete",
