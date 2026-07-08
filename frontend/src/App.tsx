@@ -1,6 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { safetyPosture } from "./safety";
+import {
+  createReadApiClient,
+  initialReadApiState,
+  loadOperationsSnapshot,
+  type AlertApiView,
+  type OperationsApiSnapshot,
+  type PositionApiView,
+  type ReadApiClient,
+  type ReadApiLoadState,
+} from "./readApiClient";
 import {
   defaultStrategyBuilderState,
   formatStrategyDslPreview,
@@ -24,6 +33,11 @@ type WorkflowRow = {
   tone: Tone;
 };
 
+type AppProps = {
+  initialReadState?: ReadApiLoadState;
+  readApiClient?: ReadApiClient;
+};
+
 const visualBuilderSection = "Visual builder" as const;
 
 const workflowSections = [
@@ -35,125 +49,39 @@ const workflowSections = [
   "Alerts",
 ] as const;
 
+type WorkflowSection = (typeof workflowSections)[number];
+
 const shellSections = [visualBuilderSection, ...workflowSections] as const;
 
-const summaryPanels: SummaryPanel[] = [
-  {
-    title: "Signals",
-    metric: "2 replay-only",
-    detail: "Deterministic local strategy output; no order intents.",
-    tone: "info",
-  },
-  {
-    title: "Approval tickets",
-    metric: "1 pending",
-    detail: "Manual review required before any future execution workflow.",
-    tone: "warning",
-  },
-  {
-    title: "Orders",
-    metric: "0 live",
-    detail: "Simulation records only; no broker route is configured.",
-    tone: "good",
-  },
-  {
-    title: "Alerts",
-    metric: "1 critical",
-    detail: "Local no-op dispatch recorded in the append-only journal.",
-    tone: "critical",
-  },
-];
-
-const workflowRows: Record<(typeof workflowSections)[number], WorkflowRow[]> = {
-  Signals: [
-    {
-      label: "AAPL replay SMA",
-      detail: "Long bias from local bars",
-      status: "journaled",
-      tone: "info",
-    },
-    {
-      label: "MSFT replay SMA",
-      detail: "Neutral bias from local bars",
-      status: "journaled",
-      tone: "neutral",
-    },
-  ],
-  "Approval tickets": [
-    {
-      label: "approval-ticket-001",
-      detail: "Passed risk decision awaiting explicit human decision",
-      status: "pending",
-      tone: "warning",
-    },
-  ],
-  Orders: [
-    {
-      label: "client-001",
-      detail: "Fake broker acknowledgement in simulation",
-      status: "simulated",
-      tone: "good",
-    },
-    {
-      label: "client-002",
-      detail: "OMS state requires manual approval",
-      status: "pending approval",
-      tone: "warning",
-    },
-  ],
-  Positions: [
-    {
-      label: "AAPL simulated position",
-      detail: "Expected protection plan present",
-      status: "covered",
-      tone: "good",
-    },
-    {
-      label: "MSFT simulated position",
-      detail: "Protection review alert recorded",
-      status: "review",
-      tone: "critical",
-    },
-  ],
-  "Audit events": [
-    {
-      label: "risk.decision.evaluated",
-      detail: "Risk decision appended to journal",
-      status: "sequence 238",
-      tone: "info",
-    },
-    {
-      label: "approval.ticket.created",
-      detail: "Manual approval ticket appended to journal",
-      status: "sequence 239",
-      tone: "info",
-    },
-    {
-      label: "alert.intent.created",
-      detail: "Critical local alert intent appended to journal",
-      status: "sequence 240",
-      tone: "critical",
-    },
-  ],
-  Alerts: [
-    {
-      label: "Position protection missing",
-      detail: "Local no-op alert dispatch; no real delivery configured",
-      status: "critical",
-      tone: "critical",
-    },
-    {
-      label: "Replay completed",
-      detail: "Informational local alert",
-      status: "informational",
-      tone: "info",
-    },
-  ],
-};
-
-export function App() {
+export function App({ initialReadState, readApiClient }: AppProps = {}) {
   const [builderState, setBuilderState] = useState(defaultStrategyBuilderState);
+  const [readState, setReadState] = useState<ReadApiLoadState>(
+    initialReadState ?? initialReadApiState,
+  );
   const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
+  const shouldLoadFromBackend = !initialReadState || initialReadState.status === "loading";
+  const snapshot = readState.snapshot;
+  const summaryPanels = useMemo(() => buildSummaryPanels(snapshot), [snapshot]);
+  const workflowRows = useMemo(() => buildWorkflowRows(snapshot), [snapshot]);
+
+  useEffect(() => {
+    if (!shouldLoadFromBackend) {
+      return;
+    }
+
+    let isCurrent = true;
+    setReadState(initialReadApiState);
+
+    loadOperationsSnapshot(readApiClient ?? createReadApiClient()).then((state) => {
+      if (isCurrent) {
+        setReadState(state);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [readApiClient, shouldLoadFromBackend]);
 
   return (
     <div className="app-shell">
@@ -163,9 +91,13 @@ export function App() {
           <h1>Trading OMS</h1>
         </div>
         <div className="status-strip" aria-label="Safety posture">
-          <StatusPill tone="good" label="Paper mode" />
+          <StatusPill tone="good" label={`${titleCase(formatIdentifier(snapshot.safety.app_mode))} mode`} />
           <StatusPill tone="good" label="Live trading disabled" />
-          <StatusPill tone="neutral" label="Broker connectivity none" />
+          <StatusPill
+            tone="neutral"
+            label={`Broker connectivity ${formatIdentifier(snapshot.safety.broker_connectivity)}`}
+          />
+          <StatusPill tone={readStateTone(readState)} label={readStateLabel(readState)} />
         </div>
       </header>
 
@@ -184,23 +116,29 @@ export function App() {
           <section className="safety-band" aria-labelledby="console-heading">
             <div>
               <p className="eyebrow">Safety posture</p>
-              <h2 id="console-heading">Local paper workflow</h2>
+              <h2 id="console-heading">
+                {titleCase(formatIdentifier(snapshot.safety.app_mode))} workflow
+              </h2>
+              {readState.errorMessage ? <p className="state-note">{readState.errorMessage}</p> : null}
             </div>
             <dl className="posture-grid">
-              <PostureItem label="Mode" value={`${titleCase(safetyPosture.appMode)} mode`} />
+              <PostureItem
+                label="Mode"
+                value={`${titleCase(formatIdentifier(snapshot.safety.app_mode))} mode`}
+              />
               <PostureItem
                 label="Live trading"
-                value={safetyPosture.liveTradingEnabled ? "Enabled" : "Live trading disabled"}
+                value={snapshot.safety.live_trading_enabled ? "Enabled" : "Live trading disabled"}
               />
               <PostureItem
                 label="Broker connectivity"
-                value={`Broker connectivity ${safetyPosture.brokerConnectivity}`}
+                value={`Broker connectivity ${formatIdentifier(snapshot.safety.broker_connectivity)}`}
               />
-              <PostureItem label="Approval" value="Manual approval required" />
+              <PostureItem label="Approval" value={formatApprovalMode(snapshot.safety.approval_mode)} />
               <PostureItem label="Journal" value="Append-only journal" />
               <PostureItem
                 label="Alert delivery"
-                value={`Alert delivery ${safetyPosture.alertDelivery}`}
+                value={`Alert delivery ${formatIdentifier(snapshot.safety.alert_delivery)}`}
               />
             </dl>
           </section>
@@ -309,30 +247,112 @@ export function App() {
           </section>
 
           <div className="section-grid">
-            {workflowSections.map((section) => (
-              <section className="workflow-section" id={sectionId(section)} key={section}>
-                <div className="section-heading">
-                  <h2>{section}</h2>
-                  <span>{workflowRows[section].length} records</span>
-                </div>
-                <div className="record-list">
-                  {workflowRows[section].map((row) => (
-                    <article className="record-row" key={`${section}-${row.label}`}>
-                      <div>
-                        <h3>{row.label}</h3>
-                        <p>{row.detail}</p>
-                      </div>
-                      <StatusPill tone={row.tone} label={row.status} />
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ))}
+            {workflowSections.map((section) => {
+              const rows = workflowRows[section];
+              return (
+                <section className="workflow-section" id={sectionId(section)} key={section}>
+                  <div className="section-heading">
+                    <h2>{section}</h2>
+                    <span>{rows.length} records</span>
+                  </div>
+                  <div className="record-list">
+                    {rows.length === 0 ? (
+                      <p className="empty-state">No records</p>
+                    ) : (
+                      rows.map((row) => (
+                        <article className="record-row" key={`${section}-${row.label}`}>
+                          <div>
+                            <h3>{row.label}</h3>
+                            <p>{row.detail}</p>
+                          </div>
+                          <StatusPill tone={row.tone} label={row.status} />
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         </main>
       </div>
     </div>
   );
+}
+
+function buildSummaryPanels(snapshot: OperationsApiSnapshot): SummaryPanel[] {
+  const pendingTickets = snapshot.approvalTickets.filter((ticket) => ticket.status === "pending").length;
+  const criticalAlerts = snapshot.alerts.filter((alert) =>
+    ["critical", "emergency"].includes(alert.severity),
+  ).length;
+
+  return [
+    {
+      title: "Signals",
+      metric: `${snapshot.signals.length} read`,
+      detail: "Backend read API signals; no order intents.",
+      tone: snapshot.signals.length > 0 ? "info" : "neutral",
+    },
+    {
+      title: "Approval tickets",
+      metric: `${pendingTickets} pending`,
+      detail: "Inspection only; no approval action endpoint.",
+      tone: pendingTickets > 0 ? "warning" : "neutral",
+    },
+    {
+      title: "Orders",
+      metric: "0 live",
+      detail: `${snapshot.orders.length} read records; no broker route is configured.`,
+      tone: "good",
+    },
+    {
+      title: "Alerts",
+      metric: `${criticalAlerts} critical`,
+      detail: "Read API alert records; no external delivery configured.",
+      tone: criticalAlerts > 0 ? "critical" : "neutral",
+    },
+  ];
+}
+
+function buildWorkflowRows(snapshot: OperationsApiSnapshot): Record<WorkflowSection, WorkflowRow[]> {
+  return {
+    Signals: snapshot.signals.map((signal) => ({
+      label: `${signal.symbol} ${signal.strategy_id}`,
+      detail: `${formatIdentifier(signal.signal)} from ${formatIdentifier(signal.reason)}`,
+      status: signal.signal,
+      tone: signal.signal === "long_bias" ? "info" : "neutral",
+    })),
+    "Approval tickets": snapshot.approvalTickets.map((ticket) => ({
+      label: ticket.ticket_id,
+      detail: `${ticket.side} ${ticket.quantity} ${ticket.symbol}; risk ${ticket.risk_decision_id}`,
+      status: ticket.status,
+      tone: approvalTone(ticket.status),
+    })),
+    Orders: snapshot.orders.map((order) => ({
+      label: order.client_order_id,
+      detail: `${order.side} ${order.quantity} ${order.symbol}; leaves ${order.leaves_quantity}`,
+      status: formatIdentifier(order.state),
+      tone: order.requires_reconciliation ? "critical" : orderTone(order.state),
+    })),
+    Positions: snapshot.positions.map((position) => ({
+      label: position.position_id,
+      detail: `${position.symbol} quantity ${position.quantity} at ${position.average_price}`,
+      status: formatIdentifier(position.protection_status),
+      tone: positionTone(position),
+    })),
+    "Audit events": snapshot.auditEvents.map((event) => ({
+      label: event.event_type,
+      detail: event.summary,
+      status: `sequence ${event.sequence}`,
+      tone: event.event_type.includes("alert") ? "critical" : "info",
+    })),
+    Alerts: snapshot.alerts.map((alert) => ({
+      label: alert.title,
+      detail: `${formatIdentifier(alert.channel)} alert from ${alert.source_event_reference}`,
+      status: alert.severity,
+      tone: alertTone(alert),
+    })),
+  };
 }
 
 function StatusPill({ label, tone }: { label: string; tone: Tone }) {
@@ -354,4 +374,87 @@ function sectionId(section: string) {
 
 function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatIdentifier(value: string) {
+  return value.toLowerCase().replace(/[_-]+/g, " ");
+}
+
+function formatApprovalMode(value: string) {
+  if (value === "manual_required") {
+    return "Manual approval required";
+  }
+  return titleCase(formatIdentifier(value));
+}
+
+function readStateLabel(readState: ReadApiLoadState) {
+  if (readState.status === "loading") {
+    return "Read API loading";
+  }
+  if (readState.status === "error") {
+    return "Read API fallback";
+  }
+  if (readState.status === "empty") {
+    return "Read API empty";
+  }
+  return "Read API loaded";
+}
+
+function readStateTone(readState: ReadApiLoadState): Tone {
+  if (readState.status === "error") {
+    return "warning";
+  }
+  if (readState.status === "loading" || readState.status === "empty") {
+    return "neutral";
+  }
+  return "good";
+}
+
+function approvalTone(status: string): Tone {
+  if (status === "pending") {
+    return "warning";
+  }
+  if (status === "approved") {
+    return "good";
+  }
+  if (status === "rejected") {
+    return "critical";
+  }
+  return "neutral";
+}
+
+function orderTone(state: string): Tone {
+  if (state.includes("PENDING")) {
+    return "warning";
+  }
+  if (state.includes("FILLED")) {
+    return "good";
+  }
+  if (state.includes("REJECTED") || state.includes("UNKNOWN")) {
+    return "critical";
+  }
+  return "info";
+}
+
+function positionTone(position: PositionApiView): Tone {
+  if (position.protection_status === "expected_protection_present") {
+    return "good";
+  }
+  if (position.protection_status === "missing_expected_protection") {
+    return "critical";
+  }
+  if (position.protection_status === "review_required") {
+    return "warning";
+  }
+  return "neutral";
+}
+
+function alertTone(alert: AlertApiView): Tone {
+  if (alert.severity === "critical" || alert.severity === "emergency") {
+    return "critical";
+  }
+  if (alert.severity === "warning") {
+    return "warning";
+  }
+  return "info";
 }
