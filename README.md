@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, and a frontend read API client for safe inspection views.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -18,6 +18,7 @@ No live broker integration, production strategy engine, real alert delivery, con
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
 - Alert behavior is local no-op recording and formatting only.
+- Simulation run behavior is local lifecycle recording and journaling only.
 - Operations shell records are backend-derived read-only inspection data with a safe fallback.
 - Backend read models are local read-only inspection summaries only.
 - Backend read API endpoints are `GET`-only inspection views backed by local demo read data.
@@ -100,6 +101,7 @@ The Vite dev server proxies `/api` and `/healthz` to `http://127.0.0.1:8000`.
 - `docs/OMS_STATE_MACHINE.md`: explicit OMS lifecycle states and transitions.
 - `docs/APPROVAL_TICKETS.md`: semi-automatic approval ticket behavior.
 - `docs/ALERTS.md`: local alert intent, no-op dispatch, and formatting behavior.
+- `docs/SIMULATION_RUNS.md`: deterministic simulation run lifecycle model.
 - `docs/UI_SHELL.md`: read-only frontend operations shell behavior.
 - `docs/STRATEGY_DSL.md`: typed replay-only Strategy DSL shape and safety boundary.
 - `docs/VISUAL_WORKFLOW_BUILDER.md`: local replay-only visual builder behavior.
