@@ -1315,9 +1315,11 @@ Acceptance criteria:
 
 ## Slice 032 - React Flow visual canvas scaffold
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-032-react-flow-visual-canvas`
 
 Goal:
 Add the first React Flow visual canvas without execution.
@@ -1333,6 +1335,18 @@ Non-goals:
 - graph execution;
 - broker connectivity;
 - live trading.
+
+Acceptance criteria:
+- [x] React Flow dependency is installed.
+- [x] Static simulation workflow canvas renders.
+- [x] Canvas shows replay source, bar builder, strategy trigger, risk check, manual approval, fake
+  broker, and audit sink.
+- [x] Canvas is locked with no graph editing, save, run, broker, credential, route, script, import,
+  eval, or live-mode controls.
+- [x] Tests cover the scaffold shape and forbidden affordances.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
 
 ---
 

@@ -42,6 +42,7 @@ a {
 .workflow-section h2,
 .builder-section h2,
 .builder-node h3,
+.flow-node-ledger h3,
 .summary-panel h3,
 .record-row h3 {
   margin: 0;
@@ -233,6 +234,7 @@ dd {
 
 .summary-panel h3,
 .builder-node h3,
+.flow-node-ledger h3,
 .record-row h3 {
   color: #20282d;
   font-size: 0.95rem;
@@ -240,6 +242,7 @@ dd {
 
 .summary-panel p,
 .builder-node p,
+.flow-node-ledger p,
 .record-row p {
   margin: 0;
   color: #5e6873;
@@ -303,6 +306,127 @@ dd {
 .node-map {
   display: grid;
   gap: 10px;
+}
+
+.flow-scaffold {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.react-flow-frame {
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #f7faf6;
+}
+
+.react-flow-frame .react-flow {
+  min-height: 420px;
+}
+
+.simulation-flow-node {
+  min-width: 190px;
+  max-width: 220px;
+  border-color: #cfdccd;
+  background: #ffffff;
+  color: #1f2923;
+  box-shadow: 0 8px 20px rgba(36, 54, 43, 0.08);
+}
+
+.simulation-flow-node-source,
+.simulation-flow-node-audit {
+  border-color: #a9c7e8;
+}
+
+.simulation-flow-node-gate,
+.simulation-flow-node-approval {
+  border-color: #e8c273;
+}
+
+.simulation-flow-node-simulation {
+  border-color: #a8d5b1;
+}
+
+.flow-node-content {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  text-align: left;
+}
+
+.flow-node-content strong {
+  color: #20282d;
+  font-size: 0.92rem;
+  letter-spacing: 0;
+}
+
+.flow-node-content span:last-child {
+  color: #5e6873;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.flow-role {
+  display: inline-flex;
+  justify-self: start;
+  border: 1px solid #cbd2d8;
+  border-radius: 999px;
+  background: #f5f7f8;
+  color: #52606b;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 4px 7px;
+  text-transform: uppercase;
+}
+
+.flow-role-source,
+.flow-role-audit {
+  border-color: #a9c7e8;
+  background: #eef6ff;
+  color: #285f94;
+}
+
+.flow-role-gate,
+.flow-role-approval {
+  border-color: #e8c273;
+  background: #fff7df;
+  color: #815400;
+}
+
+.flow-role-simulation {
+  border-color: #a8d5b1;
+  background: #ecf8ef;
+  color: #23623a;
+}
+
+.flow-node-ledger {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.flow-node-ledger li {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 78px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #ffffff;
+  list-style: none;
+  padding: 12px;
+}
+
+.flow-node-ledger h3 {
+  color: #20282d;
+  font-size: 0.9rem;
 }
 
 .builder-node {
@@ -532,6 +656,7 @@ dd {
   .posture-grid,
   .summary-grid,
   .builder-layout,
+  .flow-node-ledger,
   .run-detail-grid,
   .section-grid {
     grid-template-columns: 1fr;

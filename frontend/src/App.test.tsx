@@ -34,11 +34,15 @@ describe("App", () => {
     const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-    expect(text).toContain("Replay bars");
-    expect(text).toContain("Close source");
-    expect(text).toContain("Simple moving average");
-    expect(text).toContain("Bias signal");
-    expect(text).toContain("Strategy DSL");
+    expect(html).toContain('aria-label="React Flow simulation workflow scaffold"');
+    expect(text).toContain("Replay source");
+    expect(text).toContain("Bar builder");
+    expect(text).toContain("Strategy trigger");
+    expect(text).toContain("Risk check");
+    expect(text).toContain("Manual approval");
+    expect(text).toContain("Fake broker");
+    expect(text).toContain("Audit sink");
+    expect(text).toContain("no transport");
     expect(text).toContain("No broker connectivity");
     expect(text).toContain("No order actions");
     expect(text).toContain("No credential fields");
@@ -123,8 +127,18 @@ describe("App", () => {
       "ibkr connect",
       "import workflow",
       "export workflow",
+      "save workflow",
+      "run workflow",
+      "execute workflow",
       "run script",
       "custom code",
+      "javascript",
+      "eval(",
+      "eval:",
+      "broker host",
+      "account id",
+      "live mode",
+      "route order",
       "api key",
       "password",
     ];

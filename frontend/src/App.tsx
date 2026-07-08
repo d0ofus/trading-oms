@@ -13,9 +13,9 @@ import {
 import {
   defaultStrategyBuilderState,
   formatStrategyDslPreview,
-  strategyBuilderNodes,
   updateStrategyBuilderState,
 } from "./strategyBuilder";
+import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
 
@@ -291,19 +291,7 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
             </div>
 
             <div className="builder-layout">
-              <div className="node-map" aria-label="Visual Strategy DSL workflow nodes">
-                {strategyBuilderNodes.map((node, index) => (
-                  <article className="builder-node" key={node.id}>
-                    <span className="node-index" aria-label={`Node ${index + 1}`}>
-                      {index + 1}
-                    </span>
-                    <div>
-                      <h3>{node.label}</h3>
-                      <p>{node.detail}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
+              <VisualSimulationWorkflowCanvas />
 
               <div className="builder-controls" aria-label="Safe Strategy DSL controls">
                 <label>

@@ -1,11 +1,12 @@
 # Visual Workflow Builder
 
-Slice 015 introduces the first safe visual workflow builder foundation.
+Slice 015 introduces the first safe visual workflow builder foundation. Slice 032 adds the first
+React Flow canvas scaffold for Gate C.
 
 It does not add live trading, broker integration, order intents, order submission, risk checks,
 approval execution workflow, OMS or fake broker orchestration, real market-data ingestion, backend
-API mutation, persistence, dependency installs, arbitrary expressions, custom scripts, code
-execution, drag-and-drop editing, file import/export, credentials, tokens, or secrets.
+API mutation, persistence, arbitrary expressions, custom scripts, code execution, file
+import/export, credentials, tokens, or secrets.
 
 ## Purpose
 
@@ -13,12 +14,12 @@ The visual builder is a frontend-only inspection and configuration surface for t
 replay-only Strategy DSL. It helps operators see the supported `close_above_sma` workflow as local
 nodes and inspect the generated JSON-compatible DSL document.
 
-The builder is local state only. It does not save, submit, transmit, connect, import, export, or
-call a backend API.
+The builder is local state only. It does not save, run, submit, transmit, connect, import, export,
+or call a backend mutation API.
 
 ## Visual Flow
 
-The first graph is fixed to:
+The original Strategy DSL preview graph is fixed to:
 
 ```text
 Replay bars -> Close source -> Simple moving average -> Bias signal -> Strategy DSL
@@ -26,6 +27,15 @@ Replay bars -> Close source -> Simple moving average -> Bias signal -> Strategy 
 
 Each node is descriptive only. Nodes do not execute orders, call brokers, fetch live market data, or
 run arbitrary code.
+
+The Gate C React Flow scaffold is fixed to:
+
+```text
+Replay source -> Bar builder -> Strategy trigger -> Risk check -> Manual approval -> Fake broker -> Audit sink
+```
+
+The scaffold is locked and non-executing. Nodes are not draggable, not connectable, and not
+selectable in Slice 032.
 
 ## Safe Controls
 
@@ -59,9 +69,10 @@ Telegram delivery controls, credential fields, import/export controls, or code e
 
 - Frontend-only local state.
 - Fixed node graph for `close_above_sma`.
-- No React Flow dependency yet.
+- React Flow canvas scaffold exists.
 - No drag-and-drop editing yet.
 - No persistence or backend API integration.
+- No workflow save or run behavior.
 - No file import or export.
 - No validation call to the backend Strategy DSL parser yet.
 - No custom strategy types, arbitrary expressions, scripts, or code execution.
