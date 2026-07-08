@@ -1087,9 +1087,11 @@ Acceptance criteria:
 
 ## Slice 026 - order-intent proposal model
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-026-order-intent-proposal-model`
 
 Goal:
 Represent strategy output as non-executable order-intent proposals.
@@ -1106,6 +1108,18 @@ Non-goals:
 - approval decisions;
 - OMS transitions;
 - live trading.
+
+Acceptance criteria:
+- [x] Typed order-intent proposal records exist.
+- [x] Proposal status is explicitly non-routable.
+- [x] Risk-increasing proposals require a protective-order plan or approved exception reference.
+- [x] Duplicate proposal IDs and duplicate source signal references are prevented.
+- [x] Every accepted proposal is journaled.
+- [x] Tests cover creation, idempotency, duplicate blocking, protection requirements, validation,
+  journaling, and no transport/order-submission behavior.
+- [x] Verification passes.
+- [x] No broker submission, approval decisions, OMS transitions, broker connectivity, or live
+  trading are added.
 
 ---
 
