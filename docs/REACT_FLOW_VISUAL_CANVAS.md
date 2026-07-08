@@ -3,9 +3,8 @@
 Slice 032 adds the first React Flow canvas scaffold for the Gate C visual simulation workflow
 builder.
 
-The canvas is frontend-only and static. It does not save, run, execute, submit, transmit, connect,
-route, call a backend mutation API, call a broker, import files, export files, or evaluate custom
-code.
+The canvas remains a simulation workflow surface. It does not run, execute, submit, transmit,
+connect, route, call a broker, import files, export files, or evaluate custom code.
 
 ## Scaffold Nodes
 
@@ -40,8 +39,8 @@ operator can arrange the visual layout.
 - no save, run, import, export, submit, transmit, connect, route, or credential controls are
   rendered.
 
-Validation, DSL compilation, persistence, simulation run orchestration, and visual run inspection
-are reserved for later Gate C slices.
+Validation and DSL compilation are now present. Canvas layout persistence, simulation run
+orchestration, and visual run inspection remain reserved for later Gate C slices.
 
 ## Graph Validation
 
@@ -57,6 +56,38 @@ Slice 035 adds frontend graph validation. The default catalog graph must pass:
 
 Invalid graphs are represented by explicit validation errors. The validator still does not save,
 run, submit, transmit, connect, route, call a broker, or call a backend mutation endpoint.
+
+## Workflow DSL Preview
+
+Slice 036 compiles the validated graph to a JSON-compatible simulation workflow DSL preview and
+adds a backend parser/validator for that generated shape. The compiler refuses invalid graphs and
+the default document uses:
+
+- `schema_version: 1`
+- `workflow_id: visual-simulation-workflow`
+- `mode: simulation`
+- `runtime: preview_only`
+- `broker: fake_broker_only`
+- `safety_gates.broker_transport_allowed: false`
+- `safety_gates.live_trading_enabled: false`
+- `safety_gates.arbitrary_code_allowed: false`
+
+The preview is local and non-executing. It does not create, save, run, submit, transmit, connect, or
+route anything.
+
+## Workflow Definition Persistence
+
+Slice 037 adds local backend persistence for validated simulation workflow definitions:
+
+- `GET /api/workflows`
+- `POST /api/workflows`
+- `GET /api/workflows/{workflow_id}`
+- `PUT /api/workflows/{workflow_id}`
+
+Saved definitions are versioned local records. Every create or update request must pass the backend
+workflow DSL parser before persistence. The endpoints do not run workflows, create simulation runs,
+submit orders, connect to a broker, or expose live-mode, credential, account, route, import, script,
+or eval fields.
 
 ## Safety Boundary
 

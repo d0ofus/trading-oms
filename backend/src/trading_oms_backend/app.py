@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -14,6 +17,11 @@ from trading_oms_backend.simulation_approval_service import (
 from trading_oms_backend.simulation_approval_service import (
     reset_simulation_approval_service as _reset_simulation_approval_service,
 )
+from trading_oms_backend.workflow_definitions import (
+    WorkflowDefinitionError,
+    WorkflowDefinitionSaveRequest,
+    WorkflowDefinitionStore,
+)
 
 app = FastAPI(title="Trading OMS", version="0.1.0")
 
@@ -24,6 +32,15 @@ class ApprovalDecisionBody(BaseModel):
     actor: str
     decision_reference: str
     reason: str
+
+
+class WorkflowDefinitionBody(BaseModel):
+    workflow_id: str
+    display_name: str
+    description: str
+    requested_at: str
+    document: dict[str, Any]
+    schema_version: int = 1
 
 
 @app.get("/healthz")
@@ -84,6 +101,40 @@ def get_readiness() -> dict[str, Any]:
     return _operations_read_model().readiness.to_json_dict()
 
 
+@app.get("/api/workflows")
+def list_workflows() -> list[dict[str, Any]]:
+    return [record.to_json_dict() for record in get_workflow_definition_store().list_workflows()]
+
+
+@app.post("/api/workflows")
+def create_workflow(definition: WorkflowDefinitionBody) -> dict[str, Any]:
+    try:
+        request = _workflow_definition_request(definition)
+        record = get_workflow_definition_store().create_workflow(request)
+    except WorkflowDefinitionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
+@app.get("/api/workflows/{workflow_id}")
+def get_workflow(workflow_id: str) -> dict[str, Any]:
+    try:
+        record = get_workflow_definition_store().get_workflow(workflow_id)
+    except WorkflowDefinitionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
+@app.put("/api/workflows/{workflow_id}")
+def update_workflow(workflow_id: str, definition: WorkflowDefinitionBody) -> dict[str, Any]:
+    try:
+        request = _workflow_definition_request(definition)
+        record = get_workflow_definition_store().update_workflow(workflow_id, request)
+    except WorkflowDefinitionError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
 @app.post("/api/approval-tickets/{ticket_id}/approve")
 def approve_simulation_ticket(
     ticket_id: str,
@@ -108,6 +159,23 @@ def reset_simulation_approval_service() -> None:
     _reset_simulation_approval_service()
 
 
+_workflow_temp_dir: TemporaryDirectory[str] | None = None
+_workflow_store: WorkflowDefinitionStore | None = None
+
+
+def get_workflow_definition_store() -> WorkflowDefinitionStore:
+    global _workflow_store
+    if _workflow_store is None:
+        _workflow_store = _build_workflow_definition_store()
+    return _workflow_store
+
+
+def reset_workflow_definition_service() -> WorkflowDefinitionStore:
+    global _workflow_store
+    _workflow_store = _build_workflow_definition_store()
+    return _workflow_store
+
+
 def _apply_simulation_approval_decision(
     ticket_id: str,
     action: str,
@@ -129,3 +197,26 @@ def _apply_simulation_approval_decision(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return record.to_json_dict()
+
+
+def _workflow_definition_request(
+    definition: WorkflowDefinitionBody,
+) -> WorkflowDefinitionSaveRequest:
+    return WorkflowDefinitionSaveRequest(
+        schema_version=definition.schema_version,
+        workflow_id=definition.workflow_id,
+        display_name=definition.display_name,
+        description=definition.description,
+        document=definition.document,
+        requested_at=definition.requested_at,
+    )
+
+
+def _build_workflow_definition_store() -> WorkflowDefinitionStore:
+    global _workflow_temp_dir
+    if _workflow_temp_dir is None:
+        _workflow_temp_dir = tempfile.TemporaryDirectory(prefix="trading-oms-workflows-")
+    store_path = Path(_workflow_temp_dir.name) / "workflow-definitions.json"
+    if store_path.exists():
+        store_path.unlink()
+    return WorkflowDefinitionStore(store_path)

@@ -16,6 +16,10 @@ import {
   updateStrategyBuilderState,
 } from "./strategyBuilder";
 import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
+import {
+  defaultVisualWorkflowDslCompileResult,
+  formatVisualWorkflowDslPreview,
+} from "./visualWorkflowDsl";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
 
@@ -179,6 +183,10 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
     initialReadState ?? initialReadApiState,
   );
   const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
+  const workflowDslPreview = useMemo(
+    () => formatVisualWorkflowDslPreview(defaultVisualWorkflowDslCompileResult),
+    [],
+  );
   const shouldLoadFromBackend = !initialReadState || initialReadState.status === "loading";
   const snapshot = readState.snapshot;
   const summaryPanels = useMemo(() => buildSummaryPanels(snapshot), [snapshot]);
@@ -344,12 +352,31 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
                 </label>
               </div>
 
+              <div className="persistence-status" aria-label="Workflow persistence status">
+                <div className="section-heading">
+                  <h2>Workflow persistence</h2>
+                  <span>versioned local storage</span>
+                </div>
+                <div className="persistence-grid">
+                  <StatusPill tone="good" label="Local definition storage ready" />
+                  <StatusPill tone="neutral" label="Validated DSL required" />
+                  <StatusPill tone="neutral" label="Simulation definitions only" />
+                </div>
+              </div>
+
               <div className="dsl-preview" aria-label="Generated Strategy DSL preview">
                 <div className="section-heading">
                   <h2>Generated DSL preview</h2>
                   <span>local only</span>
                 </div>
-                <pre>{dslPreview}</pre>
+                <div className="dsl-preview-block">
+                  <h3>Strategy DSL</h3>
+                  <pre>{dslPreview}</pre>
+                </div>
+                <div className="dsl-preview-block">
+                  <h3>Simulation workflow DSL</h3>
+                  <pre>{workflowDslPreview}</pre>
+                </div>
               </div>
             </div>
           </section>

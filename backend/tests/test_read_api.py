@@ -108,13 +108,15 @@ def test_app_module_does_not_define_mutation_or_transport_routes() -> None:
     source = inspect.getsource(app_module).lower()
 
     post_routes = set(re.findall(r'@app\.post\("([^"]+)"', source))
+    put_routes = set(re.findall(r'@app\.put\("([^"]+)"', source))
     assert post_routes == {
         "/api/approval-tickets/{ticket_id}/approve",
         "/api/approval-tickets/{ticket_id}/reject",
+        "/api/workflows",
     }
+    assert put_routes == {"/api/workflows/{workflow_id}"}
 
     forbidden_source_tokens = [
-        "@app.put",
         "@app.patch",
         "@app.delete",
         "import socket",

@@ -1460,9 +1460,11 @@ Acceptance criteria:
 
 ## Slice 036 - graph-to-DSL compiler
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-036-graph-to-dsl-compiler`
 
 Goal:
 Compile safe visual graphs to a typed simulation workflow DSL.
@@ -1478,13 +1480,29 @@ Non-goals:
 - IBKR transport;
 - live trading.
 
+Acceptance criteria:
+- [x] Validated graph compiles to a typed simulation workflow DSL document.
+- [x] Backend parser/validator accepts the safe simulation workflow DSL.
+- [x] Backend parser/validator rejects unsafe fields, missing required nodes, unsupported nodes,
+  unknown edges, and cycles.
+- [x] Invalid frontend graph compilation is blocked with validation errors.
+- [x] DSL preview is visible in the visual builder UI.
+- [x] DSL explicitly keeps broker transport, live trading, and arbitrary code disabled.
+- [x] Tests cover successful compilation, invalid graph blocking, backend parser validation, preview
+  formatting, and forbidden credential/route/live/code affordances.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
+
 ---
 
 ## Slice 037 - workflow persistence
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-037-workflow-persistence`
 
 Goal:
 Save and load validated simulation workflow definitions.
@@ -1498,6 +1516,17 @@ Non-goals:
 - execution;
 - broker connectivity;
 - live trading.
+
+Acceptance criteria:
+- [x] Valid simulation workflow DSL documents can be saved, listed, loaded, and updated locally.
+- [x] Invalid or unsafe workflow documents are rejected before persistence.
+- [x] Workflow updates are versioned and idempotent for identical payloads.
+- [x] Endpoints do not run workflows or expose broker/live/secret/action affordances.
+- [x] Frontend shows persistence status without run, broker, credential, route, script, import, eval,
+  or live-mode controls.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
 
 ---
 

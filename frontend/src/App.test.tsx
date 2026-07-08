@@ -60,6 +60,13 @@ describe("App", () => {
     expect(html).toContain("&quot;schema_version&quot;: 1");
     expect(html).toContain("&quot;mode&quot;: &quot;replay&quot;");
     expect(html).toContain("&quot;strategy_type&quot;: &quot;close_above_sma&quot;");
+    expect(text).toContain("Simulation workflow DSL");
+    expect(text).toContain("Workflow persistence");
+    expect(text).toContain("Local definition storage ready");
+    expect(html).toContain("&quot;workflow_id&quot;: &quot;visual-simulation-workflow&quot;");
+    expect(html).toContain("&quot;mode&quot;: &quot;simulation&quot;");
+    expect(html).toContain("&quot;runtime&quot;: &quot;preview_only&quot;");
+    expect(html).toContain("&quot;live_trading_enabled&quot;: false");
   });
 
   it("renders the safety posture visibly", () => {

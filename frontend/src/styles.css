@@ -513,6 +513,31 @@ dd {
   outline-offset: 1px;
 }
 
+.persistence-status {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #f9fbf7;
+  padding: 14px;
+}
+
+.persistence-status .section-heading {
+  align-items: start;
+  gap: 10px;
+}
+
+.persistence-status h2 {
+  font-size: 1rem;
+}
+
+.persistence-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .dsl-preview {
   grid-column: 1 / -1;
   overflow: hidden;
@@ -526,8 +551,26 @@ dd {
 }
 
 .dsl-preview h2,
+.dsl-preview h3,
 .dsl-preview .section-heading span {
   color: #f7faf6;
+}
+
+.dsl-preview-block {
+  display: grid;
+  border-bottom: 1px solid #2c3a43;
+}
+
+.dsl-preview-block:last-child {
+  border-bottom: 0;
+}
+
+.dsl-preview-block h3 {
+  margin: 0;
+  color: #f7faf6;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  padding: 12px 16px 0;
 }
 
 .dsl-preview pre {
