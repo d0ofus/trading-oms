@@ -1407,13 +1407,27 @@ Non-goals:
 - live mode nodes;
 - execution.
 
+Acceptance criteria:
+- [x] Typed visual node catalog exists.
+- [x] Catalog includes replay source, bar builder, strategy trigger, risk check, approval ticket,
+  fake broker, position update, alert, and audit sink nodes.
+- [x] Catalog nodes are non-executing and typed.
+- [x] Canvas renders from the typed catalog.
+- [x] Tests cover catalog shape, required risk-increasing path nodes, fixed edges, and forbidden
+  broker/credential/live/code affordances.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
+
 ---
 
 ## Slice 035 - visual graph validation
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-035-graph-validation`
 
 Goal:
 Validate visual workflows before they can be saved or run.
@@ -1431,13 +1445,13 @@ Non-goals:
 - live trading.
 
 Acceptance criteria:
-- [x] Typed visual node catalog exists.
-- [x] Catalog includes replay source, bar builder, strategy trigger, risk check, approval ticket,
-  fake broker, position update, alert, and audit sink nodes.
-- [x] Catalog nodes are non-executing and typed.
-- [x] Canvas renders from the typed catalog.
-- [x] Tests cover catalog shape, required risk-increasing path nodes, fixed edges, and forbidden
-  broker/credential/live/code affordances.
+- [x] Graph validation accepts the default typed simulation workflow graph.
+- [x] Graph validation rejects missing risk, approval, and audit sink nodes with explicit errors.
+- [x] Graph validation rejects unsafe action nodes and unsupported nodes.
+- [x] Graph validation rejects cycles and unknown edge endpoints.
+- [x] UI shows validation state without save, run, broker, credential, route, script, import, eval,
+  or live-mode controls.
+- [x] Tests cover valid and invalid validation cases.
 - [x] Verification passes.
 - [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
   added.

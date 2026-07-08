@@ -4,6 +4,7 @@ import {
   visualSimulationWorkflowEdges,
   visualSimulationWorkflowLayoutPolicy,
   visualSimulationWorkflowNodeCatalog,
+  visualSimulationWorkflowValidation,
 } from "./visualSimulationWorkflowCanvas";
 
 describe("visualSimulationWorkflowCanvas", () => {
@@ -91,6 +92,13 @@ describe("visualSimulationWorkflowCanvas", () => {
       elementsSelectable: true,
       persistenceEnabled: false,
       executionEnabled: false,
+    });
+  });
+
+  it("exposes a passing validation result for the default catalog", () => {
+    expect(visualSimulationWorkflowValidation).toEqual({
+      status: "valid",
+      errors: [],
     });
   });
 });

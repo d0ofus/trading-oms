@@ -43,6 +43,21 @@ operator can arrange the visual layout.
 Validation, DSL compilation, persistence, simulation run orchestration, and visual run inspection
 are reserved for later Gate C slices.
 
+## Graph Validation
+
+Slice 035 adds frontend graph validation. The default catalog graph must pass:
+
+- required risk check node;
+- required approval ticket node;
+- required audit sink node;
+- supported node types only;
+- no unsafe action nodes;
+- no cycles;
+- no unknown edge endpoints.
+
+Invalid graphs are represented by explicit validation errors. The validator still does not save,
+run, submit, transmit, connect, route, call a broker, or call a backend mutation endpoint.
+
 ## Safety Boundary
 
 The canvas must not introduce:

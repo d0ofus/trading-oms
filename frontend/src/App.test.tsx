@@ -46,6 +46,8 @@ describe("App", () => {
     expect(text).toContain("Alert");
     expect(text).toContain("Records local protection and safety alerts");
     expect(text).toContain("Audit sink");
+    expect(text).toContain("Graph validation passed");
+    expect(text).toContain("Risk, approval, audit, and supported-node checks passed");
     expect(text).toContain("Editable layout");
     expect(text).toContain("Node movement changes only local canvas positions");
     expect(text).toContain("no transport");

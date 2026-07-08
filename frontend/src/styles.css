@@ -424,6 +424,32 @@ dd {
   padding: 12px;
 }
 
+.flow-node-ledger ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.flow-node-ledger ul li {
+  display: list-item;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  list-style: disc;
+  padding: 0;
+}
+
+.flow-validation {
+  border-color: #a8d5b1;
+  background: #ecf8ef;
+}
+
+.flow-validation-invalid {
+  border-color: #f0afa6;
+  background: #fff0ed;
+}
+
 .flow-node-ledger h3 {
   color: #20282d;
   font-size: 0.9rem;

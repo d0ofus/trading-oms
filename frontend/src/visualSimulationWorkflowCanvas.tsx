@@ -16,6 +16,7 @@ import {
   simulationWorkflowNodeCatalog,
   type VisualWorkflowNodeRole,
 } from "./visualWorkflowNodeCatalog";
+import { validateCatalogWorkflowGraph } from "./visualWorkflowValidation";
 
 type FlowNodeData = {
   label: ReactNode;
@@ -35,6 +36,11 @@ export const visualSimulationWorkflowLayoutPolicy = {
   persistenceEnabled: false,
   executionEnabled: false,
 } as const;
+
+export const visualSimulationWorkflowValidation = validateCatalogWorkflowGraph(
+  visualSimulationWorkflowNodeCatalog,
+  simulationWorkflowEdgeCatalog,
+);
 
 export function VisualSimulationWorkflowCanvas() {
   const [nodes, , onNodesChange] = useNodesState(visualSimulationWorkflowNodes);
@@ -62,6 +68,27 @@ export function VisualSimulationWorkflowCanvas() {
       </div>
 
       <ol className="flow-node-ledger" aria-label="Simulation workflow scaffold nodes">
+        <li className={`flow-validation flow-validation-${visualSimulationWorkflowValidation.status}`}>
+          <span className="flow-role flow-role-gate">validation</span>
+          <div>
+            <h3>
+              {visualSimulationWorkflowValidation.status === "valid"
+                ? "Graph validation passed"
+                : "Graph validation blocked"}
+            </h3>
+            {visualSimulationWorkflowValidation.errors.length === 0 ? (
+              <p>Risk, approval, audit, and supported-node checks passed</p>
+            ) : (
+              <ul>
+                {visualSimulationWorkflowValidation.errors.map((error) => (
+                  <li key={`${error.code}-${error.nodeId ?? error.nodeType ?? error.message}`}>
+                    {error.message}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </li>
         <li className="flow-layout-policy">
           <span className="flow-role flow-role-transform">local layout</span>
           <div>
