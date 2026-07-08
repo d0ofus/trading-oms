@@ -749,7 +749,7 @@ Acceptance criteria:
 
 ## Slice 018 — live-trading readiness checklist
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-018-live-trading-readiness-checklist`
 
@@ -781,3 +781,951 @@ Acceptance criteria:
 - [x] Verification passes.
 - [x] No live broker connectivity or order submission path is added.
 - [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.
+
+---
+
+## Post-Slice-018 delivery gates
+
+The original safety-foundation queue is complete. The next queue moves toward the stated product
+goals through explicit human approval gates.
+
+Gate A has been approved by the human request to implement the post-Slice-018 plan. Gate A covers
+documentation and queue setup only.
+
+The following gates require separate explicit human approval before implementation starts:
+
+- Gate B: simulation mutation endpoints.
+- Gate C: visual workflow save/run.
+- Gate D: IBKR paper transport planning.
+- Gate E: IBKR paper transport implementation.
+- Gate F: production-readiness planning.
+- Gate G: any future live-trading readiness review.
+
+No future slice may enable live trading, add live-order transmission, add real credentials, expose
+IBKR TWS/Gateway ports publicly, or bypass risk, approval, OMS, or audit gates.
+
+---
+
+## Slice 019 - product gap analysis and post-Slice-018 queue
+
+status: `complete`
+
+branch: `slice-019-product-gap-plan`
+
+Goal:
+Create a durable product gap analysis and post-Slice-018 implementation queue.
+
+Scope:
+- add `docs/PRODUCT_GAP_ANALYSIS.md`;
+- add the post-Slice-018 queue entries;
+- document explicit approval gates;
+- update README references;
+- preserve the hard stops around live trading, broker transport, secrets, and production rollout.
+
+Non-goals:
+- backend implementation changes;
+- frontend implementation changes;
+- API endpoints;
+- simulation mutation endpoints;
+- persistence;
+- React Flow;
+- IBKR transport;
+- live trading;
+- production rollout.
+
+Acceptance criteria:
+- [x] Product gap analysis exists.
+- [x] Slice 019 through Slice 059 are represented in this queue.
+- [x] Future approval gates are explicit.
+- [x] No implementation behavior is changed.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.
+
+---
+
+## Slice 020 - backend read models
+
+status: `not_started`
+
+Gate: A
+
+Goal:
+Create typed backend read models for safe inspection views.
+
+Scope:
+- safety posture read model;
+- journal record read model;
+- signal, risk decision, approval ticket, order, position, alert, and readiness read models;
+- local fixture/read-model assembler for the current domain components;
+- tests proving models are read-only and contain no action affordances or secrets.
+
+Non-goals:
+- HTTP endpoints;
+- frontend integration;
+- mutation endpoints;
+- simulation orchestration;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 021 - backend read-only API endpoints
+
+status: `not_started`
+
+Gate: A
+
+Goal:
+Expose read-only FastAPI endpoints for the safe inspection views.
+
+Scope:
+- `GET /api/safety`;
+- `GET /api/audit-events`;
+- `GET /api/signals`;
+- `GET /api/risk-decisions`;
+- `GET /api/approval-tickets`;
+- `GET /api/orders`;
+- `GET /api/positions`;
+- `GET /api/alerts`;
+- `GET /api/readiness`;
+- tests proving the endpoints are read-only and expose no secrets or order-submission controls.
+
+Non-goals:
+- POST/PUT/PATCH/DELETE endpoints;
+- approval actions;
+- simulation runs;
+- persistence;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 022 - frontend API client and safe loading states
+
+status: `not_started`
+
+Gate: A
+
+Goal:
+Add a frontend API client for read-only backend views.
+
+Scope:
+- typed client functions for the read-only endpoints;
+- loading, empty, and error states;
+- safety posture fallback if the backend is unavailable;
+- frontend tests for safe rendering and forbidden action affordances.
+
+Non-goals:
+- mutation calls;
+- approval action UI;
+- order submission UI;
+- broker connection UI;
+- credentials;
+- live trading.
+
+---
+
+## Slice 023 - connect UI shell to backend read APIs
+
+status: `not_started`
+
+Gate: A
+
+Goal:
+Replace static/local UI shell records with backend-derived read data.
+
+Scope:
+- wire the existing sections to read APIs;
+- keep the visual builder local and replay-only;
+- preserve visible safety posture;
+- browser-check the local UI at `http://localhost:5173`.
+
+Non-goals:
+- simulation run creation;
+- approval actions;
+- broker actions;
+- workflow persistence;
+- live trading.
+
+---
+
+## Slice 024 - simulation run model
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Create the deterministic simulation run model.
+
+Scope:
+- run ID, status, timestamps, replay input reference, and journal references;
+- deterministic run lifecycle states;
+- tests for validation, idempotency, and journal coverage.
+
+Non-goals:
+- running a strategy;
+- approval mutation endpoints;
+- fake broker orchestration;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 025 - first product strategy
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Implement the product requirements strategy in replay mode.
+
+Scope:
+- first 5-minute bar high breakout;
+- cumulative volume at least 1.5x the 10-session average cumulative volume at the same session time;
+- deterministic replay-only signal generation;
+- journal every signal.
+
+Non-goals:
+- live market data;
+- order submission;
+- broker connectivity;
+- arbitrary strategy code;
+- live trading.
+
+---
+
+## Slice 026 - order-intent proposal model
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Represent strategy output as non-executable order-intent proposals.
+
+Scope:
+- typed order-intent proposal records;
+- explicit non-routable status;
+- protective-order plan or approved exception fields;
+- duplicate proposal prevention;
+- journaling.
+
+Non-goals:
+- broker submission;
+- approval decisions;
+- OMS transitions;
+- live trading.
+
+---
+
+## Slice 027 - replay to risk to approval orchestration
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Wire replay, bars, product strategy, order intent, risk decision, and approval ticket creation.
+
+Scope:
+- deterministic simulation orchestration;
+- every generated event appended to the journal;
+- stale data, duplicate ID, and unknown broker state blocks.
+
+Non-goals:
+- fake broker execution;
+- approval action endpoints;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 028 - simulation approval decisions
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Allow explicit approve/reject decisions for simulation-only approval tickets.
+
+Scope:
+- simulation-only approval mutation endpoints;
+- actor and reason capture;
+- idempotency;
+- journaled approval decisions.
+
+Non-goals:
+- broker order transmission;
+- real account actions;
+- bypassing risk or OMS;
+- live trading.
+
+---
+
+## Slice 029 - OMS and fake broker simulation orchestration
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Advance approved simulation orders through OMS and fake broker.
+
+Scope:
+- OMS transitions after approval;
+- fake broker acknowledgement/fill/cancel/reject paths;
+- journaled order transitions;
+- duplicate prevention.
+
+Non-goals:
+- IBKR transport;
+- paper account orders;
+- live trading.
+
+---
+
+## Slice 030 - simulated positions, protection monitoring, and alerts
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Track simulated positions and raise alerts for missing expected protection.
+
+Scope:
+- position records from simulated fills;
+- protective-order expectation checks;
+- critical alert when expected protection is missing;
+- audit coverage.
+
+Non-goals:
+- real portfolio reconciliation;
+- real alert delivery;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 031 - simulation run detail UI
+
+status: `not_started`
+
+Gate: B - requires separate explicit approval
+
+Goal:
+Show end-to-end simulation run detail in the UI.
+
+Scope:
+- run timeline;
+- signal, risk, approval, OMS, fake broker, fill, position, alert, and audit sections;
+- browser verification.
+
+Non-goals:
+- visual workflow editing;
+- IBKR transport;
+- live trading.
+
+---
+
+## Slice 032 - React Flow visual canvas scaffold
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Add the first React Flow visual canvas without execution.
+
+Scope:
+- dependency addition;
+- static canvas shell;
+- replay-only labels and safety posture;
+- tests proving no execution, broker, credential, or live-trading controls.
+
+Non-goals:
+- graph persistence;
+- graph execution;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 033 - editable graph layout
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Allow drag/drop layout edits for replay strategy nodes without changing execution behavior.
+
+Scope:
+- local graph layout state;
+- safe node movement;
+- generated read-only DSL preview remains safe.
+
+Non-goals:
+- saving workflows;
+- executing workflows;
+- adding arbitrary nodes;
+- live trading.
+
+---
+
+## Slice 034 - typed visual node catalog
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Create the safe node catalog for simulation workflows.
+
+Scope:
+- replay source, bar builder, strategy trigger, risk check, approval ticket, fake broker, position update, alert, and audit sink nodes;
+- typed node metadata;
+- forbidden node/key validation.
+
+Non-goals:
+- arbitrary code nodes;
+- broker credential nodes;
+- live mode nodes;
+- execution.
+
+---
+
+## Slice 035 - visual graph validation
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Validate visual workflows before they can be saved or run.
+
+Scope:
+- missing risk check errors;
+- missing approval errors;
+- missing audit sink errors;
+- unsupported node and cycle detection;
+- visible UI validation messages.
+
+Non-goals:
+- execution;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 036 - graph-to-DSL compiler
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Compile safe visual graphs to a typed simulation workflow DSL.
+
+Scope:
+- backend parser/validator;
+- frontend generated DSL preview;
+- rejection of arbitrary code, secrets, broker routing, and live-mode fields.
+
+Non-goals:
+- persistence;
+- workflow execution;
+- IBKR transport;
+- live trading.
+
+---
+
+## Slice 037 - workflow persistence
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Save and load validated simulation workflow definitions.
+
+Scope:
+- local persistence for workflow definitions;
+- list, detail, create, and update endpoints;
+- versioned workflow documents.
+
+Non-goals:
+- execution;
+- broker connectivity;
+- live trading.
+
+---
+
+## Slice 038 - run saved simulation workflows
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Run saved visual workflows against deterministic replay in simulation only.
+
+Scope:
+- validate before run;
+- produce simulation run records;
+- journal node execution status.
+
+Non-goals:
+- IBKR paper transport;
+- live trading;
+- production rollout.
+
+---
+
+## Slice 039 - visual run inspection
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Show visual workflow run status and audit references on the graph.
+
+Scope:
+- node status display;
+- risk blocks;
+- approval waits;
+- fills and alerts;
+- journal references.
+
+Non-goals:
+- broker transport;
+- live trading.
+
+---
+
+## Slice 040 - local persistence foundation
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Add local persistence for workflows, simulation runs, read models, and journal indexes.
+
+Scope:
+- SQLite by default;
+- deterministic migration/setup command;
+- persistence tests.
+
+Non-goals:
+- production database deployment;
+- secrets;
+- live trading.
+
+---
+
+## Slice 041 - audit explorer UI
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Add a UI for filtering and inspecting audit events.
+
+Scope:
+- filters by run, event type, symbol, order ID, ticket ID, severity, and timestamp;
+- event detail view;
+- no secret rendering.
+
+Non-goals:
+- audit deletion;
+- mutable event history;
+- live trading.
+
+---
+
+## Slice 042 - approval inbox UI
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Create an operator approval inbox for simulation-only tickets.
+
+Scope:
+- pending ticket list;
+- approve/reject forms;
+- actor and reason capture;
+- idempotency feedback.
+
+Non-goals:
+- broker transmission without paper-transport gate;
+- live trading.
+
+---
+
+## Slice 043 - order and position detail pages
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Add detailed order and position inspection pages.
+
+Scope:
+- OMS transitions;
+- fills;
+- position protection state;
+- linked audit events.
+
+Non-goals:
+- live position reconciliation;
+- broker order amendments;
+- live trading.
+
+---
+
+## Slice 044 - protection monitoring dashboard
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Show expected protection, exceptions, and critical alerts in the UI.
+
+Scope:
+- protected/unprotected position views;
+- exception references;
+- alert linkage.
+
+Non-goals:
+- live broker reconciliation;
+- real alert delivery;
+- live trading.
+
+---
+
+## Slice 045 - audit export bundle
+
+status: `not_started`
+
+Gate: C - requires separate explicit approval
+
+Goal:
+Export reviewable audit bundles without secrets.
+
+Scope:
+- deterministic export package;
+- secret-shaped content scan;
+- run/workflow/journal references.
+
+Non-goals:
+- uploading exports;
+- external delivery;
+- live trading.
+
+---
+
+## Slice 046 - IBKR paper transport plan and external review checklist
+
+status: `not_started`
+
+Gate: D - requires separate explicit approval
+
+Goal:
+Plan paper-only IBKR transport before implementation.
+
+Scope:
+- ExecPlan;
+- external review checklist;
+- paper-only safety controls;
+- no code transport yet.
+
+Non-goals:
+- IBKR SDK;
+- network transport;
+- order placement;
+- live trading.
+
+---
+
+## Slice 047 - local IBKR paper connectivity probe
+
+status: `not_started`
+
+Gate: E - requires separate explicit approval
+
+Goal:
+Probe local TWS/Gateway paper connectivity without order placement.
+
+Scope:
+- localhost-only connection attempt;
+- no public host;
+- no account ID or credential storage;
+- journal connection state.
+
+Non-goals:
+- order placement;
+- market orders;
+- live account mode;
+- live trading.
+
+---
+
+## Slice 048 - paper contract lookup
+
+status: `not_started`
+
+Gate: E - requires separate explicit approval
+
+Goal:
+Resolve paper-mode contract metadata safely.
+
+Scope:
+- paper-only contract lookup;
+- validation and journaling;
+- no market order placement.
+
+Non-goals:
+- live account lookup;
+- order placement;
+- live trading.
+
+---
+
+## Slice 049 - paper order submission adapter
+
+status: `not_started`
+
+Gate: E - requires separate explicit approval
+
+Goal:
+Submit paper-only IBKR orders behind the broker adapter boundary.
+
+Scope:
+- risk-passed, approval-referenced, OMS-ready paper orders only;
+- paper-only config enforcement;
+- reconciliation-safe state requirements;
+- journal every submission attempt and outcome.
+
+Non-goals:
+- live account mode;
+- live order routing;
+- bypassing approval;
+- live trading.
+
+---
+
+## Slice 050 - paper order status and fill callbacks
+
+status: `not_started`
+
+Gate: E - requires separate explicit approval
+
+Goal:
+Handle paper order status and fill callbacks safely.
+
+Scope:
+- callback validation;
+- idempotency;
+- OMS/fill reconciliation;
+- journal coverage.
+
+Non-goals:
+- live account mode;
+- live trading.
+
+---
+
+## Slice 051 - paper transport chaos tests
+
+status: `not_started`
+
+Gate: E - requires separate explicit approval
+
+Goal:
+Prove paper transport safety under disconnect, reconnect, duplicates, stale data, and unknown state.
+
+Scope:
+- deterministic chaos tests;
+- reconciliation-required blocks;
+- duplicate callback handling.
+
+Non-goals:
+- live account testing;
+- live trading.
+
+---
+
+## Slice 052 - paper trading operator UI
+
+status: `not_started`
+
+Gate: E - requires separate explicit approval
+
+Goal:
+Expose paper-only broker state and order status in the UI.
+
+Scope:
+- paper-only labeling;
+- connection state;
+- order status;
+- reconciliation warnings.
+
+Non-goals:
+- live trading controls;
+- credential inputs;
+- public broker host configuration.
+
+---
+
+## Slice 053 - deployment and secrets-management plan
+
+status: `not_started`
+
+Gate: F - requires separate explicit approval
+
+Goal:
+Plan production-like deployment and secret handling while live trading remains disabled.
+
+Scope:
+- deployment architecture;
+- secret storage strategy;
+- network exposure review;
+- rollback plan.
+
+Non-goals:
+- production rollout;
+- live trading;
+- adding real secrets.
+
+---
+
+## Slice 054 - authentication and authorization
+
+status: `not_started`
+
+Gate: F - requires separate explicit approval
+
+Goal:
+Add operator authentication and authorization.
+
+Scope:
+- operator identity;
+- permissions for viewing, approving, and administration;
+- audit every privileged action.
+
+Non-goals:
+- broker credential storage;
+- live trading.
+
+---
+
+## Slice 055 - operator roles and approval permissions
+
+status: `not_started`
+
+Gate: F - requires separate explicit approval
+
+Goal:
+Harden role-based controls for approval and operations.
+
+Scope:
+- approver role;
+- separation of duties;
+- approval audit evidence.
+
+Non-goals:
+- live trading approval;
+- production rollout.
+
+---
+
+## Slice 056 - emergency stop implementation
+
+status: `not_started`
+
+Gate: F - requires separate explicit approval
+
+Goal:
+Implement and test emergency stop behavior.
+
+Scope:
+- local emergency stop state;
+- risk-increasing work blocked while active;
+- journaled activation/deactivation;
+- tests.
+
+Non-goals:
+- live trading;
+- broker-side liquidation.
+
+---
+
+## Slice 057 - observability, retention, backup, and incident response
+
+status: `not_started`
+
+Gate: F - requires separate explicit approval
+
+Goal:
+Add production-readiness operating controls.
+
+Scope:
+- logs and metrics plan;
+- audit retention;
+- backup/restore;
+- incident response workflow.
+
+Non-goals:
+- live trading;
+- production rollout.
+
+---
+
+## Slice 058 - live-readiness evidence dashboard
+
+status: `not_started`
+
+Gate: F - requires separate explicit approval
+
+Goal:
+Display live-readiness evidence without enabling live trading.
+
+Scope:
+- evidence checklist UI;
+- readiness decision display;
+- missing evidence visibility.
+
+Non-goals:
+- enabling live trading;
+- live order path.
+
+---
+
+## Slice 059 - controlled paper-production rollout checklist
+
+status: `not_started`
+
+Gate: F - requires separate explicit approval
+
+Goal:
+Prepare a controlled paper-production rollout checklist.
+
+Scope:
+- paper-only rollout criteria;
+- external review evidence;
+- rollback and incident response evidence.
+
+Non-goals:
+- live trading rollout;
+- enabling live order submission.
