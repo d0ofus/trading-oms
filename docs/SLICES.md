@@ -1165,9 +1165,11 @@ Acceptance criteria:
 
 ## Slice 028 - simulation approval decisions
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-028-simulation-approval-decisions`
 
 Goal:
 Allow explicit approve/reject decisions for simulation-only approval tickets.
@@ -1183,6 +1185,20 @@ Non-goals:
 - real account actions;
 - bypassing risk or OMS;
 - live trading.
+
+Acceptance criteria:
+- [x] `POST /api/approval-tickets/{ticket_id}/approve` exists for simulation tickets only.
+- [x] `POST /api/approval-tickets/{ticket_id}/reject` exists for simulation tickets only.
+- [x] Actor, reason, decision reference, decision ID, and timestamp are captured.
+- [x] Repeating the same decision payload is idempotent.
+- [x] A ticket cannot be decided twice with different decision IDs.
+- [x] Unknown ticket IDs fail safely.
+- [x] Responses contain no broker, account, credential, route, submit, or transmit affordances.
+- [x] Tests cover approve, reject, idempotency, rejected second decisions, unknown tickets, response
+  safety, and allowed mutation route boundaries.
+- [x] Verification passes.
+- [x] No broker order transmission, real account actions, OMS advancement after approval, fake
+  broker execution, IBKR transport, or live trading are added.
 
 ---
 
