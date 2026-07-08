@@ -516,7 +516,7 @@ Acceptance criteria:
 
 ## Slice 013 — UI shell
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-013-ui-shell`
 
@@ -554,3 +554,50 @@ Acceptance criteria:
 - [x] Verification passes.
 - [x] No live broker connectivity or order submission path is added.
 - [x] No real Telegram tokens or secrets are introduced.
+
+---
+
+## Slice 014 — Strategy DSL
+
+status: `ready_for_human_review`
+
+branch: `slice-014-strategy-dsl`
+
+Goal:
+Create the first typed, validated Strategy DSL foundation for replay-only strategy configuration
+without arbitrary code execution, broker connectivity, order intents, or live-trading behavior.
+
+Scope:
+- backend Strategy DSL domain model for versioned replay-only strategy definitions;
+- JSON-compatible parser/validator for the existing `close_above_sma` replay strategy;
+- compiler from DSL documents to existing replay strategy config;
+- replay-only DSL runner that consumes local bars and journals generated strategy signals through the existing strategy path;
+- validation that rejects live mode, broker/order/action fields, credentials/secrets, unsupported strategy types, unsupported price sources, invalid symbols, invalid timeframes, and arbitrary-code-shaped fields;
+- tests proving deterministic parsing, validation, replay execution, journal coverage, and no order/broker/secret-shaped payloads;
+- docs for DSL shape, guarantees, current limitations, and future visual-builder boundaries.
+
+Non-goals:
+- live trading;
+- broker integration;
+- order intents or order submission;
+- risk checks;
+- approval tickets;
+- OMS integration;
+- fake broker orchestration;
+- real market-data ingestion;
+- arbitrary expressions or code execution;
+- YAML parser dependency;
+- visual workflow builder;
+- UI editing.
+
+Acceptance criteria:
+- [x] Strategy DSL module exists.
+- [x] DSL documents are versioned and validated before execution.
+- [x] DSL supports the existing `close_above_sma` replay strategy.
+- [x] DSL can compile to the existing replay strategy config.
+- [x] DSL replay runner journals generated signals through the existing strategy path.
+- [x] DSL rejects live mode, broker/order/action fields, secrets, unsupported strategy types, and arbitrary-code-shaped fields.
+- [x] Tests cover parsing, validation failures, deterministic replay execution, journal coverage, and no order/broker/secret-shaped payloads.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No real credentials, tokens, or secrets are introduced.

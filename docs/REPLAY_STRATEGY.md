@@ -1,8 +1,8 @@
 # Replay Strategy
 
-Slice 007 introduces the first deterministic replay-only strategy.
+Slice 007 introduced the first deterministic replay-only strategy.
 
-It does not add live market-data ingestion, broker connectivity, order intents, order submission, risk checks, approvals, OMS integration, alerts, UI, Strategy DSL execution, or live trading.
+It does not add live market-data ingestion, broker connectivity, order intents, order submission, risk checks, approvals, OMS integration, alerts, UI editing, or live trading.
 
 ## Strategy
 
@@ -62,9 +62,9 @@ The journal timestamp is the signal bar's `bar_end_timestamp`.
 ## Current Limitations
 
 - One hard-coded strategy only.
-- No Strategy DSL integration yet.
+- Strategy DSL integration is provided separately by `docs/STRATEGY_DSL.md` for this replay-only strategy.
 - Risk checks are provided separately by `docs/RISK_ENGINE.md`.
-- No fake broker or OMS integration yet.
-- No approval workflow yet.
-- No UI yet.
+- Fake broker and OMS behavior are provided separately but are not orchestrated by strategy execution.
+- Approval tickets are provided separately but are not orchestrated by strategy execution.
+- No Strategy DSL editor UI yet.
 - Numeric values currently use Python floats because bars currently use Python floats.
