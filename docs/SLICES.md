@@ -1125,9 +1125,11 @@ Acceptance criteria:
 
 ## Slice 027 - replay to risk to approval orchestration
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-027-replay-risk-approval-orchestration`
 
 Goal:
 Wire replay, bars, product strategy, order intent, risk decision, and approval ticket creation.
@@ -1142,6 +1144,22 @@ Non-goals:
 - approval action endpoints;
 - broker connectivity;
 - live trading.
+
+Acceptance criteria:
+- [x] Replay events are deterministically converted to local 5-minute bars.
+- [x] Product strategy signals create non-routable order-intent proposals.
+- [x] Every generated signal, proposal, risk decision, OMS pending-approval transition, approval
+  ticket, and simulation run transition is journaled.
+- [x] Approval tickets are created only after passed risk.
+- [x] Stale market data blocks approval-ticket creation.
+- [x] Duplicate risk request IDs block approval-ticket creation.
+- [x] Unknown broker state blocks risk-increasing approval-ticket creation.
+- [x] Duplicate order-intent proposal IDs are blocked safely.
+- [x] Tests cover passed orchestration, risk blocks, no-signal behavior, duplicate proposal blocking,
+  and no transport/order-submission behavior.
+- [x] Verification passes.
+- [x] No fake broker execution, approval action endpoints, broker connectivity, or live trading are
+  added.
 
 ---
 

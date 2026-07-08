@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -16,6 +16,7 @@ No live broker integration, production strategy engine, real alert delivery, con
 - No live order submission path.
 - Product strategy behavior is replay-only signal generation and cannot create order intents.
 - Order-intent proposals are explicitly non-routable and cannot submit orders.
+- Simulation orchestration stops at pending approval and cannot execute broker orders.
 - Fake broker behavior is local simulation only.
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
@@ -100,6 +101,7 @@ The Vite dev server proxies `/api` and `/healthz` to `http://127.0.0.1:8000`.
 - `docs/REPLAY_STRATEGY.md`: deterministic replay-only strategy behavior.
 - `docs/PRODUCT_STRATEGY.md`: first 5-minute breakout plus 1.5x volume-filter strategy.
 - `docs/ORDER_INTENTS.md`: non-routable order-intent proposal model.
+- `docs/SIMULATION_ORCHESTRATION.md`: deterministic replay-to-risk-to-approval path.
 - `docs/RISK_ENGINE.md`: structured risk checks and journaled risk decisions.
 - `docs/FAKE_BROKER.md`: simulation-only fake broker behavior.
 - `docs/OMS_STATE_MACHINE.md`: explicit OMS lifecycle states and transitions.
