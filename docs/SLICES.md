@@ -1047,9 +1047,11 @@ Acceptance criteria:
 
 ## Slice 025 - first product strategy
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-025-first-product-strategy`
 
 Goal:
 Implement the product requirements strategy in replay mode.
@@ -1066,6 +1068,20 @@ Non-goals:
 - broker connectivity;
 - arbitrary strategy code;
 - live trading.
+
+Acceptance criteria:
+- [x] First 5-minute bar high breakout detection exists.
+- [x] Cumulative volume must be at least 1.5x the 10-session average cumulative volume at the
+  same session time.
+- [x] Strategy consumes deterministic local bars only.
+- [x] Every generated signal is journaled.
+- [x] Signal payloads contain no quantity, side, order ID, broker routing, account, credential,
+  submit, or transmit fields.
+- [x] Tests cover deterministic signal generation, volume-filter blocking, validation failures,
+  journaling, and no transport/order behavior.
+- [x] Verification passes.
+- [x] No live market data, order intents, order submission, broker connectivity, arbitrary
+  strategy code, or live trading are added.
 
 ---
 
