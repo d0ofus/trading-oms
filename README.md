@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, and a local IBKR paper adapter foundation.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, and deterministic local resilience/chaos tests.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -22,6 +22,7 @@ No live broker integration, production strategy engine, real alert delivery, con
 - Strategy DSL behavior is local replay-only validation and signal generation only.
 - Visual workflow builder behavior is local replay-only DSL preview only.
 - IBKR paper adapter behavior is local configuration, state, and order-plan journaling only.
+- Resilience/chaos behavior is local event journaling and risk-gate verification only.
 - Default mode is paper/simulation.
 - IBKR transport will come later as paper-only first.
 
@@ -91,5 +92,6 @@ npm run dev --prefix frontend
 - `docs/STRATEGY_DSL.md`: typed replay-only Strategy DSL shape and safety boundary.
 - `docs/VISUAL_WORKFLOW_BUILDER.md`: local replay-only visual builder behavior.
 - `docs/IBKR_PAPER_ADAPTER.md`: local IBKR paper adapter foundation and safety boundary.
+- `docs/RESILIENCE_CHAOS.md`: local reconnect, reconciliation, and chaos-test behavior.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.

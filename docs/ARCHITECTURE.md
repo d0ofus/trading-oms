@@ -27,11 +27,11 @@
 - Strategy DSL.
 - Visual workflow builder.
 - IBKR paper adapter foundation.
+- Local resilience and chaos-test harness.
 
 ## Later components
 
 - React Flow drag-and-drop visual builder.
 - IBKR paper transport.
-- Reconciliation engine.
-- Chaos test harness.
+- Production reconciliation engine.
 - Live-readiness gate.

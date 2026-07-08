@@ -654,7 +654,7 @@ Acceptance criteria:
 
 ## Slice 016 — IBKR paper adapter
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-016-ibkr-paper-adapter`
 
@@ -699,3 +699,85 @@ Acceptance criteria:
 - [x] Verification passes.
 - [x] No IBKR SDK, socket, network transport, live broker connectivity, or order submission path is added.
 - [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.
+
+---
+
+## Slice 017 — reconnect/reconciliation/chaos tests
+
+status: `ready_for_human_review`
+
+branch: `slice-017-reconnect-reconciliation-chaos-tests`
+
+Goal:
+Add a deterministic local resilience and chaos-test foundation for disconnect, reconnect, stale data,
+unknown broker state, duplicate events, and reconciliation behavior.
+
+Scope:
+- backend resilience domain model for local connection, reconciliation, and chaos events;
+- deterministic reconnect/reconciliation scenario runner with append-only journal coverage;
+- explicit unknown-state and reconciliation-required behavior that blocks risk-increasing work;
+- duplicate resilience event IDs are rejected or replayed idempotently only when payloads match;
+- tests proving disconnect/reconnect journaling, reconciliation completion, stale-data blocking,
+  unknown broker state blocking, duplicate-event handling, and no network/secrets/live-order behavior;
+- docs for resilience/chaos guarantees, current limitations, and future adapter boundaries.
+
+Non-goals:
+- live trading;
+- real broker credentials, account IDs, certificates, private keys, passwords, or secrets;
+- IBKR SDK dependency;
+- socket or network transport;
+- connecting to TWS, IB Gateway, or any broker;
+- submitting, placing, transmitting, cancelling, or modifying real or paper broker orders;
+- market-data subscriptions;
+- production reconciliation against real broker state;
+- UI changes;
+- dependency installs.
+
+Acceptance criteria:
+- [x] Resilience/chaos module exists.
+- [x] Disconnect, reconnect, reconciliation start, and reconciliation completion events are journaled.
+- [x] Reconnect leaves risk-increasing work blocked until reconciliation completes.
+- [x] Unknown broker state blocks risk-increasing work.
+- [x] Stale market data blocks risk-increasing work in the chaos test coverage.
+- [x] Duplicate resilience event IDs are blocked or idempotently replayed when payloads match.
+- [x] Tests cover deterministic reconnect/reconciliation scenarios and safety edge cases.
+- [x] Verification passes.
+- [x] No IBKR SDK, socket, network transport, live broker connectivity, or order submission path is added.
+- [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.
+
+---
+
+## Slice 018 — live-trading readiness checklist
+
+status: `not_started`
+
+branch: `slice-018-live-trading-readiness-checklist`
+
+Goal:
+Harden the live-trading readiness gate so the repository can explicitly show why live trading remains
+disabled and what evidence would be required before any future consideration.
+
+Scope:
+- structured live-trading readiness checklist model or verifier;
+- explicit status showing live trading is not ready;
+- tests proving missing readiness evidence keeps live trading blocked;
+- docs explaining readiness evidence, current gaps, and approval boundaries.
+
+Non-goals:
+- live trading;
+- enabling live trading configuration;
+- broker order submission;
+- real broker credentials, account IDs, certificates, private keys, passwords, or secrets;
+- IBKR SDK dependency;
+- socket or network transport;
+- changing the default paper/simulation posture;
+- production rollout.
+
+Acceptance criteria:
+- [ ] Live-trading readiness gate remains disabled by default.
+- [ ] Missing readiness evidence blocks readiness.
+- [ ] Readiness status is explicit and auditable.
+- [ ] Tests cover not-ready behavior and forbidden enablement paths.
+- [ ] Verification passes.
+- [ ] No live broker connectivity or order submission path is added.
+- [ ] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.

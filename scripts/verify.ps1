@@ -32,13 +32,13 @@ Invoke-Checked python scripts/verify_repo.py
 Invoke-Checked python -m ruff format --check backend/src backend/tests
 Invoke-Checked python -m ruff check backend/src backend/tests
 Invoke-Checked python -m compileall -q backend/src backend/tests
-Invoke-Checked python -m pytest backend/tests
+Invoke-Checked python -m pytest "-p" no:cacheprovider --basetemp .pytest-tmp backend/tests
 Invoke-Checked npm.cmd --prefix frontend run lint
 Invoke-Checked npm.cmd --prefix frontend run typecheck
 Invoke-Checked npm.cmd --prefix frontend run test
 
 Write-Host "test-integration: placeholder until integration tests exist"
 Write-Host "test-replay: placeholder until replay engine exists"
-Write-Host "test-chaos: placeholder until chaos tests exist"
+Invoke-Checked python -m pytest "-p" no:cacheprovider --basetemp .pytest-tmp backend/tests/test_resilience.py
 Write-Host "test-e2e: placeholder until e2e tests exist"
 Write-Host "verify: ok"
