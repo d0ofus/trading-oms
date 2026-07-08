@@ -846,7 +846,7 @@ Acceptance criteria:
 
 ## Slice 020 - backend read models
 
-status: `ready_for_human_review`
+status: `complete`
 
 Gate: A
 
@@ -884,9 +884,11 @@ Acceptance criteria:
 
 ## Slice 021 - backend read-only API endpoints
 
-status: `not_started`
+status: `complete`
 
 Gate: A
+
+branch: `slice-021-backend-read-only-api-endpoints`
 
 Goal:
 Expose read-only FastAPI endpoints for the safe inspection views.
@@ -911,13 +913,32 @@ Non-goals:
 - broker connectivity;
 - live trading.
 
+Acceptance criteria:
+- [x] `GET /api/safety` exists.
+- [x] `GET /api/audit-events` exists.
+- [x] `GET /api/signals` exists.
+- [x] `GET /api/risk-decisions` exists.
+- [x] `GET /api/approval-tickets` exists.
+- [x] `GET /api/orders` exists.
+- [x] `GET /api/positions` exists.
+- [x] `GET /api/alerts` exists.
+- [x] `GET /api/readiness` exists.
+- [x] Tests prove the endpoints are read-only and expose no secrets or order-submission controls.
+- [x] Verification passes.
+- [x] No mutation endpoints, approval actions, simulation runs, persistence, broker connectivity,
+  or live trading are added.
+- [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets
+  are introduced.
+
 ---
 
 ## Slice 022 - frontend API client and safe loading states
 
-status: `not_started`
+status: `complete`
 
 Gate: A
+
+branch: `slice-022-frontend-api-client`
 
 Goal:
 Add a frontend API client for read-only backend views.
@@ -936,13 +957,25 @@ Non-goals:
 - credentials;
 - live trading.
 
+Acceptance criteria:
+- [x] Typed client functions exist for all read-only endpoints.
+- [x] Loading, empty, loaded, and error states exist.
+- [x] Backend-unavailable errors fall back to a safe local posture.
+- [x] Tests prove the client uses `GET` requests only.
+- [x] Tests prove forbidden action, broker, credential, and secret affordances are absent.
+- [x] Verification passes.
+- [x] No mutation calls, approval action UI, order submission UI, broker connection UI,
+  credentials, or live trading are added.
+
 ---
 
 ## Slice 023 - connect UI shell to backend read APIs
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: A
+
+branch: `slice-023-connect-ui-to-read-apis`
 
 Goal:
 Replace static/local UI shell records with backend-derived read data.
@@ -959,6 +992,19 @@ Non-goals:
 - broker actions;
 - workflow persistence;
 - live trading.
+
+Acceptance criteria:
+- [x] Existing workflow sections read from frontend read API state.
+- [x] Safety posture renders backend-derived mode, broker connectivity, alert delivery, and read
+  API status.
+- [x] Backend-unavailable state falls back to a safe no-live-trading posture.
+- [x] Visual builder remains local and replay-only.
+- [x] Tests prove backend-derived records render and static demo rows are removed.
+- [x] Tests prove forbidden live-action and credential affordances are absent.
+- [x] Verification passes.
+- [ ] Browser-check the local UI at `http://localhost:5173`.
+- [x] No simulation run creation, approval actions, broker actions, workflow persistence, or live
+  trading are added.
 
 ---
 

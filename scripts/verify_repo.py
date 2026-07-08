@@ -51,9 +51,11 @@ REQUIRED_TEXT = {
         "IBKR_ACCOUNT_MODE=paper",
     ],
     ".codex/config.toml": [
-        'approval_policy = "on-request"',
+        'approval_policy = "never"',
         'sandbox_mode = "workspace-write"',
-        "network_access = false",
+        'model_reasoning_effort = "xhigh"',
+        'plan_mode_reasoning_effort = "xhigh"',
+        "network_access = true",
     ],
 }
 

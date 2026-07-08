@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, and typed backend read models for safe inspection views.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, and a frontend read API client for safe inspection views.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -18,8 +18,10 @@ No live broker integration, production strategy engine, real alert delivery, con
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
 - Alert behavior is local no-op recording and formatting only.
-- Operations shell records are static/read-only inspection only.
+- Operations shell records are backend-derived read-only inspection data with a safe fallback.
 - Backend read models are local read-only inspection summaries only.
+- Backend read API endpoints are `GET`-only inspection views backed by local demo read data.
+- Frontend read API client calls are `GET`-only and fall back to a safe no-live-trading posture.
 - Strategy DSL behavior is local replay-only validation and signal generation only.
 - Visual workflow builder behavior is local replay-only DSL preview only.
 - IBKR paper adapter behavior is local configuration, state, and order-plan journaling only.
@@ -54,11 +56,19 @@ On Windows without `make`:
 .\scripts\verify.ps1
 ```
 
-Run the frontend UI shell locally:
+Run the backend read API locally:
+
+```bash
+python -m uvicorn trading_oms_backend.app:app --app-dir backend/src --host 127.0.0.1 --port 8000
+```
+
+Run the frontend UI shell locally in a second terminal:
 
 ```bash
 npm run dev --prefix frontend
 ```
+
+The Vite dev server proxies `/api` and `/healthz` to `http://127.0.0.1:8000`.
 
 ## Recommended development loop
 
@@ -99,5 +109,7 @@ npm run dev --prefix frontend
 - `docs/POST_SLICE_018_REVIEW.md`: post-queue planning boundary before any rollout work.
 - `docs/PRODUCT_GAP_ANALYSIS.md`: post-Slice-018 product gap map and approval gates.
 - `docs/READ_MODELS.md`: typed backend read-model behavior and limitations.
+- `docs/READ_API.md`: backend read-only API endpoints and safety boundary.
+- `docs/FRONTEND_READ_API_CLIENT.md`: frontend read API client and safe loading states.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.

@@ -167,6 +167,12 @@ a {
   font-size: 1.35rem;
 }
 
+.state-note {
+  margin: 8px 0 0;
+  color: #815400;
+  font-weight: 700;
+}
+
 .posture-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -420,6 +426,13 @@ dd {
 
 .record-row > div {
   min-width: 0;
+}
+
+.empty-state {
+  margin: 0;
+  color: #68736c;
+  font-weight: 700;
+  padding: 18px 16px;
 }
 
 @media (max-width: 980px) {

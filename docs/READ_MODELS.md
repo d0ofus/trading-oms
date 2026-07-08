@@ -7,9 +7,9 @@ orchestration, persistence, broker connectivity, IBKR transport, order submissio
 
 ## Purpose
 
-The read models are stable, JSON-compatible summaries for future read-only API endpoints and UI
-sections. They make the current safety posture and local workflow state inspectable without adding
-action controls.
+The read models are stable, JSON-compatible summaries for read-only API endpoints and UI sections.
+They make the current safety posture and local workflow state inspectable without adding action
+controls.
 
 The backend module is:
 
@@ -36,9 +36,9 @@ Every read model exposes `to_json_dict()` for deterministic JSON-compatible outp
 
 ## Demo Assembler
 
-`build_demo_operations_read_model()` returns a safe local aggregate view for the next read-only API
-slice. It uses static inspection records only. It does not read from a database, write to the event
-journal, submit orders, approve tickets, connect to brokers, or call external services.
+`build_demo_operations_read_model()` returns a safe local aggregate view for the current read-only
+API slice. It uses static inspection records only. It does not read from a database, write to the
+event journal, submit orders, approve tickets, connect to brokers, or call external services.
 
 ## Safety Guarantees
 
@@ -53,7 +53,7 @@ journal, submit orders, approve tickets, connect to brokers, or call external se
 ## Current Limitations
 
 - The aggregate assembler is local demo data only.
-- No HTTP endpoints expose these models yet.
+- Slice 021 exposes these models through read-only `GET /api/...` endpoints.
 - No frontend screen consumes these models yet.
 - No database-backed read model persistence exists yet.
 - Position records are inspection summaries only; full simulated position tracking remains a later
