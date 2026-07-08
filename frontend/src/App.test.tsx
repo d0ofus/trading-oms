@@ -21,6 +21,7 @@ describe("App", () => {
 
     expect(text).toContain("Trading OMS");
     expect(text).toContain("Visual builder");
+    expect(text).toContain("Simulation run detail");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
     expect(text).toContain("Orders");
@@ -71,6 +72,27 @@ describe("App", () => {
     expect(text).toContain("Backend protection review");
     expect(text).not.toContain("AAPL replay SMA");
     expect(text).not.toContain("MSFT replay SMA");
+  });
+
+  it("renders the simulation run detail timeline and safety records", () => {
+    const text = renderedText(<App initialReadState={loadedReadState} />);
+
+    expect(text).toContain("Run sim-run-001");
+    expect(text).toContain("Replay loaded");
+    expect(text).toContain("Signal generated");
+    expect(text).toContain("Risk evaluated");
+    expect(text).toContain("Approval decided");
+    expect(text).toContain("Fake broker filled");
+    expect(text).toContain("Protection monitored");
+    expect(text).toContain("signal-001");
+    expect(text).toContain("risk-001");
+    expect(text).toContain("approval-ticket-001");
+    expect(text).toContain("order-001");
+    expect(text).toContain("fake-client-001");
+    expect(text).toContain("fill-001");
+    expect(text).toContain("position-AAPL");
+    expect(text).toContain("alert-position-update-001");
+    expect(text).toContain("append only");
   });
 
   it("renders a safe fallback when backend read APIs are unavailable", () => {

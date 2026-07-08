@@ -33,12 +33,21 @@ type WorkflowRow = {
   tone: Tone;
 };
 
+type SimulationRunDetailItem = {
+  group: string;
+  label: string;
+  detail: string;
+  status: string;
+  tone: Tone;
+};
+
 type AppProps = {
   initialReadState?: ReadApiLoadState;
   readApiClient?: ReadApiClient;
 };
 
 const visualBuilderSection = "Visual builder" as const;
+const simulationRunSection = "Simulation run detail" as const;
 
 const workflowSections = [
   "Signals",
@@ -51,7 +60,118 @@ const workflowSections = [
 
 type WorkflowSection = (typeof workflowSections)[number];
 
-const shellSections = [visualBuilderSection, ...workflowSections] as const;
+const shellSections = [visualBuilderSection, simulationRunSection, ...workflowSections] as const;
+
+const simulationRunTimeline: SimulationRunDetailItem[] = [
+  {
+    group: "Timeline",
+    label: "Replay loaded",
+    detail: "AAPL session replay built 5-minute bars",
+    status: "completed",
+    tone: "good",
+  },
+  {
+    group: "Timeline",
+    label: "Signal generated",
+    detail: "First 5-minute breakout with 1.5x volume filter",
+    status: "long entry candidate",
+    tone: "info",
+  },
+  {
+    group: "Timeline",
+    label: "Risk evaluated",
+    detail: "Fresh data, known simulation broker state, protection plan present",
+    status: "passed",
+    tone: "good",
+  },
+  {
+    group: "Timeline",
+    label: "Approval decided",
+    detail: "Manual simulation approval recorded",
+    status: "approved",
+    tone: "good",
+  },
+  {
+    group: "Timeline",
+    label: "Fake broker filled",
+    detail: "Local fake broker acknowledged and filled the simulation order",
+    status: "filled",
+    tone: "good",
+  },
+  {
+    group: "Timeline",
+    label: "Protection monitored",
+    detail: "Missing expected stop-loss protection raised a local critical alert",
+    status: "critical alert",
+    tone: "critical",
+  },
+];
+
+const simulationRunDetailItems: SimulationRunDetailItem[] = [
+  {
+    group: "Signal",
+    label: "signal-001",
+    detail: "AAPL breakout above first 5-minute high",
+    status: "long entry candidate",
+    tone: "info",
+  },
+  {
+    group: "Risk",
+    label: "risk-001",
+    detail: "Duplicate, stale data, and unknown state checks passed",
+    status: "passed",
+    tone: "good",
+  },
+  {
+    group: "Approval",
+    label: "approval-ticket-001",
+    detail: "Manual simulation approval captured with actor and reason",
+    status: "approved",
+    tone: "good",
+  },
+  {
+    group: "OMS",
+    label: "order-001",
+    detail: "CREATED -> PENDING_APPROVAL -> APPROVED -> SUBMITTED -> FILLED",
+    status: "filled",
+    tone: "good",
+  },
+  {
+    group: "Fake broker",
+    label: "fake-client-001",
+    detail: "Simulation-only acknowledgement and fill",
+    status: "filled",
+    tone: "good",
+  },
+  {
+    group: "Fill",
+    label: "fill-001",
+    detail: "10 AAPL at 102.00 from local fake broker",
+    status: "simulated",
+    tone: "info",
+  },
+  {
+    group: "Position",
+    label: "position-AAPL",
+    detail: "Quantity 10, expected stop-loss protection missing",
+    status: "missing expected protection",
+    tone: "critical",
+  },
+  {
+    group: "Alert",
+    label: "alert-position-update-001",
+    detail: "Local no-op critical alert recorded",
+    status: "critical",
+    tone: "critical",
+  },
+  {
+    group: "Audit",
+    label: "journal",
+    detail: "Signal, proposal, risk, approval, OMS, fill, position, and alert events",
+    status: "append only",
+    tone: "info",
+  },
+];
 
 export function App({ initialReadState, readApiClient }: AppProps = {}) {
   const [builderState, setBuilderState] = useState(defaultStrategyBuilderState);
@@ -242,6 +362,47 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
                   <span>local only</span>
                 </div>
                 <pre>{dslPreview}</pre>
+              </div>
+            </div>
+          </section>
+
+          <section className="run-detail-section" id={sectionId(simulationRunSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Simulation run</p>
+                <h2>Run sim-run-001</h2>
+              </div>
+              <StatusPill tone="good" label="Simulation only" />
+            </div>
+            <div className="run-detail-layout">
+              <div className="run-timeline" aria-label="Simulation run timeline">
+                {simulationRunTimeline.map((item, index) => (
+                  <article className="timeline-step" key={item.label}>
+                    <span className="node-index" aria-label={`Timeline step ${index + 1}`}>
+                      {index + 1}
+                    </span>
+                    <div>
+                      <h3>{item.label}</h3>
+                      <p>{item.detail}</p>
+                    </div>
+                    <StatusPill tone={item.tone} label={item.status} />
+                  </article>
+                ))}
+              </div>
+              <div className="run-detail-grid" aria-label="Simulation run detail records">
+                {simulationRunDetailItems.map((item) => (
+                  <article className="run-detail-card" key={`${item.group}-${item.label}`}>
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">{item.group}</p>
+                        <h3>{item.label}</h3>
+                      </div>
+                      <span className={`swatch swatch-${item.tone}`} aria-hidden="true" />
+                    </div>
+                    <p>{item.detail}</p>
+                    <StatusPill tone={item.tone} label={item.status} />
+                  </article>
+                ))}
               </div>
             </div>
           </section>

@@ -207,6 +207,7 @@ dd {
 
 .summary-panel,
 .builder-section,
+.run-detail-section,
 .workflow-section {
   border: 1px solid #d9ded5;
   border-radius: 8px;
@@ -394,6 +395,64 @@ dd {
   overflow: hidden;
 }
 
+.run-detail-section {
+  overflow: hidden;
+}
+
+.run-detail-layout {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.run-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.timeline-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 70px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #f9fbf7;
+  padding: 12px;
+}
+
+.timeline-step h3,
+.run-detail-card h3 {
+  margin: 0;
+  color: #20282d;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+}
+
+.timeline-step p,
+.run-detail-card p {
+  margin: 0;
+  color: #5e6873;
+}
+
+.run-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.run-detail-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 150px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
 .section-heading {
   border-bottom: 1px solid #e3e7e1;
   padding: 14px 16px;
@@ -473,6 +532,7 @@ dd {
   .posture-grid,
   .summary-grid,
   .builder-layout,
+  .run-detail-grid,
   .section-grid {
     grid-template-columns: 1fr;
   }
@@ -487,5 +547,15 @@ dd {
   .record-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .timeline-step {
+    align-items: flex-start;
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .timeline-step .status-pill {
+    grid-column: 2;
+    justify-self: start;
   }
 }
