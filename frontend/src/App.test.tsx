@@ -22,6 +22,7 @@ describe("App", () => {
     expect(text).toContain("Trading OMS");
     expect(text).toContain("Visual builder");
     expect(text).toContain("Simulation run detail");
+    expect(text).toContain("Approval inbox");
     expect(text).toContain("Audit explorer");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
@@ -146,6 +147,24 @@ describe("App", () => {
     expect(text).toContain("informational");
   });
 
+  it("renders simulation-only approval inbox forms with idempotency feedback", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Approval inbox");
+    expect(text).toContain("Simulation ticket review");
+    expect(text).toContain("ticket-backend-001");
+    expect(text).toContain("Actor");
+    expect(text).toContain("Reason");
+    expect(text).toContain("Approve simulation");
+    expect(text).toContain("Reject simulation");
+    expect(text).toContain("Idempotency key");
+    expect(html).toContain("<form");
+    expect(html).toContain("<button");
+    expect(text).not.toContain("transmit order");
+    expect(text).not.toContain("connect broker");
+  });
+
   it("renders a safe fallback when backend read APIs are unavailable", () => {
     const fallbackState: ReadApiLoadState = {
       status: "error",
@@ -193,8 +212,6 @@ describe("App", () => {
     for (const phrase of forbiddenPhrases) {
       expect(html).not.toContain(phrase);
     }
-    expect(html).not.toContain("<button");
-    expect(html).not.toContain("<form");
   });
 });
 

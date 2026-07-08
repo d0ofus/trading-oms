@@ -41,6 +41,7 @@ a {
 .safety-band h2,
 .workflow-section h2,
 .audit-explorer-section h2,
+.approval-inbox-section h2,
 .builder-section h2,
 .builder-node h3,
 .flow-node-ledger h3,
@@ -211,6 +212,7 @@ dd {
 .builder-section,
 .run-detail-section,
 .audit-explorer-section,
+.approval-inbox-section,
 .workflow-section {
   border: 1px solid #d9ded5;
   border-radius: 8px;
@@ -637,6 +639,118 @@ dd {
   overflow: hidden;
 }
 
+.approval-inbox-section {
+  overflow: hidden;
+}
+
+.approval-inbox-list {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.approval-ticket-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.approval-ticket-card h3 {
+  margin: 0;
+  color: #20282d;
+  font-size: 0.95rem;
+}
+
+.approval-ticket-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.approval-ticket-facts > div {
+  min-width: 0;
+  border-left: 3px solid #e8c273;
+  background: #fffaf0;
+  padding: 10px 12px;
+}
+
+.approval-form {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #edf0eb;
+  padding-top: 14px;
+}
+
+.approval-form label {
+  display: grid;
+  gap: 6px;
+  color: #4d5852;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.approval-form input,
+.approval-form textarea {
+  min-height: 38px;
+  width: 100%;
+  border: 1px solid #cbd6cb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2923;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 7px 9px;
+}
+
+.approval-form textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.approval-form input:focus,
+.approval-form textarea:focus {
+  border-color: #6aa56f;
+  outline: 2px solid #d8efdb;
+  outline-offset: 1px;
+}
+
+.approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.approval-actions button {
+  min-height: 36px;
+  border: 1px solid #cbd2d8;
+  border-radius: 6px;
+  background: #f5f7f8;
+  color: #26313a;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 7px 12px;
+}
+
+.approval-actions button:hover,
+.approval-actions button:focus-visible {
+  border-color: #6aa56f;
+  outline: 2px solid #d8efdb;
+  outline-offset: 1px;
+}
+
+.approval-feedback {
+  margin: 0;
+  color: #5e6873;
+  font-size: 0.84rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .audit-explorer-layout {
   display: grid;
   grid-template-columns: minmax(240px, 0.85fr) minmax(260px, 1fr) minmax(240px, 0.8fr);
@@ -866,6 +980,7 @@ dd {
   .builder-layout,
   .flow-node-ledger,
   .run-detail-grid,
+  .approval-ticket-facts,
   .audit-explorer-layout,
   .section-grid {
     grid-template-columns: 1fr;

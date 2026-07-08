@@ -1674,9 +1674,11 @@ Acceptance criteria:
 
 ## Slice 042 - approval inbox UI
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-042-approval-inbox-ui`
 
 Goal:
 Create an operator approval inbox for simulation-only tickets.
@@ -1690,6 +1692,18 @@ Scope:
 Non-goals:
 - broker transmission without paper-transport gate;
 - live trading.
+
+Acceptance criteria:
+- [x] UI lists pending simulation approval tickets.
+- [x] UI captures actor and reason.
+- [x] UI exposes approve/reject controls labeled simulation-only.
+- [x] UI shows idempotency feedback.
+- [x] Frontend client posts only to simulation approval endpoints.
+- [x] UI contains no broker, credential, route, script, import, eval, submit-order,
+  transmit-order, or live-mode controls.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, fake broker execution, or
+  production rollout are added.
 
 ---
 

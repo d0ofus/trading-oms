@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  buildApprovalDecisionRequest,
+  defaultApprovalInboxFormState,
+  safeApprovalInboxText,
+  type ApprovalInboxAction,
+  type ApprovalInboxFormState,
+} from "./approvalInbox";
+import {
   defaultAuditExplorerFilters,
   filterAuditEvents,
   safeAuditDisplayText,
@@ -11,12 +18,17 @@ import {
   initialReadApiState,
   loadOperationsSnapshot,
   type AlertApiView,
+  type ApprovalTicketApiView,
   type AuditEventApiView,
   type OperationsApiSnapshot,
   type PositionApiView,
   type ReadApiClient,
   type ReadApiLoadState,
 } from "./readApiClient";
+import {
+  createSimulationApprovalApiClient,
+  type SimulationApprovalApiClient,
+} from "./simulationApprovalApiClient";
 import {
   defaultStrategyBuilderState,
   formatStrategyDslPreview,
@@ -55,10 +67,12 @@ type SimulationRunDetailItem = {
 type AppProps = {
   initialReadState?: ReadApiLoadState;
   readApiClient?: ReadApiClient;
+  simulationApprovalApiClient?: SimulationApprovalApiClient;
 };
 
 const visualBuilderSection = "Visual builder" as const;
 const simulationRunSection = "Simulation run detail" as const;
+const approvalInboxSection = "Approval inbox" as const;
 const auditExplorerSection = "Audit explorer" as const;
 
 const workflowSections = [
@@ -75,6 +89,7 @@ type WorkflowSection = (typeof workflowSections)[number];
 const shellSections = [
   visualBuilderSection,
   simulationRunSection,
+  approvalInboxSection,
   auditExplorerSection,
   ...workflowSections,
 ] as const;
@@ -190,11 +205,21 @@ const simulationRunDetailItems: SimulationRunDetailItem[] = [
   },
 ];
 
-export function App({ initialReadState, readApiClient }: AppProps = {}) {
+export function App({
+  initialReadState,
+  readApiClient,
+  simulationApprovalApiClient,
+}: AppProps = {}) {
   const [builderState, setBuilderState] = useState(defaultStrategyBuilderState);
   const [auditFilters, setAuditFilters] = useState(defaultAuditExplorerFilters);
+  const [approvalForms, setApprovalForms] = useState<Record<string, ApprovalInboxFormState>>({});
+  const [approvalFeedback, setApprovalFeedback] = useState<Record<string, string>>({});
   const [readState, setReadState] = useState<ReadApiLoadState>(
     initialReadState ?? initialReadApiState,
+  );
+  const approvalClient = useMemo(
+    () => simulationApprovalApiClient ?? createSimulationApprovalApiClient(),
+    [simulationApprovalApiClient],
   );
   const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
   const workflowDslPreview = useMemo(
@@ -205,6 +230,10 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
   const snapshot = readState.snapshot;
   const summaryPanels = useMemo(() => buildSummaryPanels(snapshot), [snapshot]);
   const workflowRows = useMemo(() => buildWorkflowRows(snapshot), [snapshot]);
+  const pendingApprovalTickets = useMemo(
+    () => snapshot.approvalTickets.filter((ticket) => ticket.status === "pending"),
+    [snapshot.approvalTickets],
+  );
   const auditExplorerEvents = useMemo(
     () => filterAuditEvents(snapshot.auditEvents, auditFilters),
     [auditFilters, snapshot.auditEvents],
@@ -229,6 +258,49 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
       isCurrent = false;
     };
   }, [readApiClient, shouldLoadFromBackend]);
+
+  const updateApprovalForm = (
+    ticketId: string,
+    patch: Partial<ApprovalInboxFormState>,
+  ) => {
+    setApprovalForms((current) => ({
+      ...current,
+      [ticketId]: {
+        ...approvalFormState(current, ticketId),
+        ...patch,
+      },
+    }));
+  };
+
+  const applySimulationDecision = async (
+    event: { preventDefault: () => void },
+    ticket: ApprovalTicketApiView,
+    action: ApprovalInboxAction,
+  ) => {
+    event.preventDefault();
+    const formState = approvalFormState(approvalForms, ticket.ticket_id);
+    const request = buildApprovalDecisionRequest(ticket.ticket_id, action, formState);
+    setApprovalFeedback((current) => ({
+      ...current,
+      [ticket.ticket_id]: `Sending simulation ${action} decision ${request.decision_id}`,
+    }));
+
+    try {
+      const response =
+        action === "approve"
+          ? await approvalClient.approveTicket(ticket.ticket_id, request)
+          : await approvalClient.rejectTicket(ticket.ticket_id, request);
+      setApprovalFeedback((current) => ({
+        ...current,
+        [ticket.ticket_id]: `Simulation ${response.new_status} recorded; idempotency key ${response.decision_id}`,
+      }));
+    } catch {
+      setApprovalFeedback((current) => ({
+        ...current,
+        [ticket.ticket_id]: "Simulation decision failed; ticket state was not changed locally",
+      }));
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -443,6 +515,97 @@ export function App({ initialReadState, readApiClient }: AppProps = {}) {
             </div>
           </section>
 
+          <section className="approval-inbox-section" id={sectionId(approvalInboxSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Approval inbox</p>
+                <h2>Simulation ticket review</h2>
+              </div>
+              <StatusPill tone="warning" label={`${pendingApprovalTickets.length} pending`} />
+            </div>
+            <div className="approval-inbox-list" aria-label="Simulation approval inbox">
+              {pendingApprovalTickets.length === 0 ? (
+                <p className="empty-state">No pending simulation approvals</p>
+              ) : (
+                pendingApprovalTickets.map((ticket) => {
+                  const formState = approvalFormState(approvalForms, ticket.ticket_id);
+                  return (
+                    <article className="approval-ticket-card" key={ticket.ticket_id}>
+                      <div className="panel-heading">
+                        <div>
+                          <p className="eyebrow">Pending simulation approval</p>
+                          <h3>{safeApprovalInboxText(ticket.ticket_id)}</h3>
+                        </div>
+                        <StatusPill tone="warning" label={ticket.status} />
+                      </div>
+                      <dl className="approval-ticket-facts">
+                        <PostureItem label="Order" value={safeApprovalInboxText(ticket.order_id)} />
+                        <PostureItem label="Symbol" value={ticket.symbol} />
+                        <PostureItem label="Side" value={ticket.side} />
+                        <PostureItem label="Quantity" value={`${ticket.quantity}`} />
+                        <PostureItem label="Risk" value={safeApprovalInboxText(ticket.risk_decision_id)} />
+                        <PostureItem label="Expires" value={ticket.expires_at} />
+                      </dl>
+                      <form
+                        className="approval-form"
+                        onSubmit={(event) => event.preventDefault()}
+                      >
+                        <label>
+                          <span>Actor</span>
+                          <input
+                            aria-label={`Approval actor for ${ticket.ticket_id}`}
+                            maxLength={80}
+                            name={`${ticket.ticket_id}-actor`}
+                            onChange={(event) =>
+                              updateApprovalForm(ticket.ticket_id, {
+                                actor: event.target.value,
+                              })
+                            }
+                            value={formState.actor}
+                          />
+                        </label>
+                        <label>
+                          <span>Reason</span>
+                          <textarea
+                            aria-label={`Approval reason for ${ticket.ticket_id}`}
+                            maxLength={240}
+                            name={`${ticket.ticket_id}-reason`}
+                            onChange={(event) =>
+                              updateApprovalForm(ticket.ticket_id, {
+                                reason: event.target.value,
+                              })
+                            }
+                            value={formState.reason}
+                          />
+                        </label>
+                        <div className="approval-actions">
+                          <button
+                            onClick={(event) =>
+                              applySimulationDecision(event, ticket, "approve")
+                            }
+                            type="button"
+                          >
+                            Approve simulation
+                          </button>
+                          <button
+                            onClick={(event) => applySimulationDecision(event, ticket, "reject")}
+                            type="button"
+                          >
+                            Reject simulation
+                          </button>
+                        </div>
+                        <p className="approval-feedback">
+                          {approvalFeedback[ticket.ticket_id] ??
+                            `Idempotency key ${ticket.ticket_id}-approve-decision or ${ticket.ticket_id}-reject-decision`}
+                        </p>
+                      </form>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
           <section className="audit-explorer-section" id={sectionId(auditExplorerSection)}>
             <div className="section-heading">
               <div>
@@ -607,6 +770,13 @@ function AuditFilterInput({
       />
     </label>
   );
+}
+
+function approvalFormState(
+  forms: Record<string, ApprovalInboxFormState>,
+  ticketId: string,
+) {
+  return forms[ticketId] ?? defaultApprovalInboxFormState;
 }
 
 function AuditEventDetail({ event }: { event: AuditEventApiView | null }) {

@@ -41,5 +41,6 @@ The response is the approval-ticket decision record from the local approval doma
 
 - The service is in-memory and seeded with the demo pending ticket.
 - Decisions are not persisted beyond the local temporary JSONL journal.
-- The frontend does not yet provide an approval inbox.
-- Approved simulation orders are not executed until a later Gate B slice.
+- The frontend approval inbox can call these simulation-only endpoints.
+- Execution orchestration is handled by later simulation slices and remains fake-broker only; this
+  endpoint itself records the approval decision.
