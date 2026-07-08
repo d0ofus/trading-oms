@@ -1352,9 +1352,11 @@ Acceptance criteria:
 
 ## Slice 033 - editable graph layout
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-033-editable-graph-layout`
 
 Goal:
 Allow drag/drop layout edits for replay strategy nodes without changing execution behavior.
@@ -1369,6 +1371,17 @@ Non-goals:
 - executing workflows;
 - adding arbitrary nodes;
 - live trading.
+
+Acceptance criteria:
+- [x] React Flow nodes can be moved in local frontend state.
+- [x] Edges remain fixed and nodes remain non-connectable.
+- [x] Generated read-only DSL preview remains safe.
+- [x] No save, run, broker, credential, route, script, import, eval, or live-mode controls are
+  added.
+- [x] Tests cover local layout policy and forbidden affordances.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
 
 ---
 

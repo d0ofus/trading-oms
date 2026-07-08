@@ -25,19 +25,21 @@ The graph intentionally keeps the required safe path visible:
 - fake broker simulation;
 - append-only audit sink.
 
-## Locked Behavior
+## Local Layout Editing
 
-The Slice 032 canvas is configured as a non-executing scaffold:
+Slice 032 introduced a locked, non-executing scaffold. Slice 033 allows local node movement so the
+operator can arrange the visual layout.
 
-- nodes are not draggable;
+- node movement changes frontend-local canvas positions only;
+- nodes remain the fixed simulation scaffold;
+- edges remain fixed;
 - nodes are not connectable;
-- elements are not selectable;
 - React Flow Controls are not rendered;
 - no save, run, import, export, submit, transmit, connect, route, or credential controls are
   rendered.
 
-Editing, validation, DSL compilation, persistence, simulation run orchestration, and visual run
-inspection are reserved for later Gate C slices.
+Validation, DSL compilation, persistence, simulation run orchestration, and visual run inspection
+are reserved for later Gate C slices.
 
 ## Safety Boundary
 

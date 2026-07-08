@@ -5,6 +5,7 @@ import {
   ReactFlow,
   type Edge,
   type Node,
+  useNodesState,
 } from "@xyflow/react";
 import type { ReactNode } from "react";
 
@@ -94,17 +95,29 @@ export const visualSimulationWorkflowEdges: Edge[] = [
   buildEdge("fake-broker", "audit-sink", "fake-broker-to-audit-sink"),
 ];
 
+export const visualSimulationWorkflowLayoutPolicy = {
+  mode: "local_editable_layout",
+  nodesDraggable: true,
+  nodesConnectable: false,
+  elementsSelectable: true,
+  persistenceEnabled: false,
+  executionEnabled: false,
+} as const;
+
 export function VisualSimulationWorkflowCanvas() {
+  const [nodes, , onNodesChange] = useNodesState(visualSimulationWorkflowNodes);
+
   return (
     <div className="flow-scaffold" aria-label="React Flow simulation workflow scaffold">
       <div className="react-flow-frame">
         <ReactFlow
           edges={visualSimulationWorkflowEdges}
-          elementsSelectable={false}
+          elementsSelectable={visualSimulationWorkflowLayoutPolicy.elementsSelectable}
           fitView
-          nodes={visualSimulationWorkflowNodes}
-          nodesConnectable={false}
-          nodesDraggable={false}
+          nodes={nodes}
+          nodesConnectable={visualSimulationWorkflowLayoutPolicy.nodesConnectable}
+          nodesDraggable={visualSimulationWorkflowLayoutPolicy.nodesDraggable}
+          onNodesChange={onNodesChange}
           panOnDrag={false}
           preventScrolling={false}
           proOptions={{ hideAttribution: true }}
@@ -117,6 +130,13 @@ export function VisualSimulationWorkflowCanvas() {
       </div>
 
       <ol className="flow-node-ledger" aria-label="Simulation workflow scaffold nodes">
+        <li className="flow-layout-policy">
+          <span className="flow-role flow-role-transform">local layout</span>
+          <div>
+            <h3>Editable layout</h3>
+            <p>Node movement changes only local canvas positions</p>
+          </div>
+        </li>
         {visualSimulationWorkflowNodeCatalog.map((node) => (
           <li key={node.id}>
             <span className={`flow-role flow-role-${node.role}`}>{node.badge}</span>

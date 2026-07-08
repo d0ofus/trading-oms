@@ -34,8 +34,8 @@ The Gate C React Flow scaffold is fixed to:
 Replay source -> Bar builder -> Strategy trigger -> Risk check -> Manual approval -> Fake broker -> Audit sink
 ```
 
-The scaffold is locked and non-executing. Nodes are not draggable, not connectable, and not
-selectable in Slice 032.
+The scaffold is non-executing. Slice 033 allows local node movement only; nodes are still not
+connectable and graph layout changes are not persisted.
 
 ## Safe Controls
 
@@ -70,7 +70,7 @@ Telegram delivery controls, credential fields, import/export controls, or code e
 - Frontend-only local state.
 - Fixed node graph for `close_above_sma`.
 - React Flow canvas scaffold exists.
-- No drag-and-drop editing yet.
+- Local node layout editing exists.
 - No persistence or backend API integration.
 - No workflow save or run behavior.
 - No file import or export.

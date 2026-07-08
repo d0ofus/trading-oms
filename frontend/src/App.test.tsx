@@ -42,6 +42,8 @@ describe("App", () => {
     expect(text).toContain("Manual approval");
     expect(text).toContain("Fake broker");
     expect(text).toContain("Audit sink");
+    expect(text).toContain("Editable layout");
+    expect(text).toContain("Node movement changes only local canvas positions");
     expect(text).toContain("no transport");
     expect(text).toContain("No broker connectivity");
     expect(text).toContain("No order actions");

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   visualSimulationWorkflowEdges,
+  visualSimulationWorkflowLayoutPolicy,
   visualSimulationWorkflowNodeCatalog,
 } from "./visualSimulationWorkflowCanvas";
 
@@ -56,5 +57,16 @@ describe("visualSimulationWorkflowCanvas", () => {
     for (const term of forbidden) {
       expect(serialized).not.toContain(term);
     }
+  });
+
+  it("allows local layout editing without enabling connection, persistence, or execution", () => {
+    expect(visualSimulationWorkflowLayoutPolicy).toMatchObject({
+      mode: "local_editable_layout",
+      nodesDraggable: true,
+      nodesConnectable: false,
+      elementsSelectable: true,
+      persistenceEnabled: false,
+      executionEnabled: false,
+    });
   });
 });
