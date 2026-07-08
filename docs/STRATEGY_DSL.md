@@ -102,7 +102,7 @@ transmission flags, account identifiers, tokens, passwords, credentials, or host
 - JSON-compatible inputs only; YAML parsing is deferred.
 - One supported strategy type: `close_above_sma`.
 - One supported price source: `close`.
-- No visual workflow builder yet.
-- No frontend DSL editor yet.
+- A first local visual workflow builder exists, documented in `docs/VISUAL_WORKFLOW_BUILDER.md`.
+- No persisted frontend DSL editor yet.
 - No risk, approval, OMS, or broker orchestration yet.
 - Numeric values currently use Python floats because bars currently use Python floats.

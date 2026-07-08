@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a read-only UI shell, and a typed replay-only Strategy DSL.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a read-only UI shell, a typed replay-only Strategy DSL, and a local visual workflow builder foundation.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -18,8 +18,9 @@ No live broker integration, production strategy engine, real alert delivery, con
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
 - Alert behavior is local no-op recording and formatting only.
-- UI shell behavior is read-only static inspection only.
+- Operations shell records are static/read-only inspection only.
 - Strategy DSL behavior is local replay-only validation and signal generation only.
+- Visual workflow builder behavior is local replay-only DSL preview only.
 - Default mode is paper/simulation.
 - IBKR integration will come later as paper-only first.
 
@@ -87,5 +88,6 @@ npm run dev --prefix frontend
 - `docs/ALERTS.md`: local alert intent, no-op dispatch, and formatting behavior.
 - `docs/UI_SHELL.md`: read-only frontend operations shell behavior.
 - `docs/STRATEGY_DSL.md`: typed replay-only Strategy DSL shape and safety boundary.
+- `docs/VISUAL_WORKFLOW_BUILDER.md`: local replay-only visual builder behavior.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.

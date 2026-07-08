@@ -559,7 +559,7 @@ Acceptance criteria:
 
 ## Slice 014 — Strategy DSL
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-014-strategy-dsl`
 
@@ -598,6 +598,54 @@ Acceptance criteria:
 - [x] DSL replay runner journals generated signals through the existing strategy path.
 - [x] DSL rejects live mode, broker/order/action fields, secrets, unsupported strategy types, and arbitrary-code-shaped fields.
 - [x] Tests cover parsing, validation failures, deterministic replay execution, journal coverage, and no order/broker/secret-shaped payloads.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No real credentials, tokens, or secrets are introduced.
+
+---
+
+## Slice 015 — Visual workflow builder
+
+status: `ready_for_human_review`
+
+branch: `slice-015-visual-workflow-builder`
+
+Goal:
+Create the first safe visual workflow builder foundation backed by the typed replay-only Strategy DSL
+without adding live trading, broker connectivity, order submission, dependency installs, or backend mutation.
+
+Scope:
+- frontend visual workflow builder section in the existing UI shell;
+- static/local node graph for the supported `close_above_sma` replay strategy;
+- safe editable local controls for symbol, lookback bars, and timeframe only;
+- generated JSON-compatible Strategy DSL preview matching the Slice 014 document shape;
+- explicit safety posture showing replay-only mode, no broker connectivity, no order actions, and no credential fields;
+- tests proving the builder renders expected nodes, produces safe DSL text, and contains no live trading/order/broker/secret affordances;
+- docs for visual builder behavior, safety boundaries, and current limitations.
+
+Non-goals:
+- live trading;
+- broker integration;
+- order intents or order submission;
+- risk checks;
+- approval execution workflow;
+- OMS or fake broker orchestration;
+- real market-data ingestion;
+- backend API mutation or persistence;
+- adding React Flow or other new dependencies;
+- arbitrary expressions, custom scripts, or code execution;
+- drag-and-drop graph editing;
+- importing or exporting files;
+- real credentials, tokens, or secrets.
+
+Acceptance criteria:
+- [x] Visual workflow builder section exists in the frontend shell.
+- [x] Builder represents the replay-only `close_above_sma` flow as visual nodes.
+- [x] Builder can update safe local DSL fields for symbol, lookback bars, and timeframe.
+- [x] Builder renders a generated DSL preview with `schema_version: 1`, `mode: replay`, and `strategy_type: close_above_sma`.
+- [x] UI clearly states no broker connectivity, no order actions, and no credential fields.
+- [x] UI contains no enabled order submission, broker, live trading, Telegram, credential, import/export, or code-execution controls.
+- [x] Tests cover node rendering, DSL preview behavior, safe editable controls, and forbidden live-action affordances.
 - [x] Verification passes.
 - [x] No live broker connectivity or order submission path is added.
 - [x] No real credentials, tokens, or secrets are introduced.
