@@ -16,6 +16,11 @@ import {
   simulationWorkflowNodeCatalog,
   type VisualWorkflowNodeRole,
 } from "./visualWorkflowNodeCatalog";
+import {
+  defaultVisualWorkflowRunInspection,
+  inspectionByNodeId,
+  type VisualWorkflowRunStatus,
+} from "./visualWorkflowRunInspection";
 import { validateCatalogWorkflowGraph } from "./visualWorkflowValidation";
 
 type FlowNodeData = {
@@ -41,6 +46,18 @@ export const visualSimulationWorkflowValidation = validateCatalogWorkflowGraph(
   visualSimulationWorkflowNodeCatalog,
   simulationWorkflowEdgeCatalog,
 );
+
+export const visualSimulationWorkflowRunInspection = defaultVisualWorkflowRunInspection;
+
+export const visualSimulationWorkflowStatusLegend: VisualWorkflowRunStatus[] = [
+  "completed",
+  "passed",
+  "risk_blocked",
+  "waiting_for_approval",
+  "blocked_waiting_for_approval",
+  "filled",
+  "alert_recorded",
+];
 
 export function VisualSimulationWorkflowCanvas() {
   const [nodes, , onNodesChange] = useNodesState(visualSimulationWorkflowNodes);
@@ -102,9 +119,26 @@ export function VisualSimulationWorkflowCanvas() {
             <div>
               <h3>{node.title}</h3>
               <p>{node.detail}</p>
+              <RunInspection nodeId={node.id} />
             </div>
           </li>
         ))}
+        <li className="flow-status-legend">
+          <span className="flow-role flow-role-audit">statuses</span>
+          <div>
+            <h3>Run inspection statuses</h3>
+            <p>Read-only status vocabulary for approval waits, risk blocks, fills, and alerts</p>
+            <ul>
+              {visualSimulationWorkflowStatusLegend.map((status) => (
+                <li key={status}>
+                  <span className={`run-inspection run-inspection-${status}`}>
+                    <span>{formatStatus(status)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </li>
       </ol>
     </div>
   );
@@ -121,6 +155,7 @@ const visualSimulationWorkflowNodes: Node<FlowNodeData>[] = visualSimulationWork
           <span className={`flow-role flow-role-${node.role}`}>{node.badge}</span>
           <strong>{node.title}</strong>
           <span>{node.detail}</span>
+          <RunInspection nodeId={node.id} compact />
         </div>
       ),
     },
@@ -130,6 +165,27 @@ const visualSimulationWorkflowNodes: Node<FlowNodeData>[] = visualSimulationWork
     type: node.id === "replay-source" ? "input" : node.id === "audit-sink" ? "output" : "default",
   }),
 );
+
+const runInspectionByNodeId = inspectionByNodeId(visualSimulationWorkflowRunInspection);
+
+function RunInspection({ compact = false, nodeId }: { compact?: boolean; nodeId: string }) {
+  const inspection = runInspectionByNodeId.get(nodeId);
+  if (!inspection) {
+    return null;
+  }
+
+  return (
+    <span className={`run-inspection run-inspection-${inspection.status}`}>
+      <span>{formatStatus(inspection.status)}</span>
+      {!compact && <span>{inspection.detail}</span>}
+      <span>{inspection.journalReference}</span>
+    </span>
+  );
+}
+
+function formatStatus(status: string) {
+  return status.replaceAll("_", " ");
+}
 
 function buildEdge(source: string, target: string, id: string): Edge {
   return {

@@ -100,6 +100,20 @@ through strategy, risk, OMS pending approval, and manual approval-ticket creatio
 per-node statuses. It stops at manual approval wait. Fake broker, position update, and alert nodes
 are marked blocked until approval; they are not executed by this endpoint.
 
+## Visual Run Inspection
+
+Slice 039 shows run inspection state on the graph and node ledger. Each node displays:
+
+- current simulation status;
+- short inspection detail;
+- append-only journal reference.
+
+The first inspection view shows the deterministic approval-wait run from Slice 038. Risk checks pass,
+the approval ticket waits for manual review, and fake broker, position update, and alert nodes remain
+blocked. The status model can represent future risk blocks, fake fills, and alert records without
+adding execution controls. The UI also shows those supported statuses in a read-only legend so fills
+and alerts are inspectable status types, not action affordances.
+
 ## Safety Boundary
 
 The canvas must not introduce:

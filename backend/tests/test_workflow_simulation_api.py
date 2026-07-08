@@ -66,6 +66,28 @@ def test_workflow_simulation_api_is_idempotent_for_same_run_payload(
     assert second.json() == first.json()
 
 
+def test_workflow_simulation_api_lists_and_loads_run_inspection_records(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+
+    created = client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+    listed = client.get("/api/workflows/workflow-001/simulation-runs")
+    loaded = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    missing = client.get("/api/workflows/workflow-001/simulation-runs/missing-run")
+
+    assert created.status_code == 200
+    assert listed.status_code == 200
+    assert listed.json() == [created.json()]
+    assert loaded.status_code == 200
+    assert loaded.json() == created.json()
+    assert missing.status_code == 404
+
+
 def test_workflow_simulation_api_rejects_unknown_or_conflicting_runs(
     monkeypatch: MonkeyPatch,
 ) -> None:

@@ -77,6 +77,11 @@ export type WorkflowApiClient = {
     workflowId: string,
     request: WorkflowSimulationRunRequest,
   ) => Promise<WorkflowSimulationRunApiView>;
+  listSimulationRuns: (workflowId: string) => Promise<WorkflowSimulationRunApiView[]>;
+  getSimulationRun: (
+    workflowId: string,
+    runId: string,
+  ) => Promise<WorkflowSimulationRunApiView>;
 };
 
 type WorkflowApiClientOptions = {
@@ -125,6 +130,21 @@ export function createWorkflowApiClient(
         buildUrl(baseUrl, `${workflowPath(workflowId)}/simulation-runs`),
         "POST",
         request,
+      ),
+    listSimulationRuns: (workflowId) =>
+      requestJson<WorkflowSimulationRunApiView[]>(
+        fetchImpl,
+        buildUrl(baseUrl, `${workflowPath(workflowId)}/simulation-runs`),
+        "GET",
+      ),
+    getSimulationRun: (workflowId, runId) =>
+      requestJson<WorkflowSimulationRunApiView>(
+        fetchImpl,
+        buildUrl(
+          baseUrl,
+          `${workflowPath(workflowId)}/simulation-runs/${encodeURIComponent(runId)}`,
+        ),
+        "GET",
       ),
   };
 }

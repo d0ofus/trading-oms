@@ -4,6 +4,8 @@ import {
   visualSimulationWorkflowEdges,
   visualSimulationWorkflowLayoutPolicy,
   visualSimulationWorkflowNodeCatalog,
+  visualSimulationWorkflowRunInspection,
+  visualSimulationWorkflowStatusLegend,
   visualSimulationWorkflowValidation,
 } from "./visualSimulationWorkflowCanvas";
 
@@ -100,5 +102,40 @@ describe("visualSimulationWorkflowCanvas", () => {
       status: "valid",
       errors: [],
     });
+  });
+
+  it("exposes visual run inspection status and journal references", () => {
+    expect(visualSimulationWorkflowRunInspection).toMatchObject({
+      runId: "workflow-run-001",
+      status: "waiting_for_approval",
+    });
+    expect(visualSimulationWorkflowRunInspection.nodes.map((node) => node.status)).toEqual([
+      "completed",
+      "completed",
+      "completed",
+      "passed",
+      "waiting_for_approval",
+      "blocked_waiting_for_approval",
+      "blocked_waiting_for_approval",
+      "blocked_waiting_for_approval",
+      "completed",
+    ]);
+    expect(
+      visualSimulationWorkflowRunInspection.nodes.every((node) =>
+        node.journalReference.startsWith("journal_sequence:"),
+      ),
+    ).toBe(true);
+  });
+
+  it("exposes read-only inspection vocabulary for risk blocks, fills, and alerts", () => {
+    expect(visualSimulationWorkflowStatusLegend).toEqual([
+      "completed",
+      "passed",
+      "risk_blocked",
+      "waiting_for_approval",
+      "blocked_waiting_for_approval",
+      "filled",
+      "alert_recorded",
+    ]);
   });
 });

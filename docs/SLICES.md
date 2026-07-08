@@ -1566,9 +1566,11 @@ Acceptance criteria:
 
 ## Slice 039 - visual run inspection
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-039-visual-run-inspection`
 
 Goal:
 Show visual workflow run status and audit references on the graph.
@@ -1583,6 +1585,17 @@ Scope:
 Non-goals:
 - broker transport;
 - live trading.
+
+Acceptance criteria:
+- [x] Saved workflow simulation run records can be inspected through read-only endpoints.
+- [x] Visual canvas shows node statuses and journal references.
+- [x] Approval waits and risk/block states are visible.
+- [x] Status vocabulary can represent fills and alerts without enabling execution.
+- [x] UI contains no broker, credential, route, script, import, eval, submit, transmit, or live-mode
+  controls.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, or production rollout are
+  added.
 
 ---
 

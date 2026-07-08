@@ -154,6 +154,22 @@ def start_workflow_simulation_run(
     return record.to_json_dict()
 
 
+@app.get("/api/workflows/{workflow_id}/simulation-runs")
+def list_workflow_simulation_runs(workflow_id: str) -> list[dict[str, Any]]:
+    return [
+        record.to_json_dict() for record in get_workflow_simulation_runner().list_runs(workflow_id)
+    ]
+
+
+@app.get("/api/workflows/{workflow_id}/simulation-runs/{run_id}")
+def get_workflow_simulation_run(workflow_id: str, run_id: str) -> dict[str, Any]:
+    try:
+        record = get_workflow_simulation_runner().get_run(workflow_id, run_id)
+    except WorkflowSimulationRunError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
 @app.put("/api/workflows/{workflow_id}")
 def update_workflow(workflow_id: str, definition: WorkflowDefinitionBody) -> dict[str, Any]:
     try:

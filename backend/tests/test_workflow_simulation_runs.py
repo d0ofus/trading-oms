@@ -87,6 +87,22 @@ def test_workflow_simulation_runner_is_idempotent_for_identical_run_payload(
     assert len(runner.journal_records()) == event_count
 
 
+def test_workflow_simulation_runner_lists_and_loads_run_inspection_records(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path), JsonlEventJournal(journal_path)
+    )
+
+    record = runner.start_run("workflow-001", _run_request())
+
+    assert runner.list_runs("workflow-001") == (record,)
+    assert runner.get_run("workflow-001", "workflow-run-001") == record
+    with pytest.raises(WorkflowSimulationRunError, match="unknown workflow simulation run"):
+        runner.get_run("workflow-001", "missing-run")
+
+
 def test_workflow_simulation_runner_rejects_unknown_or_conflicting_runs(
     workflow_paths: tuple[Path, Path],
 ) -> None:

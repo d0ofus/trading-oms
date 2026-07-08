@@ -203,6 +203,20 @@ class WorkflowSimulationRunner:
     def journal_records(self) -> tuple[JournalRecord, ...]:
         return tuple(self._journal.read_all())
 
+    def list_runs(self, workflow_id: str) -> tuple[WorkflowSimulationRunRecord, ...]:
+        _validated_identifier(workflow_id, "workflow_id")
+        return tuple(
+            record for record in self._results.values() if record.workflow_id == workflow_id
+        )
+
+    def get_run(self, workflow_id: str, run_id: str) -> WorkflowSimulationRunRecord:
+        _validated_identifier(workflow_id, "workflow_id")
+        _validated_identifier(run_id, "run_id")
+        record = self._results.get(run_id)
+        if record is None or record.workflow_id != workflow_id:
+            raise WorkflowSimulationRunError("unknown workflow simulation run")
+        return record
+
     def _load_valid_workflow(self, workflow_id: str):
         try:
             workflow = self._store.get_workflow(workflow_id)

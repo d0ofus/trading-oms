@@ -122,6 +122,8 @@ describe("workflow API client", () => {
     await client.createWorkflow(saveRequest);
     await client.updateWorkflow("workflow-001", saveRequest);
     await client.startSimulationRun("workflow-001", simulationRunRequest);
+    await client.listSimulationRuns("workflow-001");
+    await client.getSimulationRun("workflow-001", "workflow-run-001");
 
     expect(calls.map((call) => [call.input, call.init?.method])).toEqual([
       [WORKFLOW_API_ENDPOINTS.workflows, "GET"],
@@ -129,6 +131,11 @@ describe("workflow API client", () => {
       [WORKFLOW_API_ENDPOINTS.workflows, "POST"],
       [`${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001`, "PUT"],
       [`${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001/simulation-runs`, "POST"],
+      [`${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001/simulation-runs`, "GET"],
+      [
+        `${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001/simulation-runs/workflow-run-001`,
+        "GET",
+      ],
     ]);
     expect(calls[2].init?.body).toBe(JSON.stringify(saveRequest));
     expect(calls[3].init?.body).toBe(JSON.stringify(saveRequest));
@@ -137,10 +144,19 @@ describe("workflow API client", () => {
 
   it("loads simulation run responses as approval-wait records", async () => {
     const client = createWorkflowApiClient({
-      fetchImpl: async () => jsonResponse(simulationRun),
+      fetchImpl: async (input, init) =>
+        jsonResponse(
+          init.method === "GET" && String(input).endsWith("/simulation-runs")
+            ? [simulationRun]
+            : simulationRun,
+        ),
     });
 
     await expect(client.startSimulationRun("workflow-001", simulationRunRequest)).resolves.toEqual(
+      simulationRun,
+    );
+    await expect(client.listSimulationRuns("workflow-001")).resolves.toEqual([simulationRun]);
+    await expect(client.getSimulationRun("workflow-001", "workflow-run-001")).resolves.toEqual(
       simulationRun,
     );
   });

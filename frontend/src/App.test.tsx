@@ -65,6 +65,12 @@ describe("App", () => {
     expect(text).toContain("Local definition storage ready");
     expect(text).toContain("Simulation replay endpoint ready");
     expect(text).toContain("Manual approval wait only");
+    expect(text).toContain("waiting for approval");
+    expect(text).toContain("blocked waiting for approval");
+    expect(text).toContain("risk blocked");
+    expect(text).toContain("filled");
+    expect(text).toContain("alert recorded");
+    expect(text).toContain("journal_sequence:14");
     expect(html).toContain("&quot;workflow_id&quot;: &quot;visual-simulation-workflow&quot;");
     expect(html).toContain("&quot;mode&quot;: &quot;simulation&quot;");
     expect(html).toContain("&quot;runtime&quot;: &quot;preview_only&quot;");
