@@ -23,6 +23,12 @@ The application configuration layer is safety-first. Defaults must keep the syst
 
 These checks are startup safety checks only. They do not add broker connectivity, order submission, OMS behavior, or live trading.
 
+## Live-readiness gate
+
+The live-readiness checker is an audit artifact only. It can evaluate and journal checklist evidence,
+but it cannot override configuration safety checks or enable live trading. Truthy
+`LIVE_TRADING_ENABLED` values continue to fail configuration validation.
+
 ## IBKR paper adapter checks
 
 The Slice 016 IBKR paper adapter adds an adapter-local configuration boundary on top of `Settings`.
