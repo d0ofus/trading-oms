@@ -704,7 +704,7 @@ Acceptance criteria:
 
 ## Slice 017 — reconnect/reconciliation/chaos tests
 
-status: `ready_for_human_review`
+status: `complete`
 
 branch: `slice-017-reconnect-reconciliation-chaos-tests`
 
@@ -749,7 +749,7 @@ Acceptance criteria:
 
 ## Slice 018 — live-trading readiness checklist
 
-status: `not_started`
+status: `ready_for_human_review`
 
 branch: `slice-018-live-trading-readiness-checklist`
 
@@ -774,10 +774,10 @@ Non-goals:
 - production rollout.
 
 Acceptance criteria:
-- [ ] Live-trading readiness gate remains disabled by default.
-- [ ] Missing readiness evidence blocks readiness.
-- [ ] Readiness status is explicit and auditable.
-- [ ] Tests cover not-ready behavior and forbidden enablement paths.
-- [ ] Verification passes.
-- [ ] No live broker connectivity or order submission path is added.
-- [ ] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.
+- [x] Live-trading readiness gate remains disabled by default.
+- [x] Missing readiness evidence blocks readiness.
+- [x] Readiness status is explicit and auditable.
+- [x] Tests cover not-ready behavior and forbidden enablement paths.
+- [x] Verification passes.
+- [x] No live broker connectivity or order submission path is added.
+- [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.

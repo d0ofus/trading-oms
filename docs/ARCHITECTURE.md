@@ -28,10 +28,11 @@
 - Visual workflow builder.
 - IBKR paper adapter foundation.
 - Local resilience and chaos-test harness.
+- Live-readiness checklist gate.
 
 ## Later components
 
 - React Flow drag-and-drop visual builder.
 - IBKR paper transport.
 - Production reconciliation engine.
-- Live-readiness gate.
+- Controlled production rollout tooling.

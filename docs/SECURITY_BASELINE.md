@@ -28,3 +28,4 @@ Use `.env.example` for placeholders only.
 Use `.env.local` or a secret manager for local private values.
 `*.local` files must not be committed.
 Application config must default to paper or simulation mode, keep live trading disabled, keep IBKR account mode paper-only, and require localhost-only IBKR host values.
+Live-readiness evaluation must remain an audit/checklist mechanism only and must not override disabled live-trading configuration.

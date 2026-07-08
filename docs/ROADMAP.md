@@ -41,6 +41,7 @@ The first foundation is local and deterministic; production broker reconciliatio
 ## Phase 9: Live-readiness gate
 
 Create checklist and hard-coded live-trading disabled default.
+The first backend readiness verifier is an audit gate only and cannot enable live trading.
 
 ## Phase 10: Controlled production rollout
 
