@@ -36,6 +36,7 @@ paper transport requires later explicit approval and reconciliation work.
 ## Phase 8: Chaos and resilience
 
 Test disconnect, reconnect, stale data, unknown broker state, duplicate events, and reconciliation.
+The first foundation is local and deterministic; production broker reconciliation remains future work.
 
 ## Phase 9: Live-readiness gate
 

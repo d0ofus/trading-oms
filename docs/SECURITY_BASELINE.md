@@ -19,6 +19,7 @@ Never commit:
 - Do not expose IBKR TWS or Gateway API ports to the public internet.
 - Prefer localhost-only broker connectivity.
 - IBKR paper adapter configuration may use only localhost and known paper ports `7497` or `4002`.
+- Resilience and chaos tests must remain local and must not open broker or market-data network connections.
 - Keep Codex command network access disabled unless explicitly needed.
 
 ## Configuration

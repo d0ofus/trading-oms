@@ -4,6 +4,8 @@ PYTHON ?= python
 NPM ?= npm
 BACKEND_DIR ?= backend
 FRONTEND_DIR ?= frontend
+PYTEST_BASETEMP ?= .pytest-tmp
+PYTEST_ARGS ?= -p no:cacheprovider --basetemp $(PYTEST_BASETEMP)
 
 format:
 	@$(PYTHON) -m ruff format --check $(BACKEND_DIR)/src $(BACKEND_DIR)/tests
@@ -18,7 +20,7 @@ typecheck:
 	@$(NPM) --prefix $(FRONTEND_DIR) run typecheck
 
 test:
-	@$(PYTHON) -m pytest $(BACKEND_DIR)/tests
+	@$(PYTHON) -m pytest $(PYTEST_ARGS) $(BACKEND_DIR)/tests
 	@$(NPM) --prefix $(FRONTEND_DIR) run test
 
 test-integration:
@@ -28,7 +30,7 @@ test-replay:
 	@echo "test-replay: placeholder until replay engine exists"
 
 test-chaos:
-	@echo "test-chaos: placeholder until chaos tests exist"
+	@$(PYTHON) -m pytest $(PYTEST_ARGS) $(BACKEND_DIR)/tests/test_resilience.py
 
 test-e2e:
 	@echo "test-e2e: placeholder until e2e tests exist"

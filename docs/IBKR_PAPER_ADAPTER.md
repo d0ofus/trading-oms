@@ -88,5 +88,6 @@ ibkr.paper.order_plan.created
 - No paper order transport.
 - No order status or fill callbacks.
 - No OMS/fake broker/approval orchestration.
-- No reconnect or reconciliation implementation beyond local state representation.
+- Reconnect and reconciliation are covered only by the local resilience/chaos harness; there is no
+  real IBKR session reconciliation.
 - No persistence beyond the event journal records written by callers.
