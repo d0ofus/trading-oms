@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, and an auditable live-readiness checklist gate.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, first replay-only strategy, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, and typed backend read models for safe inspection views.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -19,6 +19,7 @@ No live broker integration, production strategy engine, real alert delivery, con
 - Approval ticket behavior is local decision recording only.
 - Alert behavior is local no-op recording and formatting only.
 - Operations shell records are static/read-only inspection only.
+- Backend read models are local read-only inspection summaries only.
 - Strategy DSL behavior is local replay-only validation and signal generation only.
 - Visual workflow builder behavior is local replay-only DSL preview only.
 - IBKR paper adapter behavior is local configuration, state, and order-plan journaling only.
@@ -97,5 +98,6 @@ npm run dev --prefix frontend
 - `docs/LIVE_TRADING_READINESS_CHECKLIST.md`: auditable live-readiness checklist gate.
 - `docs/POST_SLICE_018_REVIEW.md`: post-queue planning boundary before any rollout work.
 - `docs/PRODUCT_GAP_ANALYSIS.md`: post-Slice-018 product gap map and approval gates.
+- `docs/READ_MODELS.md`: typed backend read-model behavior and limitations.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.
