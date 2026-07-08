@@ -1601,9 +1601,11 @@ Acceptance criteria:
 
 ## Slice 040 - local persistence foundation
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-040-local-persistence-foundation`
 
 Goal:
 Add local persistence for workflows, simulation runs, read models, and journal indexes.
@@ -1617,6 +1619,20 @@ Non-goals:
 - production database deployment;
 - secrets;
 - live trading.
+
+Acceptance criteria:
+- [x] Local SQLite schema setup is deterministic and idempotent.
+- [x] A setup command initializes the local schema.
+- [x] Workflow definitions can be persisted and listed.
+- [x] Workflow simulation run records can be persisted and listed.
+- [x] Operations read-model snapshots can be persisted and loaded.
+- [x] Journal records can be indexed with run, event type, symbol, order ID, ticket ID, severity,
+  and timestamp fields for later filtering.
+- [x] Secret-shaped, live-enabled, broker-host/account, submit, transmit, and route-live payloads
+  are rejected before persistence.
+- [x] Verification passes.
+- [x] No production database deployment, IBKR transport, broker connectivity, live trading, secrets,
+  or production rollout are added.
 
 ---
 

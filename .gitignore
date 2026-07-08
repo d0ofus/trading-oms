@@ -5,6 +5,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .pytest-tmp/
+backend/.test-tmp/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
@@ -39,6 +40,8 @@ Thumbs.db
 # Logs/data
 logs/
 data/
+.tmp/
 *.log
 *.sqlite
+*.sqlite3
 *.db

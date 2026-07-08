@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -32,6 +32,8 @@ No live broker integration, production strategy engine, real alert delivery, con
 - Frontend read API client calls are `GET`-only and fall back to a safe no-live-trading posture.
 - Strategy DSL behavior is local replay-only validation and signal generation only.
 - Visual workflow builder behavior is local replay-only DSL preview only.
+- Local SQLite persistence behavior is local storage and journal indexing only; it rejects secrets,
+  live-enabled payloads, broker routing fields, and order-transmission-shaped payloads.
 - IBKR paper adapter behavior is local configuration, state, and order-plan journaling only.
 - Resilience/chaos behavior is local event journaling and risk-gate verification only.
 - Live-readiness behavior is checklist evaluation and journaling only; it cannot enable live trading.
@@ -78,6 +80,13 @@ npm run dev --prefix frontend
 
 The Vite dev server proxies `/api` and `/healthz` to `http://127.0.0.1:8000`.
 
+Initialize the optional local SQLite persistence schema:
+
+```powershell
+$env:PYTHONPATH = "backend/src"
+python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms.sqlite3
+```
+
 ## Recommended development loop
 
 1. Create a branch.
@@ -118,6 +127,7 @@ The Vite dev server proxies `/api` and `/healthz` to `http://127.0.0.1:8000`.
 - `docs/UI_SHELL.md`: read-only frontend operations shell behavior.
 - `docs/STRATEGY_DSL.md`: typed replay-only Strategy DSL shape and safety boundary.
 - `docs/VISUAL_WORKFLOW_BUILDER.md`: local replay-only visual builder behavior.
+- `docs/LOCAL_PERSISTENCE.md`: local SQLite persistence foundation and safety boundary.
 - `docs/IBKR_PAPER_ADAPTER.md`: local IBKR paper adapter foundation and safety boundary.
 - `docs/RESILIENCE_CHAOS.md`: local reconnect, reconciliation, and chaos-test behavior.
 - `docs/LIVE_TRADING_READINESS_CHECKLIST.md`: auditable live-readiness checklist gate.
