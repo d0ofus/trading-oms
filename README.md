@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -19,6 +19,7 @@ No live broker integration, production strategy engine, real alert delivery, con
 - Simulation orchestration stops at pending approval and cannot execute broker orders.
 - Simulation approval endpoints decide local approval tickets only and cannot execute orders.
 - Approved-order simulation execution uses only the local fake broker.
+- Simulated position protection alerts are local/no-op only.
 - Fake broker behavior is local simulation only.
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
@@ -105,6 +106,7 @@ The Vite dev server proxies `/api` and `/healthz` to `http://127.0.0.1:8000`.
 - `docs/ORDER_INTENTS.md`: non-routable order-intent proposal model.
 - `docs/SIMULATION_ORCHESTRATION.md`: deterministic replay-to-risk-to-approval path.
 - `docs/SIMULATION_EXECUTION.md`: approved-order OMS and fake broker simulation execution.
+- `docs/SIMULATED_POSITIONS.md`: simulated positions and protection monitoring alerts.
 - `docs/RISK_ENGINE.md`: structured risk checks and journaled risk decisions.
 - `docs/FAKE_BROKER.md`: simulation-only fake broker behavior.
 - `docs/OMS_STATE_MACHINE.md`: explicit OMS lifecycle states and transitions.
