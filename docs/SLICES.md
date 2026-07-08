@@ -1010,9 +1010,11 @@ Acceptance criteria:
 
 ## Slice 024 - simulation run model
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: B - requires separate explicit approval
+
+branch: `slice-024-simulation-run-model`
 
 Goal:
 Create the deterministic simulation run model.
@@ -1028,6 +1030,18 @@ Non-goals:
 - fake broker orchestration;
 - broker connectivity;
 - live trading.
+
+Acceptance criteria:
+- [x] Simulation run records include run ID, status, timestamps, replay input reference, and
+  journal references.
+- [x] Deterministic lifecycle statuses and allowed transitions exist.
+- [x] Accepted create and transition operations append journal records.
+- [x] Duplicate create and transition IDs are idempotent only when payloads match.
+- [x] Invalid transitions fail without journaling.
+- [x] Tests cover validation, idempotency, lifecycle transitions, and journal coverage.
+- [x] Verification passes.
+- [x] No strategy execution, simulation run HTTP endpoints, approval mutation endpoints, fake
+  broker orchestration, broker connectivity, or live trading are added.
 
 ---
 
