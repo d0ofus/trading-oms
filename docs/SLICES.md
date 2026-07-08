@@ -846,9 +846,11 @@ Acceptance criteria:
 
 ## Slice 020 - backend read models
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: A
+
+branch: `slice-020-backend-read-models`
 
 Goal:
 Create typed backend read models for safe inspection views.
@@ -867,6 +869,16 @@ Non-goals:
 - simulation orchestration;
 - broker connectivity;
 - live trading.
+
+Acceptance criteria:
+- [x] Safety posture read model exists.
+- [x] Journal/audit event read model exists.
+- [x] Signal, risk decision, approval ticket, order, position, alert, and readiness read models exist.
+- [x] Aggregate local operations read-model assembler exists.
+- [x] Tests prove models are read-only and contain no action affordances or secrets.
+- [x] Verification passes.
+- [x] No HTTP endpoints, mutation endpoints, simulation orchestration, broker connectivity, or live trading are added.
+- [x] No real credentials, account IDs, tokens, certificates, private keys, passwords, or secrets are introduced.
 
 ---
 
