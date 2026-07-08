@@ -95,5 +95,7 @@ npm run dev --prefix frontend
 - `docs/IBKR_PAPER_ADAPTER.md`: local IBKR paper adapter foundation and safety boundary.
 - `docs/RESILIENCE_CHAOS.md`: local reconnect, reconciliation, and chaos-test behavior.
 - `docs/LIVE_TRADING_READINESS_CHECKLIST.md`: auditable live-readiness checklist gate.
+- `docs/POST_SLICE_018_REVIEW.md`: post-queue planning boundary before any rollout work.
+- `docs/PRODUCT_GAP_ANALYSIS.md`: post-Slice-018 product gap map and approval gates.
 - `docs/ROADMAP.md`: staged roadmap.
 - `docs/SECURITY_BASELINE.md`: secret and network rules.
