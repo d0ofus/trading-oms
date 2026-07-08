@@ -1,4 +1,12 @@
+import { useMemo, useState } from "react";
+
 import { safetyPosture } from "./safety";
+import {
+  defaultStrategyBuilderState,
+  formatStrategyDslPreview,
+  strategyBuilderNodes,
+  updateStrategyBuilderState,
+} from "./strategyBuilder";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
 
@@ -16,7 +24,9 @@ type WorkflowRow = {
   tone: Tone;
 };
 
-const shellSections = [
+const visualBuilderSection = "Visual builder" as const;
+
+const workflowSections = [
   "Signals",
   "Approval tickets",
   "Orders",
@@ -24,6 +34,8 @@ const shellSections = [
   "Audit events",
   "Alerts",
 ] as const;
+
+const shellSections = [visualBuilderSection, ...workflowSections] as const;
 
 const summaryPanels: SummaryPanel[] = [
   {
@@ -52,7 +64,7 @@ const summaryPanels: SummaryPanel[] = [
   },
 ];
 
-const workflowRows: Record<(typeof shellSections)[number], WorkflowRow[]> = {
+const workflowRows: Record<(typeof workflowSections)[number], WorkflowRow[]> = {
   Signals: [
     {
       label: "AAPL replay SMA",
@@ -140,6 +152,9 @@ const workflowRows: Record<(typeof shellSections)[number], WorkflowRow[]> = {
 };
 
 export function App() {
+  const [builderState, setBuilderState] = useState(defaultStrategyBuilderState);
+  const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -203,8 +218,98 @@ export function App() {
             ))}
           </section>
 
+          <section className="builder-section" id={sectionId("Visual builder")}>
+            <div className="builder-heading">
+              <div>
+                <p className="eyebrow">Visual builder</p>
+                <h2>Replay strategy workflow</h2>
+              </div>
+              <div className="status-strip" aria-label="Builder safety posture">
+                <StatusPill tone="good" label="Replay only" />
+                <StatusPill tone="neutral" label="No broker connectivity" />
+                <StatusPill tone="neutral" label="No order actions" />
+                <StatusPill tone="neutral" label="No credential fields" />
+              </div>
+            </div>
+
+            <div className="builder-layout">
+              <div className="node-map" aria-label="Visual Strategy DSL workflow nodes">
+                {strategyBuilderNodes.map((node, index) => (
+                  <article className="builder-node" key={node.id}>
+                    <span className="node-index" aria-label={`Node ${index + 1}`}>
+                      {index + 1}
+                    </span>
+                    <div>
+                      <h3>{node.label}</h3>
+                      <p>{node.detail}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="builder-controls" aria-label="Safe Strategy DSL controls">
+                <label>
+                  <span>Symbol</span>
+                  <input
+                    aria-label="Strategy symbol"
+                    maxLength={12}
+                    name="symbol"
+                    onChange={(event) =>
+                      setBuilderState((current) =>
+                        updateStrategyBuilderState(current, { symbol: event.target.value }),
+                      )
+                    }
+                    value={builderState.symbol}
+                  />
+                </label>
+                <label>
+                  <span>Lookback bars</span>
+                  <input
+                    aria-label="Strategy lookback bars"
+                    min={2}
+                    name="lookbackBars"
+                    onChange={(event) =>
+                      setBuilderState((current) =>
+                        updateStrategyBuilderState(current, {
+                          lookbackBars: event.target.valueAsNumber,
+                        }),
+                      )
+                    }
+                    type="number"
+                    value={builderState.lookbackBars}
+                  />
+                </label>
+                <label>
+                  <span>Timeframe seconds</span>
+                  <input
+                    aria-label="Strategy timeframe seconds"
+                    min={1}
+                    name="timeframeSeconds"
+                    onChange={(event) =>
+                      setBuilderState((current) =>
+                        updateStrategyBuilderState(current, {
+                          timeframeSeconds: event.target.valueAsNumber,
+                        }),
+                      )
+                    }
+                    type="number"
+                    value={builderState.timeframeSeconds}
+                  />
+                </label>
+              </div>
+
+              <div className="dsl-preview" aria-label="Generated Strategy DSL preview">
+                <div className="section-heading">
+                  <h2>Generated DSL preview</h2>
+                  <span>local only</span>
+                </div>
+                <pre>{dslPreview}</pre>
+              </div>
+            </div>
+          </section>
+
           <div className="section-grid">
-            {shellSections.map((section) => (
+            {workflowSections.map((section) => (
               <section className="workflow-section" id={sectionId(section)} key={section}>
                 <div className="section-heading">
                   <h2>{section}</h2>

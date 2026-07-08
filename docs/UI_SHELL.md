@@ -1,10 +1,10 @@
 # UI Shell
 
-Slice 013 introduces the first frontend operations shell.
+Slice 013 introduced the first frontend operations shell.
 
 It does not add live trading, broker integration, real broker credentials, Telegram delivery,
 order submission, cancellation, approval actions, backend API integration, authentication,
-database persistence, Strategy DSL editing, or the visual workflow builder.
+database persistence, or backend Strategy DSL mutation.
 
 ## Purpose
 
@@ -33,17 +33,21 @@ broker, Telegram, or execution integration.
 The shell includes static sections for:
 
 - Signals
+- Visual builder
 - Approval tickets
 - Orders
 - Positions
 - Audit events
 - Alerts
 
-Each section uses local display records. There are no forms, action buttons, or mutation controls.
+Each section uses local display records. Slice 015 adds a local visual builder with safe inputs for
+the replay-only Strategy DSL preview. There are no forms, action buttons, API mutation controls,
+broker controls, or order submission controls.
 
 ## Guarantees
 
-- The UI is read-only in this slice.
+- The operational workflow sections are read-only.
+- The visual builder edits local state only.
 - No backend API client is added.
 - No live trading controls are added.
 - No broker connection controls are added.
@@ -64,8 +68,9 @@ Frontend tests render the shell to static markup and assert:
 ## Current Limitations
 
 - Demo records are static and local.
+- The visual builder is local state only.
 - There is no backend read API integration yet.
 - There is no authentication or authorization model yet.
-- There are no user-customizable views yet.
+- User-customizable behavior is limited to local visual-builder DSL preview fields.
 - The UI is not yet wired to approval decisions, OMS state transitions, alert delivery, or audit
   event queries.
