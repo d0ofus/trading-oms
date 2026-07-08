@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from trading_oms_backend.audit_export import AuditExportError, build_audit_export_bundle
 from trading_oms_backend.config import get_settings
 from trading_oms_backend.event_journal import JsonlEventJournal
 from trading_oms_backend.read_models import OperationsReadModel, build_demo_operations_read_model
@@ -114,6 +115,28 @@ def get_alerts() -> list[dict[str, Any]]:
 @app.get("/api/readiness")
 def get_readiness() -> dict[str, Any]:
     return _operations_read_model().readiness.to_json_dict()
+
+
+@app.get("/api/audit-export-bundle")
+def get_audit_export_bundle() -> dict[str, Any]:
+    try:
+        workflows = get_workflow_definition_store().list_workflows()
+        runner = get_workflow_simulation_runner()
+        runs = tuple(
+            run for workflow in workflows for run in runner.list_runs(workflow.workflow_id)
+        )
+        bundle = build_audit_export_bundle(
+            export_id="audit-export-local-review",
+            generated_at="2026-07-08T13:46:00Z",
+            review_reference="local-human-review",
+            operations_read_model=_operations_read_model(),
+            workflow_definitions=workflows,
+            workflow_simulation_runs=runs,
+            journal_records=runner.journal_records(),
+        )
+    except AuditExportError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return bundle.to_json_dict()
 
 
 @app.get("/api/workflows")

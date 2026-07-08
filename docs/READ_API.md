@@ -19,8 +19,15 @@ The backend exposes:
 - `GET /api/positions`
 - `GET /api/alerts`
 - `GET /api/readiness`
+- `GET /api/audit-export-bundle`
 
-Each route returns the matching section from `build_demo_operations_read_model()`.
+The section routes from `/api/safety` through `/api/readiness` return the matching section from
+`build_demo_operations_read_model()`.
+
+`GET /api/audit-export-bundle` returns a deterministic local review bundle built from the current
+read-model snapshot, workflow definitions, workflow simulation run records, and journal records. It
+recursively scans the bundle and fails closed if secret-shaped or live-routing-shaped content is
+present.
 
 `GET /api/audit-events` includes optional audit filter metadata fields:
 
@@ -39,6 +46,8 @@ Each route returns the matching section from `build_demo_operations_read_model()
   password, account, host, port, route, socket, or secret affordance keys.
 - Readiness responses keep `live_trading_enabled: false` and
   `live_trading_authorized: false`.
+- Audit export responses include local JSON review data only and do not upload, deliver, submit,
+  transmit, route, or connect anything.
 - No broker SDK, socket, network client, or transport behavior is introduced.
 
 ## Current Limitations
@@ -47,5 +56,8 @@ Each route returns the matching section from `build_demo_operations_read_model()
 - SQLite persistence exists as a local foundation, but these endpoints still use safe static demo
   read-model data.
 - Frontend screens consume these endpoints for read-only inspection and safe fallback rendering.
-- Approval tickets are visible for inspection only; no approval action endpoint exists.
+- Approval ticket read models are visible for inspection; simulation-only approval decision
+  endpoints are documented separately in `docs/SIMULATION_APPROVAL_API.md`.
 - Orders are visible for inspection only; no order submission, cancellation, or broker route exists.
+- The audit export endpoint uses current in-process stores; SQLite-backed export orchestration is
+  future work.

@@ -1781,9 +1781,11 @@ Acceptance criteria:
 
 ## Slice 045 - audit export bundle
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-045-audit-export-bundle`
 
 Goal:
 Export reviewable audit bundles without secrets.
@@ -1797,6 +1799,17 @@ Non-goals:
 - uploading exports;
 - external delivery;
 - live trading.
+
+Acceptance criteria:
+- [x] Export bundle output is deterministic stable JSON.
+- [x] Export bundle includes workflow IDs, run IDs, journal references, and read-model data.
+- [x] Export recursively rejects secret-shaped content, live-enabled booleans, broker host/account
+  fields, submit/transmit/route affordances, and arbitrary-code-shaped text.
+- [x] `GET /api/audit-export-bundle` returns a safe read-only bundle.
+- [x] Local file writing emits the same stable JSON.
+- [x] Verification passes.
+- [x] No uploads, external delivery, IBKR transport, broker connectivity, live trading, secrets, or
+  production rollout are added.
 
 ---
 
