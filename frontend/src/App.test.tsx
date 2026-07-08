@@ -24,6 +24,8 @@ describe("App", () => {
     expect(text).toContain("Simulation run detail");
     expect(text).toContain("Approval inbox");
     expect(text).toContain("Audit explorer");
+    expect(text).toContain("Order detail");
+    expect(text).toContain("Position detail");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
     expect(text).toContain("Orders");
@@ -163,6 +165,26 @@ describe("App", () => {
     expect(html).toContain("<button");
     expect(text).not.toContain("transmit order");
     expect(text).not.toContain("connect broker");
+  });
+
+  it("renders read-only order and position detail pages", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Order detail");
+    expect(text).toContain("OMS inspection");
+    expect(text).toContain("client-backend-001");
+    expect(text).toContain("pending approval");
+    expect(text).toContain("0 filled / 5 leaves");
+    expect(text).toContain("Linked order audit records");
+    expect(text).toContain("backend.audit.event");
+    expect(text).toContain("Position detail");
+    expect(text).toContain("Protection inspection");
+    expect(text).toContain("position-backend-001");
+    expect(text).toContain("expected protection present");
+    expect(text).toContain("5 TSLA at 210.5");
+    expect(text).toContain("Linked position audit records");
+    expect(text).not.toContain("broker amendment");
   });
 
   it("renders a safe fallback when backend read APIs are unavailable", () => {

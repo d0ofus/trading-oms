@@ -30,6 +30,13 @@ import {
   type SimulationApprovalApiClient,
 } from "./simulationApprovalApiClient";
 import {
+  buildOrderDetailView,
+  buildPositionDetailView,
+  safeOrderPositionDetailText,
+  type OrderDetailView,
+  type PositionDetailView,
+} from "./orderPositionDetails";
+import {
   defaultStrategyBuilderState,
   formatStrategyDslPreview,
   updateStrategyBuilderState,
@@ -74,6 +81,8 @@ const visualBuilderSection = "Visual builder" as const;
 const simulationRunSection = "Simulation run detail" as const;
 const approvalInboxSection = "Approval inbox" as const;
 const auditExplorerSection = "Audit explorer" as const;
+const orderDetailSection = "Order detail" as const;
+const positionDetailSection = "Position detail" as const;
 
 const workflowSections = [
   "Signals",
@@ -91,6 +100,8 @@ const shellSections = [
   simulationRunSection,
   approvalInboxSection,
   auditExplorerSection,
+  orderDetailSection,
+  positionDetailSection,
   ...workflowSections,
 ] as const;
 
@@ -233,6 +244,14 @@ export function App({
   const pendingApprovalTickets = useMemo(
     () => snapshot.approvalTickets.filter((ticket) => ticket.status === "pending"),
     [snapshot.approvalTickets],
+  );
+  const orderDetail = useMemo(
+    () => buildOrderDetailView(snapshot.orders[0], snapshot.auditEvents),
+    [snapshot.auditEvents, snapshot.orders],
+  );
+  const positionDetail = useMemo(
+    () => buildPositionDetailView(snapshot.positions[0], snapshot.auditEvents),
+    [snapshot.auditEvents, snapshot.positions],
   );
   const auditExplorerEvents = useMemo(
     () => filterAuditEvents(snapshot.auditEvents, auditFilters),
@@ -713,6 +732,28 @@ export function App({
             </div>
           </section>
 
+          <section className="detail-section" id={sectionId(orderDetailSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Order detail</p>
+                <h2>OMS inspection</h2>
+              </div>
+              <StatusPill tone="neutral" label="Read only" />
+            </div>
+            <OrderDetailPanel detail={orderDetail} />
+          </section>
+
+          <section className="detail-section" id={sectionId(positionDetailSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Position detail</p>
+                <h2>Protection inspection</h2>
+              </div>
+              <StatusPill tone="neutral" label="Read only" />
+            </div>
+            <PositionDetailPanel detail={positionDetail} />
+          </section>
+
           <div className="section-grid">
             {workflowSections.map((section) => {
               const rows = workflowRows[section];
@@ -811,6 +852,148 @@ function AuditDetailRow({ label, value }: { label: string; value: string | null 
       <span>{label}</span>
       <strong>{safeAuditDisplayText(value)}</strong>
     </div>
+  );
+}
+
+function OrderDetailPanel({ detail }: { detail: OrderDetailView | null }) {
+  if (!detail) {
+    return <p className="empty-state detail-empty">No order detail available</p>;
+  }
+
+  const { order } = detail;
+  return (
+    <div className="detail-layout" aria-label="Order detail records">
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Order</p>
+            <h3>{safeOrderPositionDetailText(order.client_order_id)}</h3>
+          </div>
+          <StatusPill
+            tone={order.requires_reconciliation ? "critical" : orderTone(order.state)}
+            label={detail.stateLabel}
+          />
+        </div>
+        <dl className="detail-facts">
+          <PostureItem label="Order ID" value={safeOrderPositionDetailText(order.order_id)} />
+          <PostureItem label="Symbol" value={order.symbol} />
+          <PostureItem label="Side" value={order.side} />
+          <PostureItem label="Quantity" value={`${order.quantity}`} />
+          <PostureItem
+            label="Risk decision"
+            value={safeOrderPositionDetailText(order.risk_decision_id)}
+          />
+          <PostureItem
+            label="Approval"
+            value={safeOrderPositionDetailText(order.approval_reference)}
+          />
+          <PostureItem label="Updated" value={order.updated_at} />
+          <PostureItem label="Reconciliation" value={detail.reconciliationLabel} />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Fills</p>
+            <h3>Simulation fill summary</h3>
+          </div>
+          <StatusPill tone={order.leaves_quantity === 0 ? "good" : "warning"} label={detail.fillLabel} />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem
+            label="Cumulative filled"
+            value={`${order.cumulative_filled_quantity}`}
+          />
+          <PostureItem label="Leaves" value={`${order.leaves_quantity}`} />
+          <PostureItem label="OMS state" value={detail.stateLabel} />
+        </dl>
+      </article>
+
+      <DetailAuditEvents events={detail.linkedAuditEvents} title="Linked order audit records" />
+    </div>
+  );
+}
+
+function PositionDetailPanel({ detail }: { detail: PositionDetailView | null }) {
+  if (!detail) {
+    return <p className="empty-state detail-empty">No position detail available</p>;
+  }
+
+  const { position } = detail;
+  return (
+    <div className="detail-layout" aria-label="Position detail records">
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Position</p>
+            <h3>{safeOrderPositionDetailText(position.position_id)}</h3>
+          </div>
+          <StatusPill tone={positionTone(position)} label={detail.protectionLabel} />
+        </div>
+        <dl className="detail-facts">
+          <PostureItem label="Symbol" value={position.symbol} />
+          <PostureItem label="Quantity" value={`${position.quantity}`} />
+          <PostureItem label="Average price" value={`${position.average_price}`} />
+          <PostureItem label="Source" value={formatIdentifier(position.source)} />
+          <PostureItem label="Updated" value={position.updated_at} />
+          <PostureItem label="Protection state" value={detail.protectionLabel} />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Protection</p>
+            <h3>{detail.quantityLabel}</h3>
+          </div>
+          <StatusPill tone={positionTone(position)} label={detail.protectionLabel} />
+        </div>
+        <p className="detail-note">
+          Missing expected protection remains critical and must stay visible for operator review.
+        </p>
+      </article>
+
+      <DetailAuditEvents events={detail.linkedAuditEvents} title="Linked position audit records" />
+    </div>
+  );
+}
+
+function DetailAuditEvents({
+  events,
+  title,
+}: {
+  events: AuditEventApiView[];
+  title: string;
+}) {
+  return (
+    <article className="detail-card detail-audit-card">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Audit</p>
+          <h3>{title}</h3>
+        </div>
+        <StatusPill tone={events.length > 0 ? "info" : "neutral"} label={`${events.length} linked`} />
+      </div>
+      {events.length === 0 ? (
+        <p className="empty-state">No linked audit records</p>
+      ) : (
+        <div className="detail-audit-list">
+          {events.map((event) => (
+            <article className="record-row" key={`detail-audit-${event.sequence}`}>
+              <div>
+                <h3>{safeOrderPositionDetailText(event.event_type)}</h3>
+                <p>{safeOrderPositionDetailText(event.summary)}</p>
+              </div>
+              <StatusPill
+                tone={auditSeverityTone(event)}
+                label={event.severity ?? `sequence ${event.sequence}`}
+              />
+            </article>
+          ))}
+        </div>
+      )}
+    </article>
   );
 }
 

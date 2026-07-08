@@ -1709,9 +1709,11 @@ Acceptance criteria:
 
 ## Slice 043 - order and position detail pages
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: C - requires separate explicit approval
+
+branch: `slice-043-order-position-details`
 
 Goal:
 Add detailed order and position inspection pages.
@@ -1726,6 +1728,19 @@ Non-goals:
 - live position reconciliation;
 - broker order amendments;
 - live trading.
+
+Acceptance criteria:
+- [x] UI shows read-only order detail with current OMS state.
+- [x] UI shows cumulative filled and leaves quantities.
+- [x] UI shows order risk, approval, reconciliation, and linked audit references.
+- [x] UI shows read-only position detail with quantity, average price, source, and protection
+  state.
+- [x] UI links position detail to audit records without exposing secrets.
+- [x] UI contains no broker, credential, route, script, import, eval, submit-order,
+  transmit-order, amendment, reconciliation-action, or live-mode controls.
+- [x] Verification passes.
+- [x] No IBKR transport, broker connectivity, live trading, secrets, real alert delivery, or
+  production rollout are added.
 
 ---
 

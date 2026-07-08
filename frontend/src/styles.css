@@ -41,6 +41,7 @@ a {
 .safety-band h2,
 .workflow-section h2,
 .audit-explorer-section h2,
+.detail-section h2,
 .approval-inbox-section h2,
 .builder-section h2,
 .builder-node h3,
@@ -212,6 +213,7 @@ dd {
 .builder-section,
 .run-detail-section,
 .audit-explorer-section,
+.detail-section,
 .approval-inbox-section,
 .workflow-section {
   border: 1px solid #d9ded5;
@@ -845,6 +847,65 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.detail-section {
+  overflow: hidden;
+}
+
+.detail-layout {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.detail-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.detail-card h3 {
+  margin: 0;
+  color: #20282d;
+  font-size: 0.95rem;
+}
+
+.detail-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.detail-facts.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detail-facts > div {
+  min-width: 0;
+  border-left: 3px solid #92b6cf;
+  background: #f5f9fb;
+  padding: 10px 12px;
+}
+
+.detail-note {
+  margin: 0;
+  color: #4d5852;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.detail-empty {
+  padding: 16px;
+}
+
+.detail-audit-list {
+  display: grid;
+  gap: 10px;
+}
+
 .run-detail-layout {
   display: grid;
   gap: 16px;
@@ -981,6 +1042,8 @@ dd {
   .flow-node-ledger,
   .run-detail-grid,
   .approval-ticket-facts,
+  .detail-facts,
+  .detail-facts.compact,
   .audit-explorer-layout,
   .section-grid {
     grid-template-columns: 1fr;

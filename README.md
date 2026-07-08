@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -34,6 +34,8 @@ No live broker integration, production strategy engine, real alert delivery, con
   redaction.
 - Approval inbox behavior records simulation-only approval decisions and cannot execute broker
   orders.
+- Order and position detail behavior is read-only inspection of existing read models and linked
+  audit records.
 - Strategy DSL behavior is local replay-only validation and signal generation only.
 - Visual workflow builder behavior is local replay-only DSL preview only.
 - Local SQLite persistence behavior is local storage and journal indexing only; it rejects secrets,
@@ -131,6 +133,7 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
 - `docs/UI_SHELL.md`: read-only frontend operations shell behavior.
 - `docs/AUDIT_EXPLORER.md`: read-only audit explorer filters, detail view, and redaction boundary.
 - `docs/APPROVAL_INBOX.md`: simulation-only approval inbox behavior and idempotency boundary.
+- `docs/ORDER_POSITION_DETAILS.md`: read-only order and position detail behavior.
 - `docs/STRATEGY_DSL.md`: typed replay-only Strategy DSL shape and safety boundary.
 - `docs/VISUAL_WORKFLOW_BUILDER.md`: local replay-only visual builder behavior.
 - `docs/LOCAL_PERSISTENCE.md`: local SQLite persistence foundation and safety boundary.
