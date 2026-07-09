@@ -2112,7 +2112,7 @@ Acceptance criteria:
 
 ## Slice 053 - deployment and secrets-management plan
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: F - requires separate explicit approval
 
@@ -2129,6 +2129,21 @@ Non-goals:
 - production rollout;
 - live trading;
 - adding real secrets.
+
+Acceptance criteria:
+- [x] Slice 053 ExecPlan exists.
+- [x] Deployment and secrets-management planning documentation exists.
+- [x] Deployment options for production-like paper operation are documented without approving
+  rollout.
+- [x] Secrets-management requirements prohibit real credentials, account identifiers, passwords,
+  certificates, private keys, tokens, and secrets in repo files, logs, docs, tests, screenshots,
+  exports, and alert payloads.
+- [x] Network exposure rules explicitly prohibit public IBKR TWS or Gateway API ports.
+- [x] Rollback and backup/restore planning requirements preserve audit records and avoid secret
+  exports.
+- [x] Tests verify the documentation hard stops and confirm Slice 054 and later remain not started.
+- [x] No production rollout, authentication/authorization implementation, live trading, live account
+  mode, real secrets, broker controls, market-data subscriptions, or Slice 054+ behavior is added.
 
 ---
 

@@ -52,3 +52,7 @@ The checklist remains not ready until the required evidence exists. In particula
 implementation, external code review, paper-trading history review, secrets-management review,
 network-exposure review, and explicit human approval must be documented before any future
 consideration.
+
+Slice 053 adds `docs/DEPLOYMENT_AND_SECRETS_MANAGEMENT_PLAN.md` as planning input for future
+secrets-management and network-exposure review. It is not a completed review, production rollout
+approval, or live-trading approval.
