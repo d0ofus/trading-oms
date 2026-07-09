@@ -1985,9 +1985,11 @@ Acceptance criteria:
 
 ## Slice 050 - paper order status and fill callbacks
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: E - requires separate explicit approval
+
+branch: `slice-050-paper-status-fill-callbacks`
 
 Goal:
 Handle paper order status and fill callbacks safely.
@@ -1999,8 +2001,30 @@ Scope:
 - journal coverage.
 
 Non-goals:
+- SDK/network callback listener registration;
+- market-data subscriptions;
+- paper trading UI;
 - live account mode;
 - live trading.
+
+Acceptance criteria:
+- [x] Slice 050 ExecPlan exists.
+- [x] Paper order status callbacks are recorded behind the IBKR paper adapter boundary.
+- [x] Paper fill callbacks are recorded behind the IBKR paper adapter boundary.
+- [x] Callback handling requires an existing accepted Slice 049 paper submission record.
+- [x] Callback handling requires matching client order ID and local acknowledgement/correlation
+  reference.
+- [x] Duplicate callback IDs are idempotent only for matching canonical callback payloads.
+- [x] Conflicting duplicate callback IDs are blocked and require reconciliation.
+- [x] Mismatched, stale, out-of-order, invalid, disconnected, unknown-state, or
+  reconciliation-required callback data is journaled and requires reconciliation.
+- [x] Accepted callbacks map only to OMS-compatible target states.
+- [x] Callback payloads exclude host, port, account, credential, route, submit, transmit, broker
+  order identifier, market-data payload, token, password, certificate, private key, and secret
+  fields.
+- [x] No live trading, live account mode, credentials, account IDs, market-data subscriptions,
+  SDK/network callback listener registration, paper trading UI, production-readiness work, or
+  production rollout are added.
 
 ---
 

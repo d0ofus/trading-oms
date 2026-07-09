@@ -14,7 +14,11 @@ from trading_oms_backend.ibkr_paper_adapter import (
     IBKR_PAPER_CONNECTIVITY_PROBE_EVENT_TYPE,
     IBKR_PAPER_CONTRACT_LOOKUP_ATTEMPT_EVENT_TYPE,
     IBKR_PAPER_CONTRACT_LOOKUP_RESULT_EVENT_TYPE,
+    IBKR_PAPER_FILL_CALLBACK_RECEIVED_EVENT_TYPE,
+    IBKR_PAPER_FILL_CALLBACK_RESULT_EVENT_TYPE,
     IBKR_PAPER_ORDER_PLAN_EVENT_TYPE,
+    IBKR_PAPER_ORDER_STATUS_CALLBACK_RECEIVED_EVENT_TYPE,
+    IBKR_PAPER_ORDER_STATUS_CALLBACK_RESULT_EVENT_TYPE,
     IBKR_PAPER_ORDER_SUBMISSION_ATTEMPT_EVENT_TYPE,
     IBKR_PAPER_ORDER_SUBMISSION_RESULT_EVENT_TYPE,
     IbkrConnectionStateRecord,
@@ -26,7 +30,11 @@ from trading_oms_backend.ibkr_paper_adapter import (
     IbkrPaperContractLookupRequest,
     IbkrPaperContractLookupResult,
     IbkrPaperContractNotFoundError,
+    IbkrPaperFillCallback,
+    IbkrPaperFillCallbackRecord,
     IbkrPaperOrderPlan,
+    IbkrPaperOrderStatusCallback,
+    IbkrPaperOrderStatusCallbackRecord,
     IbkrPaperOrderSubmissionRecord,
     IbkrPaperOrderSubmissionRequest,
     IbkrPaperResolvedContract,
@@ -37,6 +45,9 @@ RECORDED_AT = "2026-07-06T00:01:00Z"
 LOOKUP_RECORDED_AT = "2026-07-06T00:03:00Z"
 SUBMISSION_REQUESTED_AT = "2026-07-06T00:04:00Z"
 SUBMISSION_RECORDED_AT = "2026-07-06T00:04:01Z"
+CALLBACK_OBSERVED_AT = "2026-07-06T00:05:00Z"
+CALLBACK_RECEIVED_AT = "2026-07-06T00:05:01Z"
+CALLBACK_RECORDED_AT = "2026-07-06T00:05:02Z"
 
 
 def order_request(**overrides: Any) -> BrokerOrderRequest:
@@ -102,6 +113,59 @@ def order_submission_request(**overrides: Any) -> IbkrPaperOrderSubmissionReques
     }
     values.update(overrides)
     return IbkrPaperOrderSubmissionRequest(**values)
+
+
+def order_status_callback(**overrides: Any) -> IbkrPaperOrderStatusCallback:
+    values: dict[str, Any] = {
+        "callback_id": "status-callback-001",
+        "observed_at": CALLBACK_OBSERVED_AT,
+        "received_at": CALLBACK_RECEIVED_AT,
+        "reason": "paper_order_status_callback",
+        "client_order_id": "client-001",
+        "correlation_reference": "paper-ack-idempotency-client-001",
+        "paper_status": "acknowledged",
+        "cumulative_filled_quantity": 0,
+    }
+    values.update(overrides)
+    return IbkrPaperOrderStatusCallback(**values)
+
+
+def fill_callback(**overrides: Any) -> IbkrPaperFillCallback:
+    values: dict[str, Any] = {
+        "callback_id": "fill-callback-001",
+        "observed_at": CALLBACK_OBSERVED_AT,
+        "received_at": CALLBACK_RECEIVED_AT,
+        "reason": "paper_fill_callback",
+        "client_order_id": "client-001",
+        "correlation_reference": "paper-ack-idempotency-client-001",
+        "fill_quantity": 4,
+        "cumulative_filled_quantity": 4,
+        "fill_price": 99.5,
+    }
+    values.update(overrides)
+    return IbkrPaperFillCallback(**values)
+
+
+def accepted_paper_submission(
+    adapter: IbkrPaperAdapter,
+    *,
+    client_order_id: str = "client-001",
+) -> IbkrPaperOrderSubmissionRecord:
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    plan = adapter.create_order_plan(order_request(client_order_id=client_order_id))
+    request = order_submission_request(
+        order_plan=plan,
+        idempotency_key=f"idempotency-{client_order_id}",
+    )
+    return adapter.record_paper_order_submission(
+        request,
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: None,
+    )
 
 
 def test_ibkr_paper_adapter_config_defaults_to_paper_localhost_tws_port() -> None:
@@ -912,6 +976,410 @@ def test_ibkr_paper_submission_payloads_exclude_accounts_credentials_and_live_fi
     payloads = [
         request.to_json_dict(),
         result.to_json_dict(),
+        *(record.payload for record in journal.read_all()),
+    ]
+    for payload in payloads:
+        assert forbidden_keys.isdisjoint(_all_payload_keys(payload))
+
+
+def test_ibkr_paper_status_callback_maps_acknowledged_and_journals_receipt(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    submission = accepted_paper_submission(adapter)
+
+    result = adapter.record_paper_order_status_callback(
+        order_status_callback(),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert result == IbkrPaperOrderStatusCallbackRecord(
+        callback_id="status-callback-001",
+        observed_at=CALLBACK_OBSERVED_AT,
+        received_at=CALLBACK_RECEIVED_AT,
+        recorded_at=CALLBACK_RECORDED_AT,
+        reason="paper_order_status_callback",
+        endpoint_kind="tws_paper",
+        status="accepted_status_update",
+        requires_reconciliation=False,
+        failure_category=None,
+        submission_id="paper-submission-001",
+        client_order_id="client-001",
+        correlation_reference="paper-ack-idempotency-client-001",
+        paper_status="acknowledged",
+        cumulative_filled_quantity=0,
+        oms_target_state="ACKNOWLEDGED",
+    )
+    assert adapter.connection_state == "connected_paper"
+    assert adapter.requires_reconciliation is False
+
+    records = journal.read_all()
+    assert [record.event_type for record in records][-2:] == [
+        IBKR_PAPER_ORDER_STATUS_CALLBACK_RECEIVED_EVENT_TYPE,
+        IBKR_PAPER_ORDER_STATUS_CALLBACK_RESULT_EVENT_TYPE,
+    ]
+    assert records[-2].payload == order_status_callback().to_json_dict() | {
+        "endpoint_kind": "tws_paper"
+    }
+    assert records[-1].payload == result.to_json_dict()
+
+
+def test_ibkr_paper_status_callback_maps_rejected_state(tmp_path) -> None:
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+
+    result = adapter.record_paper_order_status_callback(
+        order_status_callback(
+            callback_id="status-callback-rejected-001",
+            paper_status="rejected",
+        ),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert result.status == "accepted_status_update"
+    assert result.paper_status == "rejected"
+    assert result.oms_target_state == "REJECTED"
+    assert result.requires_reconciliation is False
+
+
+def test_ibkr_paper_fill_callbacks_map_partial_and_full_fills(tmp_path) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    submission = accepted_paper_submission(adapter)
+
+    partial = adapter.record_paper_fill_callback(
+        fill_callback(),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+    full = adapter.record_paper_fill_callback(
+        fill_callback(
+            callback_id="fill-callback-002",
+            observed_at="2026-07-06T00:05:03Z",
+            received_at="2026-07-06T00:05:04Z",
+            fill_quantity=6,
+            cumulative_filled_quantity=10,
+        ),
+        submission=submission,
+        recorded_at="2026-07-06T00:05:05Z",
+    )
+
+    assert partial == IbkrPaperFillCallbackRecord(
+        callback_id="fill-callback-001",
+        observed_at=CALLBACK_OBSERVED_AT,
+        received_at=CALLBACK_RECEIVED_AT,
+        recorded_at=CALLBACK_RECORDED_AT,
+        reason="paper_fill_callback",
+        endpoint_kind="tws_paper",
+        status="accepted_fill_update",
+        requires_reconciliation=False,
+        failure_category=None,
+        submission_id="paper-submission-001",
+        client_order_id="client-001",
+        correlation_reference="paper-ack-idempotency-client-001",
+        fill_quantity=4,
+        cumulative_filled_quantity=4,
+        leaves_quantity=6,
+        fill_price=99.5,
+        oms_target_state="PARTIALLY_FILLED",
+    )
+    assert full.status == "accepted_fill_update"
+    assert full.cumulative_filled_quantity == 10
+    assert full.leaves_quantity == 0
+    assert full.oms_target_state == "FILLED"
+    assert [record.event_type for record in journal.read_all()][-2:] == [
+        IBKR_PAPER_FILL_CALLBACK_RECEIVED_EVENT_TYPE,
+        IBKR_PAPER_FILL_CALLBACK_RESULT_EVENT_TYPE,
+    ]
+
+
+def test_ibkr_paper_callbacks_require_accepted_submission_record(tmp_path) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    plan = adapter.create_order_plan(order_request())
+    blocked_submission = adapter.record_paper_order_submission(
+        order_submission_request(order_plan=plan),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: None,
+    )
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=CALLBACK_RECEIVED_AT,
+        reason="operator_rechecked_local_paper_session",
+    )
+
+    result = adapter.record_paper_order_status_callback(
+        order_status_callback(),
+        submission=blocked_submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert blocked_submission.status == "blocked_disconnected"
+    assert result.status == "blocked_submission_not_accepted"
+    assert result.requires_reconciliation is True
+    assert result.failure_category == "submission_not_accepted"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+    assert adapter.requires_reconciliation is True
+
+
+def test_ibkr_paper_callbacks_require_matching_client_and_correlation(
+    tmp_path,
+) -> None:
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+
+    client_mismatch = adapter.record_paper_order_status_callback(
+        order_status_callback(callback_id="status-client-mismatch", client_order_id="MSFT-001"),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert client_mismatch.status == "blocked_correlation_mismatch"
+    assert client_mismatch.requires_reconciliation is True
+    assert client_mismatch.failure_category == "correlation_mismatch"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events-2.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+    correlation_mismatch = adapter.record_paper_fill_callback(
+        fill_callback(
+            callback_id="fill-correlation-mismatch",
+            correlation_reference="different-paper-ack",
+        ),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert correlation_mismatch.status == "blocked_correlation_mismatch"
+    assert correlation_mismatch.requires_reconciliation is True
+    assert correlation_mismatch.failure_category == "correlation_mismatch"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+
+
+def test_ibkr_paper_status_callback_is_idempotent_and_rejects_conflicts(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    submission = accepted_paper_submission(adapter)
+    callback = order_status_callback(callback_id="status-idempotent-001")
+
+    first = adapter.record_paper_order_status_callback(
+        callback,
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+    duplicate = adapter.record_paper_order_status_callback(
+        callback,
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+    conflict = adapter.record_paper_order_status_callback(
+        order_status_callback(
+            callback_id="status-idempotent-001",
+            paper_status="rejected",
+        ),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert first.status == "accepted_status_update"
+    assert duplicate.status == "duplicate_status_update"
+    assert duplicate.oms_target_state == first.oms_target_state
+    assert conflict.status == "blocked_duplicate_conflict"
+    assert conflict.requires_reconciliation is True
+    assert conflict.failure_category == "duplicate_conflict"
+    assert [record.event_type for record in journal.read_all()].count(
+        IBKR_PAPER_ORDER_STATUS_CALLBACK_RESULT_EVENT_TYPE
+    ) == 3
+
+
+def test_ibkr_paper_fill_callback_is_idempotent_and_rejects_conflicts(
+    tmp_path,
+) -> None:
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+    callback = fill_callback(callback_id="fill-idempotent-001")
+
+    first = adapter.record_paper_fill_callback(
+        callback,
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+    duplicate = adapter.record_paper_fill_callback(
+        callback,
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+    conflict = adapter.record_paper_fill_callback(
+        fill_callback(callback_id="fill-idempotent-001", cumulative_filled_quantity=5),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert first.status == "accepted_fill_update"
+    assert duplicate.status == "duplicate_fill_update"
+    assert duplicate.cumulative_filled_quantity == first.cumulative_filled_quantity
+    assert conflict.status == "blocked_duplicate_conflict"
+    assert conflict.requires_reconciliation is True
+    assert conflict.failure_category == "duplicate_conflict"
+
+
+def test_ibkr_paper_callbacks_reject_stale_and_out_of_order_timestamps(
+    tmp_path,
+) -> None:
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+
+    stale = adapter.record_paper_order_status_callback(
+        order_status_callback(
+            callback_id="status-stale-001",
+            observed_at="2026-07-06T00:00:00Z",
+            received_at="2026-07-06T00:05:01Z",
+        ),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+        max_callback_age_seconds=60,
+    )
+
+    assert stale.status == "blocked_stale_callback"
+    assert stale.requires_reconciliation is True
+    assert stale.failure_category == "stale_callback"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events-2.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+    first = adapter.record_paper_fill_callback(
+        fill_callback(callback_id="fill-ordering-001"),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+    out_of_order = adapter.record_paper_fill_callback(
+        fill_callback(
+            callback_id="fill-ordering-002",
+            observed_at="2026-07-06T00:04:59Z",
+            received_at="2026-07-06T00:05:06Z",
+            cumulative_filled_quantity=5,
+        ),
+        submission=submission,
+        recorded_at="2026-07-06T00:05:07Z",
+    )
+
+    assert first.status == "accepted_fill_update"
+    assert out_of_order.status == "blocked_out_of_order_callback"
+    assert out_of_order.requires_reconciliation is True
+    assert out_of_order.failure_category == "out_of_order_callback"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+
+
+def test_ibkr_paper_callbacks_reject_invalid_status_and_fill_values(tmp_path) -> None:
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+
+    invalid_status = adapter.record_paper_order_status_callback(
+        order_status_callback(callback_id="status-invalid-001", paper_status="mystery"),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert invalid_status.status == "blocked_invalid_status"
+    assert invalid_status.requires_reconciliation is True
+    assert invalid_status.failure_category == "invalid_status"
+
+    adapter = IbkrPaperAdapter(
+        JsonlEventJournal(tmp_path / "events-2.jsonl"),
+        IbkrPaperAdapterConfig(),
+    )
+    submission = accepted_paper_submission(adapter)
+    invalid_fill = adapter.record_paper_fill_callback(
+        fill_callback(
+            callback_id="fill-invalid-001",
+            fill_quantity=11,
+            cumulative_filled_quantity=11,
+        ),
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+
+    assert invalid_fill.status == "blocked_invalid_fill"
+    assert invalid_fill.requires_reconciliation is True
+    assert invalid_fill.failure_category == "invalid_fill"
+
+
+def test_ibkr_paper_callback_payloads_exclude_accounts_credentials_and_live_fields(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    submission = accepted_paper_submission(adapter)
+    status_request = order_status_callback()
+    status_result = adapter.record_paper_order_status_callback(
+        status_request,
+        submission=submission,
+        recorded_at=CALLBACK_RECORDED_AT,
+    )
+    fill_request = fill_callback(
+        callback_id="fill-safe-payload-001",
+        observed_at="2026-07-06T00:05:03Z",
+        received_at="2026-07-06T00:05:04Z",
+    )
+    fill_result = adapter.record_paper_fill_callback(
+        fill_request,
+        submission=submission,
+        recorded_at="2026-07-06T00:05:05Z",
+    )
+
+    forbidden_keys = {
+        "account",
+        "account_id",
+        "api_key",
+        "authorization",
+        "broker_order_id",
+        "certificate",
+        "credential",
+        "host",
+        "market_data",
+        "password",
+        "port",
+        "private_key",
+        "route",
+        "route_live",
+        "secret",
+        "submit",
+        "submit_live",
+        "token",
+        "transmit",
+        "transmit_live",
+    }
+    payloads = [
+        status_request.to_json_dict(),
+        status_result.to_json_dict(),
+        fill_request.to_json_dict(),
+        fill_result.to_json_dict(),
         *(record.payload for record in journal.read_all()),
     ]
     for payload in payloads:

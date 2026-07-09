@@ -9,9 +9,10 @@ The current adapter validates paper-only local configuration, can run a local TC
 against a validated localhost paper endpoint, can resolve sanitized stock contract metadata through
 an injected adapter-bound connector, records local connection-state observations, builds local paper
 order plans from validated `BrokerOrderRequest` records, records guarded paper submission attempts
-through an injected adapter-bound connector, and journals those records. It does not authenticate
-with TWS or IB Gateway by itself, does not import an IBKR SDK, does not expose account identifiers,
-and does not handle order status or fill callbacks.
+through an injected adapter-bound connector, records correlated paper order status and fill
+callbacks, and journals those records. It does not authenticate with TWS or IB Gateway by itself,
+does not import an IBKR SDK, does not expose account identifiers, and does not register network
+callback listeners.
 
 ## Rules
 
@@ -34,6 +35,8 @@ Current local foundation:
   order requests.
 - Record guarded paper order submission attempts and outcomes only after risk, approval, OMS,
   contract, idempotency, connection-state, reconciliation, and protection checks pass.
+- Record paper order status and fill callback observations only when they correlate to an accepted
+  paper submission and pass idempotency, ordering, freshness, and OMS-compatible state checks.
 - Emit structured local events to the event journal.
 
 Future paper transport responsibilities:
@@ -41,8 +44,6 @@ Future paper transport responsibilities:
 - Establish an authenticated paper-only TWS or IB Gateway session.
 - Subscribe to market data.
 - Add SDK-backed contract lookup after separate review if needed.
-- Receive order status updates.
-- Receive fills.
 - Reconcile open orders and positions.
 - Emit structured events to the event journal.
 

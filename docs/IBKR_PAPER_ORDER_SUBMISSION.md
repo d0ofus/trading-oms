@@ -4,8 +4,9 @@ Slice 049 adds a guarded paper order submission record surface behind the existi
 adapter boundary.
 
 The submission surface is paper-only. It does not enable live trading, live account mode, real
-broker credentials, account identifiers, public IBKR exposure, market-data subscriptions, order
-status callbacks, fill callbacks, paper trading UI, production rollout, or live order transmission.
+broker credentials, account identifiers, public IBKR exposure, market-data subscriptions,
+SDK/network callback listener registration, paper trading UI, production rollout, or live order
+transmission.
 
 ## Scope
 
@@ -33,8 +34,8 @@ The adapter cannot:
 - subscribe to market data;
 - request account state;
 - route live orders;
-- receive order status callbacks;
-- receive fill callbacks;
+- register SDK/network order status listeners;
+- register SDK/network fill listeners;
 - expose public IBKR ports;
 - enable live trading.
 
@@ -114,15 +115,16 @@ The adapter stores a canonical payload hash per idempotency key in memory.
 - Stale contract metadata blocks connector use and requires reconciliation.
 - Risk, approval, OMS, contract, idempotency, and protection evidence are required before connector
   use.
-- No order status or fill callback behavior is added.
+- No SDK/network callback listener or live broker callback path is added.
+- Slice 050 documents deterministic paper status and fill callback records separately in
+  `docs/IBKR_PAPER_STATUS_FILL_CALLBACKS.md`.
 - Core OMS, risk, approval, workflow, and strategy modules remain broker-agnostic.
 
 ## Current Limitations
 
 - No authenticated IBKR session is created by this module.
 - No SDK-backed paper transport is included by default.
-- Accepted records are local adapter outcomes, not status or fill confirmations.
-- No order status callbacks.
-- No fill callbacks.
+- Accepted submission records are local adapter outcomes, not status or fill confirmations.
+- No SDK/network callback listener registration.
 - No paper trading UI.
 - In-memory idempotency state is process-local until a later persistence/reconciliation slice.

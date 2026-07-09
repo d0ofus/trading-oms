@@ -27,8 +27,8 @@ The probe cannot:
 - subscribe to market data;
 - perform contract lookup itself;
 - place, submit, transmit, route, cancel, or modify orders;
-- receive order status callbacks;
-- receive fill callbacks;
+- register SDK/network order status listeners;
+- register SDK/network fill listeners;
 - expose public IBKR ports;
 - enable live trading.
 

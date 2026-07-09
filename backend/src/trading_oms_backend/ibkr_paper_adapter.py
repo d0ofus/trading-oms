@@ -17,6 +17,10 @@ IBKR_PAPER_CONTRACT_LOOKUP_RESULT_EVENT_TYPE = "ibkr.paper.contract_lookup.recor
 IBKR_PAPER_ORDER_PLAN_EVENT_TYPE = "ibkr.paper.order_plan.created"
 IBKR_PAPER_ORDER_SUBMISSION_ATTEMPT_EVENT_TYPE = "ibkr.paper.order_submission.attempted"
 IBKR_PAPER_ORDER_SUBMISSION_RESULT_EVENT_TYPE = "ibkr.paper.order_submission.recorded"
+IBKR_PAPER_ORDER_STATUS_CALLBACK_RECEIVED_EVENT_TYPE = "ibkr.paper.order_status_callback.received"
+IBKR_PAPER_ORDER_STATUS_CALLBACK_RESULT_EVENT_TYPE = "ibkr.paper.order_status_callback.recorded"
+IBKR_PAPER_FILL_CALLBACK_RECEIVED_EVENT_TYPE = "ibkr.paper.fill_callback.received"
+IBKR_PAPER_FILL_CALLBACK_RESULT_EVENT_TYPE = "ibkr.paper.fill_callback.recorded"
 
 IBKR_PAPER_ADAPTER_NAME = "ibkr_paper"
 IBKR_PAPER_PORTS = {4002, 7497}
@@ -41,6 +45,32 @@ PaperOrderSubmissionStatus = Literal[
     "blocked_contract_mismatch",
     "blocked_missing_protection",
     "blocked_duplicate_conflict",
+    "unknown_requires_reconciliation",
+]
+PaperOrderStatusCallbackOutcome = Literal[
+    "accepted_status_update",
+    "duplicate_status_update",
+    "blocked_submission_not_accepted",
+    "blocked_disconnected",
+    "blocked_reconciliation_required",
+    "blocked_correlation_mismatch",
+    "blocked_duplicate_conflict",
+    "blocked_stale_callback",
+    "blocked_out_of_order_callback",
+    "blocked_invalid_status",
+    "unknown_requires_reconciliation",
+]
+PaperFillCallbackOutcome = Literal[
+    "accepted_fill_update",
+    "duplicate_fill_update",
+    "blocked_submission_not_accepted",
+    "blocked_disconnected",
+    "blocked_reconciliation_required",
+    "blocked_correlation_mismatch",
+    "blocked_duplicate_conflict",
+    "blocked_stale_callback",
+    "blocked_out_of_order_callback",
+    "blocked_invalid_fill",
     "unknown_requires_reconciliation",
 ]
 ConnectivityProbeStatus = Literal[
@@ -87,6 +117,18 @@ PaperOrderSubmissionFailureCategory = Literal[
     "duplicate_conflict",
     "timeout",
     "os_error",
+    "unexpected_error",
+]
+PaperCallbackFailureCategory = Literal[
+    "submission_not_accepted",
+    "disconnected",
+    "reconciliation_required",
+    "correlation_mismatch",
+    "duplicate_conflict",
+    "stale_callback",
+    "out_of_order_callback",
+    "invalid_status",
+    "invalid_fill",
     "unexpected_error",
 ]
 
@@ -830,6 +872,381 @@ class IbkrPaperOrderSubmissionRecord:
         }
 
 
+@dataclass(frozen=True)
+class IbkrPaperOrderStatusCallback:
+    callback_id: str
+    observed_at: str
+    received_at: str
+    reason: str
+    client_order_id: str
+    correlation_reference: str
+    paper_status: str
+    cumulative_filled_quantity: int
+    adapter_name: str = IBKR_PAPER_ADAPTER_NAME
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise IbkrPaperAdapterError("schema_version must be 1")
+        if self.adapter_name != IBKR_PAPER_ADAPTER_NAME:
+            raise IbkrPaperAdapterError("adapter_name must be ibkr_paper")
+        _validated_identifier(self.callback_id, "callback_id")
+        _parse_timestamp(self.observed_at, "observed_at")
+        _parse_timestamp(self.received_at, "received_at")
+        _validated_identifier(self.reason, "reason")
+        _validated_identifier(self.client_order_id, "client_order_id")
+        _validated_identifier(self.correlation_reference, "correlation_reference")
+        _validated_identifier(self.paper_status, "paper_status")
+        _validated_nonnegative_integer(
+            self.cumulative_filled_quantity,
+            "cumulative_filled_quantity",
+        )
+        _assert_json_serializable(self.to_json_dict(), "IBKR paper status callback")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "callback_id": self.callback_id,
+            "observed_at": self.observed_at,
+            "received_at": self.received_at,
+            "reason": self.reason,
+            "client_order_id": self.client_order_id,
+            "correlation_reference": self.correlation_reference,
+            "paper_status": self.paper_status,
+            "cumulative_filled_quantity": self.cumulative_filled_quantity,
+        }
+
+
+@dataclass(frozen=True)
+class IbkrPaperOrderStatusCallbackRecord:
+    callback_id: str
+    observed_at: str
+    received_at: str
+    recorded_at: str
+    reason: str
+    endpoint_kind: EndpointKind
+    status: PaperOrderStatusCallbackOutcome
+    requires_reconciliation: bool
+    failure_category: PaperCallbackFailureCategory | None
+    submission_id: str
+    client_order_id: str
+    correlation_reference: str
+    paper_status: str
+    cumulative_filled_quantity: int
+    oms_target_state: str | None
+    adapter_name: str = IBKR_PAPER_ADAPTER_NAME
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise IbkrPaperAdapterError("schema_version must be 1")
+        if self.adapter_name != IBKR_PAPER_ADAPTER_NAME:
+            raise IbkrPaperAdapterError("adapter_name must be ibkr_paper")
+        _validated_identifier(self.callback_id, "callback_id")
+        _parse_timestamp(self.observed_at, "observed_at")
+        _parse_timestamp(self.received_at, "received_at")
+        _parse_timestamp(self.recorded_at, "recorded_at")
+        _validated_identifier(self.reason, "reason")
+        if self.endpoint_kind not in {"tws_paper", "gateway_paper"}:
+            raise IbkrPaperAdapterError("endpoint_kind must be tws_paper or gateway_paper")
+        if self.status not in {
+            "accepted_status_update",
+            "duplicate_status_update",
+            "blocked_submission_not_accepted",
+            "blocked_disconnected",
+            "blocked_reconciliation_required",
+            "blocked_correlation_mismatch",
+            "blocked_duplicate_conflict",
+            "blocked_stale_callback",
+            "blocked_out_of_order_callback",
+            "blocked_invalid_status",
+            "unknown_requires_reconciliation",
+        }:
+            raise IbkrPaperAdapterError("status must be a known paper status callback outcome")
+        _validated_identifier(self.submission_id, "submission_id")
+        _validated_identifier(self.client_order_id, "client_order_id")
+        _validated_identifier(self.correlation_reference, "correlation_reference")
+        _validated_identifier(self.paper_status, "paper_status")
+        _validated_nonnegative_integer(
+            self.cumulative_filled_quantity,
+            "cumulative_filled_quantity",
+        )
+        if self.oms_target_state is not None:
+            _validated_identifier(self.oms_target_state, "oms_target_state")
+
+        expected_failure_categories: set[PaperCallbackFailureCategory | None]
+        if self.status in {"accepted_status_update", "duplicate_status_update"}:
+            expected_failure_categories = {None}
+            expected_reconciliation = False
+            target_required = True
+        elif self.status == "blocked_submission_not_accepted":
+            expected_failure_categories = {"submission_not_accepted"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_disconnected":
+            expected_failure_categories = {"disconnected"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_reconciliation_required":
+            expected_failure_categories = {"reconciliation_required"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_correlation_mismatch":
+            expected_failure_categories = {"correlation_mismatch"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_duplicate_conflict":
+            expected_failure_categories = {"duplicate_conflict"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_stale_callback":
+            expected_failure_categories = {"stale_callback"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_out_of_order_callback":
+            expected_failure_categories = {"out_of_order_callback"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_invalid_status":
+            expected_failure_categories = {"invalid_status"}
+            expected_reconciliation = True
+            target_required = False
+        else:
+            expected_failure_categories = {"unexpected_error"}
+            expected_reconciliation = True
+            target_required = False
+
+        if self.requires_reconciliation is not expected_reconciliation:
+            raise IbkrPaperAdapterError("requires_reconciliation must match callback outcome")
+        if self.failure_category not in expected_failure_categories:
+            raise IbkrPaperAdapterError("failure_category must match callback outcome")
+        if target_required and self.oms_target_state is None:
+            raise IbkrPaperAdapterError("accepted callbacks require oms_target_state")
+        if not target_required and self.oms_target_state is not None:
+            raise IbkrPaperAdapterError("blocked callbacks must omit oms_target_state")
+        _assert_json_serializable(self.to_json_dict(), "IBKR paper status callback record")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "callback_id": self.callback_id,
+            "observed_at": self.observed_at,
+            "received_at": self.received_at,
+            "recorded_at": self.recorded_at,
+            "reason": self.reason,
+            "endpoint_kind": self.endpoint_kind,
+            "status": self.status,
+            "requires_reconciliation": self.requires_reconciliation,
+            "failure_category": self.failure_category,
+            "submission_id": self.submission_id,
+            "client_order_id": self.client_order_id,
+            "correlation_reference": self.correlation_reference,
+            "paper_status": self.paper_status,
+            "cumulative_filled_quantity": self.cumulative_filled_quantity,
+            "oms_target_state": self.oms_target_state,
+        }
+
+
+@dataclass(frozen=True)
+class IbkrPaperFillCallback:
+    callback_id: str
+    observed_at: str
+    received_at: str
+    reason: str
+    client_order_id: str
+    correlation_reference: str
+    fill_quantity: int
+    cumulative_filled_quantity: int
+    fill_price: float
+    adapter_name: str = IBKR_PAPER_ADAPTER_NAME
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise IbkrPaperAdapterError("schema_version must be 1")
+        if self.adapter_name != IBKR_PAPER_ADAPTER_NAME:
+            raise IbkrPaperAdapterError("adapter_name must be ibkr_paper")
+        _validated_identifier(self.callback_id, "callback_id")
+        _parse_timestamp(self.observed_at, "observed_at")
+        _parse_timestamp(self.received_at, "received_at")
+        _validated_identifier(self.reason, "reason")
+        _validated_identifier(self.client_order_id, "client_order_id")
+        _validated_identifier(self.correlation_reference, "correlation_reference")
+        _validated_nonnegative_integer(self.fill_quantity, "fill_quantity")
+        _validated_nonnegative_integer(
+            self.cumulative_filled_quantity,
+            "cumulative_filled_quantity",
+        )
+        _positive_finite_number(self.fill_price, "fill_price")
+        _assert_json_serializable(self.to_json_dict(), "IBKR paper fill callback")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "callback_id": self.callback_id,
+            "observed_at": self.observed_at,
+            "received_at": self.received_at,
+            "reason": self.reason,
+            "client_order_id": self.client_order_id,
+            "correlation_reference": self.correlation_reference,
+            "fill_quantity": self.fill_quantity,
+            "cumulative_filled_quantity": self.cumulative_filled_quantity,
+            "fill_price": self.fill_price,
+        }
+
+
+@dataclass(frozen=True)
+class IbkrPaperFillCallbackRecord:
+    callback_id: str
+    observed_at: str
+    received_at: str
+    recorded_at: str
+    reason: str
+    endpoint_kind: EndpointKind
+    status: PaperFillCallbackOutcome
+    requires_reconciliation: bool
+    failure_category: PaperCallbackFailureCategory | None
+    submission_id: str
+    client_order_id: str
+    correlation_reference: str
+    fill_quantity: int
+    cumulative_filled_quantity: int
+    leaves_quantity: int
+    fill_price: float
+    oms_target_state: str | None
+    adapter_name: str = IBKR_PAPER_ADAPTER_NAME
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise IbkrPaperAdapterError("schema_version must be 1")
+        if self.adapter_name != IBKR_PAPER_ADAPTER_NAME:
+            raise IbkrPaperAdapterError("adapter_name must be ibkr_paper")
+        _validated_identifier(self.callback_id, "callback_id")
+        _parse_timestamp(self.observed_at, "observed_at")
+        _parse_timestamp(self.received_at, "received_at")
+        _parse_timestamp(self.recorded_at, "recorded_at")
+        _validated_identifier(self.reason, "reason")
+        if self.endpoint_kind not in {"tws_paper", "gateway_paper"}:
+            raise IbkrPaperAdapterError("endpoint_kind must be tws_paper or gateway_paper")
+        if self.status not in {
+            "accepted_fill_update",
+            "duplicate_fill_update",
+            "blocked_submission_not_accepted",
+            "blocked_disconnected",
+            "blocked_reconciliation_required",
+            "blocked_correlation_mismatch",
+            "blocked_duplicate_conflict",
+            "blocked_stale_callback",
+            "blocked_out_of_order_callback",
+            "blocked_invalid_fill",
+            "unknown_requires_reconciliation",
+        }:
+            raise IbkrPaperAdapterError("status must be a known paper fill callback outcome")
+        _validated_identifier(self.submission_id, "submission_id")
+        _validated_identifier(self.client_order_id, "client_order_id")
+        _validated_identifier(self.correlation_reference, "correlation_reference")
+        _validated_nonnegative_integer(self.fill_quantity, "fill_quantity")
+        _validated_nonnegative_integer(
+            self.cumulative_filled_quantity,
+            "cumulative_filled_quantity",
+        )
+        _validated_nonnegative_integer(self.leaves_quantity, "leaves_quantity")
+        _positive_finite_number(self.fill_price, "fill_price")
+        if self.oms_target_state is not None:
+            _validated_identifier(self.oms_target_state, "oms_target_state")
+
+        expected_failure_categories: set[PaperCallbackFailureCategory | None]
+        if self.status in {"accepted_fill_update", "duplicate_fill_update"}:
+            expected_failure_categories = {None}
+            expected_reconciliation = False
+            target_required = True
+        elif self.status == "blocked_submission_not_accepted":
+            expected_failure_categories = {"submission_not_accepted"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_disconnected":
+            expected_failure_categories = {"disconnected"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_reconciliation_required":
+            expected_failure_categories = {"reconciliation_required"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_correlation_mismatch":
+            expected_failure_categories = {"correlation_mismatch"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_duplicate_conflict":
+            expected_failure_categories = {"duplicate_conflict"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_stale_callback":
+            expected_failure_categories = {"stale_callback"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_out_of_order_callback":
+            expected_failure_categories = {"out_of_order_callback"}
+            expected_reconciliation = True
+            target_required = False
+        elif self.status == "blocked_invalid_fill":
+            expected_failure_categories = {"invalid_fill"}
+            expected_reconciliation = True
+            target_required = False
+        else:
+            expected_failure_categories = {"unexpected_error"}
+            expected_reconciliation = True
+            target_required = False
+
+        if self.requires_reconciliation is not expected_reconciliation:
+            raise IbkrPaperAdapterError("requires_reconciliation must match callback outcome")
+        if self.failure_category not in expected_failure_categories:
+            raise IbkrPaperAdapterError("failure_category must match callback outcome")
+        if target_required and self.oms_target_state is None:
+            raise IbkrPaperAdapterError("accepted callbacks require oms_target_state")
+        if not target_required and self.oms_target_state is not None:
+            raise IbkrPaperAdapterError("blocked callbacks must omit oms_target_state")
+        _assert_json_serializable(self.to_json_dict(), "IBKR paper fill callback record")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "callback_id": self.callback_id,
+            "observed_at": self.observed_at,
+            "received_at": self.received_at,
+            "recorded_at": self.recorded_at,
+            "reason": self.reason,
+            "endpoint_kind": self.endpoint_kind,
+            "status": self.status,
+            "requires_reconciliation": self.requires_reconciliation,
+            "failure_category": self.failure_category,
+            "submission_id": self.submission_id,
+            "client_order_id": self.client_order_id,
+            "correlation_reference": self.correlation_reference,
+            "fill_quantity": self.fill_quantity,
+            "cumulative_filled_quantity": self.cumulative_filled_quantity,
+            "leaves_quantity": self.leaves_quantity,
+            "fill_price": self.fill_price,
+            "oms_target_state": self.oms_target_state,
+        }
+
+
 PaperOrderSubmissionConnector = Callable[
     [IbkrPaperAdapterConfig, IbkrPaperOrderSubmissionRequest, float],
     None,
@@ -857,6 +1274,18 @@ class IbkrPaperAdapter:
             str,
             IbkrPaperOrderSubmissionRecord,
         ] = {}
+        self._paper_status_callback_payloads_by_id: dict[str, str] = {}
+        self._paper_status_callback_records_by_id: dict[
+            str,
+            IbkrPaperOrderStatusCallbackRecord,
+        ] = {}
+        self._paper_fill_callback_payloads_by_id: dict[str, str] = {}
+        self._paper_fill_callback_records_by_id: dict[
+            str,
+            IbkrPaperFillCallbackRecord,
+        ] = {}
+        self._paper_callback_observed_at_by_client_order_id: dict[str, datetime] = {}
+        self._paper_callback_cumulative_by_client_order_id: dict[str, int] = {}
 
     @property
     def config(self) -> IbkrPaperAdapterConfig:
@@ -1283,6 +1712,334 @@ class IbkrPaperAdapter:
             )
         return result
 
+    def record_paper_order_status_callback(
+        self,
+        callback: IbkrPaperOrderStatusCallback,
+        *,
+        submission: IbkrPaperOrderSubmissionRecord,
+        recorded_at: str,
+        max_callback_age_seconds: float = 300.0,
+    ) -> IbkrPaperOrderStatusCallbackRecord:
+        if not isinstance(callback, IbkrPaperOrderStatusCallback):
+            raise IbkrPaperAdapterError("callback must be an IbkrPaperOrderStatusCallback")
+        if not isinstance(submission, IbkrPaperOrderSubmissionRecord):
+            raise IbkrPaperAdapterError("submission must be an IbkrPaperOrderSubmissionRecord")
+        _parse_timestamp(recorded_at, "recorded_at")
+        max_callback_age = _validated_max_result_age_seconds(max_callback_age_seconds)
+
+        endpoint_kind = _endpoint_kind_for_port(self._config.port)
+        self._journal.append(
+            event_type=IBKR_PAPER_ORDER_STATUS_CALLBACK_RECEIVED_EVENT_TYPE,
+            payload=callback.to_json_dict() | {"endpoint_kind": endpoint_kind},
+            timestamp=callback.received_at,
+        )
+
+        canonical_payload = _canonical_status_callback_payload(callback)
+        existing_payload = self._paper_status_callback_payloads_by_id.get(callback.callback_id)
+        if existing_payload is not None:
+            if existing_payload == canonical_payload:
+                previous_record = self._paper_status_callback_records_by_id[callback.callback_id]
+                result = _paper_order_status_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="duplicate_status_update",
+                    failure_category=None,
+                    oms_target_state=previous_record.oms_target_state,
+                )
+            else:
+                result = _paper_order_status_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="blocked_duplicate_conflict",
+                    failure_category="duplicate_conflict",
+                )
+        elif self._requires_reconciliation:
+            result = _paper_order_status_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_reconciliation_required",
+                failure_category="reconciliation_required",
+            )
+        elif self._connection_state != "connected_paper":
+            result = _paper_order_status_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_disconnected",
+                failure_category="disconnected",
+            )
+        elif not _submission_is_accepted_for_callbacks(submission):
+            result = _paper_order_status_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_submission_not_accepted",
+                failure_category="submission_not_accepted",
+            )
+        elif not _callback_matches_submission(callback, submission):
+            result = _paper_order_status_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_correlation_mismatch",
+                failure_category="correlation_mismatch",
+            )
+        elif _callback_is_stale(
+            callback.observed_at,
+            recorded_at=recorded_at,
+            max_callback_age_seconds=max_callback_age,
+        ):
+            result = _paper_order_status_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_stale_callback",
+                failure_category="stale_callback",
+            )
+        elif self._callback_is_out_of_order(callback.client_order_id, callback.observed_at):
+            result = _paper_order_status_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_out_of_order_callback",
+                failure_category="out_of_order_callback",
+            )
+        else:
+            target_state = _status_callback_oms_target_state(callback, submission)
+            if target_state is None:
+                result = _paper_order_status_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="blocked_invalid_status",
+                    failure_category="invalid_status",
+                )
+            else:
+                result = _paper_order_status_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="accepted_status_update",
+                    failure_category=None,
+                    oms_target_state=target_state,
+                )
+                self._paper_status_callback_payloads_by_id[callback.callback_id] = canonical_payload
+                self._paper_status_callback_records_by_id[callback.callback_id] = result
+                self._remember_callback_progress(
+                    callback.client_order_id,
+                    observed_at=callback.observed_at,
+                    cumulative_filled_quantity=callback.cumulative_filled_quantity,
+                )
+
+        self._journal.append(
+            event_type=IBKR_PAPER_ORDER_STATUS_CALLBACK_RESULT_EVENT_TYPE,
+            payload=result.to_json_dict(),
+            timestamp=result.recorded_at,
+        )
+        self._mark_unknown_if_callback_requires_reconciliation(result)
+        return result
+
+    def record_paper_fill_callback(
+        self,
+        callback: IbkrPaperFillCallback,
+        *,
+        submission: IbkrPaperOrderSubmissionRecord,
+        recorded_at: str,
+        max_callback_age_seconds: float = 300.0,
+    ) -> IbkrPaperFillCallbackRecord:
+        if not isinstance(callback, IbkrPaperFillCallback):
+            raise IbkrPaperAdapterError("callback must be an IbkrPaperFillCallback")
+        if not isinstance(submission, IbkrPaperOrderSubmissionRecord):
+            raise IbkrPaperAdapterError("submission must be an IbkrPaperOrderSubmissionRecord")
+        _parse_timestamp(recorded_at, "recorded_at")
+        max_callback_age = _validated_max_result_age_seconds(max_callback_age_seconds)
+
+        endpoint_kind = _endpoint_kind_for_port(self._config.port)
+        self._journal.append(
+            event_type=IBKR_PAPER_FILL_CALLBACK_RECEIVED_EVENT_TYPE,
+            payload=callback.to_json_dict() | {"endpoint_kind": endpoint_kind},
+            timestamp=callback.received_at,
+        )
+
+        canonical_payload = _canonical_fill_callback_payload(callback)
+        existing_payload = self._paper_fill_callback_payloads_by_id.get(callback.callback_id)
+        if existing_payload is not None:
+            if existing_payload == canonical_payload:
+                previous_record = self._paper_fill_callback_records_by_id[callback.callback_id]
+                result = _paper_fill_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="duplicate_fill_update",
+                    failure_category=None,
+                    leaves_quantity=previous_record.leaves_quantity,
+                    oms_target_state=previous_record.oms_target_state,
+                )
+            else:
+                result = _paper_fill_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="blocked_duplicate_conflict",
+                    failure_category="duplicate_conflict",
+                )
+        elif self._requires_reconciliation:
+            result = _paper_fill_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_reconciliation_required",
+                failure_category="reconciliation_required",
+            )
+        elif self._connection_state != "connected_paper":
+            result = _paper_fill_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_disconnected",
+                failure_category="disconnected",
+            )
+        elif not _submission_is_accepted_for_callbacks(submission):
+            result = _paper_fill_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_submission_not_accepted",
+                failure_category="submission_not_accepted",
+            )
+        elif not _callback_matches_submission(callback, submission):
+            result = _paper_fill_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_correlation_mismatch",
+                failure_category="correlation_mismatch",
+            )
+        elif _callback_is_stale(
+            callback.observed_at,
+            recorded_at=recorded_at,
+            max_callback_age_seconds=max_callback_age,
+        ):
+            result = _paper_fill_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_stale_callback",
+                failure_category="stale_callback",
+            )
+        elif self._callback_is_out_of_order(callback.client_order_id, callback.observed_at):
+            result = _paper_fill_callback_record(
+                callback,
+                submission=submission,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_out_of_order_callback",
+                failure_category="out_of_order_callback",
+            )
+        else:
+            target_state = _fill_callback_oms_target_state(callback, submission)
+            if target_state is None or not self._fill_callback_increases_cumulative(callback):
+                result = _paper_fill_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="blocked_invalid_fill",
+                    failure_category="invalid_fill",
+                )
+            else:
+                leaves_quantity = submission.quantity - callback.cumulative_filled_quantity
+                result = _paper_fill_callback_record(
+                    callback,
+                    submission=submission,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="accepted_fill_update",
+                    failure_category=None,
+                    leaves_quantity=leaves_quantity,
+                    oms_target_state=target_state,
+                )
+                self._paper_fill_callback_payloads_by_id[callback.callback_id] = canonical_payload
+                self._paper_fill_callback_records_by_id[callback.callback_id] = result
+                self._remember_callback_progress(
+                    callback.client_order_id,
+                    observed_at=callback.observed_at,
+                    cumulative_filled_quantity=callback.cumulative_filled_quantity,
+                )
+
+        self._journal.append(
+            event_type=IBKR_PAPER_FILL_CALLBACK_RESULT_EVENT_TYPE,
+            payload=result.to_json_dict(),
+            timestamp=result.recorded_at,
+        )
+        self._mark_unknown_if_callback_requires_reconciliation(result)
+        return result
+
+    def _callback_is_out_of_order(self, client_order_id: str, observed_at: str) -> bool:
+        observed = _parse_timestamp(observed_at, "observed_at")
+        previous_observed = self._paper_callback_observed_at_by_client_order_id.get(client_order_id)
+        return previous_observed is not None and observed < previous_observed
+
+    def _fill_callback_increases_cumulative(self, callback: IbkrPaperFillCallback) -> bool:
+        previous_cumulative = self._paper_callback_cumulative_by_client_order_id.get(
+            callback.client_order_id,
+            0,
+        )
+        return callback.cumulative_filled_quantity > previous_cumulative
+
+    def _remember_callback_progress(
+        self,
+        client_order_id: str,
+        *,
+        observed_at: str,
+        cumulative_filled_quantity: int,
+    ) -> None:
+        self._paper_callback_observed_at_by_client_order_id[client_order_id] = _parse_timestamp(
+            observed_at, "observed_at"
+        )
+        previous_cumulative = self._paper_callback_cumulative_by_client_order_id.get(
+            client_order_id,
+            0,
+        )
+        self._paper_callback_cumulative_by_client_order_id[client_order_id] = max(
+            previous_cumulative,
+            cumulative_filled_quantity,
+        )
+
+    def _mark_unknown_if_callback_requires_reconciliation(
+        self,
+        result: IbkrPaperOrderStatusCallbackRecord | IbkrPaperFillCallbackRecord,
+    ) -> None:
+        if (
+            result.requires_reconciliation
+            and self._connection_state != "unknown_requires_reconciliation"
+        ):
+            self.record_connection_state(
+                "unknown_requires_reconciliation",
+                recorded_at=result.recorded_at,
+                reason=f"paper_callback_{result.status}",
+            )
+
 
 def _validated_identifier(value: str, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
@@ -1322,6 +2079,12 @@ def _positive_finite_number(value: Any, field_name: str) -> float:
     if not (number > 0) or number in {float("inf"), float("-inf")}:
         raise IbkrPaperAdapterError(f"{field_name} must be a finite number greater than zero")
     return number
+
+
+def _validated_nonnegative_integer(value: Any, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise IbkrPaperAdapterError(f"{field_name} must be a non-negative integer")
+    return value
 
 
 def _validated_timeout_seconds(value: Any) -> float:
@@ -1482,6 +2245,155 @@ def _canonical_submission_payload(request: IbkrPaperOrderSubmissionRequest) -> s
 def _local_acknowledgement_reference(idempotency_key: str) -> str:
     _validated_identifier(idempotency_key, "idempotency_key")
     return f"paper-ack-{idempotency_key}"
+
+
+def _paper_order_status_callback_record(
+    callback: IbkrPaperOrderStatusCallback,
+    *,
+    submission: IbkrPaperOrderSubmissionRecord,
+    recorded_at: str,
+    endpoint_kind: EndpointKind,
+    status: PaperOrderStatusCallbackOutcome,
+    failure_category: PaperCallbackFailureCategory | None,
+    oms_target_state: str | None = None,
+) -> IbkrPaperOrderStatusCallbackRecord:
+    return IbkrPaperOrderStatusCallbackRecord(
+        callback_id=callback.callback_id,
+        observed_at=callback.observed_at,
+        received_at=callback.received_at,
+        recorded_at=recorded_at,
+        reason=callback.reason,
+        endpoint_kind=endpoint_kind,
+        status=status,
+        requires_reconciliation=status not in {"accepted_status_update", "duplicate_status_update"},
+        failure_category=failure_category,
+        submission_id=submission.submission_id,
+        client_order_id=callback.client_order_id,
+        correlation_reference=callback.correlation_reference,
+        paper_status=callback.paper_status,
+        cumulative_filled_quantity=callback.cumulative_filled_quantity,
+        oms_target_state=oms_target_state,
+    )
+
+
+def _paper_fill_callback_record(
+    callback: IbkrPaperFillCallback,
+    *,
+    submission: IbkrPaperOrderSubmissionRecord,
+    recorded_at: str,
+    endpoint_kind: EndpointKind,
+    status: PaperFillCallbackOutcome,
+    failure_category: PaperCallbackFailureCategory | None,
+    leaves_quantity: int | None = None,
+    oms_target_state: str | None = None,
+) -> IbkrPaperFillCallbackRecord:
+    safe_leaves_quantity = (
+        max(submission.quantity - callback.cumulative_filled_quantity, 0)
+        if leaves_quantity is None
+        else leaves_quantity
+    )
+    return IbkrPaperFillCallbackRecord(
+        callback_id=callback.callback_id,
+        observed_at=callback.observed_at,
+        received_at=callback.received_at,
+        recorded_at=recorded_at,
+        reason=callback.reason,
+        endpoint_kind=endpoint_kind,
+        status=status,
+        requires_reconciliation=status not in {"accepted_fill_update", "duplicate_fill_update"},
+        failure_category=failure_category,
+        submission_id=submission.submission_id,
+        client_order_id=callback.client_order_id,
+        correlation_reference=callback.correlation_reference,
+        fill_quantity=callback.fill_quantity,
+        cumulative_filled_quantity=callback.cumulative_filled_quantity,
+        leaves_quantity=safe_leaves_quantity,
+        fill_price=callback.fill_price,
+        oms_target_state=oms_target_state,
+    )
+
+
+def _submission_is_accepted_for_callbacks(
+    submission: IbkrPaperOrderSubmissionRecord,
+) -> bool:
+    return (
+        submission.status in {"accepted_paper_submission", "duplicate_accepted"}
+        and submission.local_acknowledgement_reference is not None
+    )
+
+
+def _callback_matches_submission(
+    callback: IbkrPaperOrderStatusCallback | IbkrPaperFillCallback,
+    submission: IbkrPaperOrderSubmissionRecord,
+) -> bool:
+    return (
+        callback.client_order_id == submission.client_order_id
+        and callback.correlation_reference == submission.local_acknowledgement_reference
+    )
+
+
+def _callback_is_stale(
+    observed_at: str,
+    *,
+    recorded_at: str,
+    max_callback_age_seconds: float,
+) -> bool:
+    recorded_timestamp = _parse_timestamp(recorded_at, "recorded_at")
+    observed_timestamp = _parse_timestamp(observed_at, "observed_at")
+    age_seconds = (recorded_timestamp - observed_timestamp).total_seconds()
+    return age_seconds < 0 or age_seconds > max_callback_age_seconds
+
+
+def _status_callback_oms_target_state(
+    callback: IbkrPaperOrderStatusCallback,
+    submission: IbkrPaperOrderSubmissionRecord,
+) -> str | None:
+    paper_status = callback.paper_status
+    cumulative = callback.cumulative_filled_quantity
+    if paper_status == "acknowledged" and cumulative == 0:
+        return "ACKNOWLEDGED"
+    if paper_status == "partially_filled" and 0 < cumulative < submission.quantity:
+        return "PARTIALLY_FILLED"
+    if paper_status == "filled" and cumulative == submission.quantity:
+        return "FILLED"
+    if paper_status == "rejected" and cumulative == 0:
+        return "REJECTED"
+    return None
+
+
+def _fill_callback_oms_target_state(
+    callback: IbkrPaperFillCallback,
+    submission: IbkrPaperOrderSubmissionRecord,
+) -> str | None:
+    if callback.fill_quantity <= 0:
+        return None
+    if callback.cumulative_filled_quantity <= 0:
+        return None
+    if callback.fill_quantity > callback.cumulative_filled_quantity:
+        return None
+    if callback.cumulative_filled_quantity > submission.quantity:
+        return None
+    if callback.cumulative_filled_quantity < submission.quantity:
+        return "PARTIALLY_FILLED"
+    return "FILLED"
+
+
+def _canonical_status_callback_payload(callback: IbkrPaperOrderStatusCallback) -> str:
+    return json.dumps(
+        callback.to_json_dict(),
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _canonical_fill_callback_payload(callback: IbkrPaperFillCallback) -> str:
+    return json.dumps(
+        callback.to_json_dict(),
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
 
 
 def _paper_contract_lookup_connector_unavailable(

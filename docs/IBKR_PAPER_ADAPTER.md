@@ -3,13 +3,13 @@
 Slice 016 introduces the first IBKR paper adapter foundation. Slice 047 adds a local-only TCP
 reachability probe for validated paper TWS/Gateway endpoints. Slice 048 adds adapter-bound paper
 contract lookup records for sanitized stock metadata. Slice 049 adds guarded adapter-bound paper
-order submission records.
+order submission records. Slice 050 adds correlated paper order status and fill callback records.
 
 It does not add live trading, live IBKR account mode, real broker credentials, account IDs,
 certificates, private keys, passwords, tokens, public IBKR exposure, an IBKR SDK dependency,
 authenticated TWS/Gateway sessions by default, live order submission, order cancellation, order
 modification, market-data subscriptions, OMS orchestration, approval workflow orchestration, order
-status callbacks, fill callbacks, paper trading UI, or production rollout.
+status/fill network listener registration, paper trading UI, or production rollout.
 
 ## Purpose
 
@@ -27,8 +27,10 @@ The current implementation is local only. It can:
   `BrokerOrderRequest`;
 - record a guarded paper order submission attempt through an injected adapter-bound connector after
   risk, approval, OMS, contract, idempotency, reconciliation, and protection checks pass;
-- append connectivity-probe, contract-lookup, connection-state, order-plan, and paper submission
-  records to the event journal.
+- record paper order status and fill callback observations after accepted-submission correlation,
+  idempotency, freshness, ordering, and OMS-compatible state checks pass;
+- append connectivity-probe, contract-lookup, connection-state, order-plan, paper submission, order
+  status callback, and fill callback records to the event journal.
 
 ## Configuration Boundary
 
@@ -184,6 +186,60 @@ Submission payloads intentionally omit host, port, account, credential, route, s
 broker order identifier, order status callback, fill callback, token, password, certificate,
 private key, and secret fields.
 
+## Paper Order Status And Fill Callbacks
+
+`IbkrPaperAdapter.record_paper_order_status_callback` accepts an
+`IbkrPaperOrderStatusCallback` and an existing accepted `IbkrPaperOrderSubmissionRecord`.
+
+`IbkrPaperAdapter.record_paper_fill_callback` accepts an `IbkrPaperFillCallback` and an existing
+accepted `IbkrPaperOrderSubmissionRecord`.
+
+Both callback methods require:
+
+- an accepted Slice 049 paper submission record;
+- matching client order ID;
+- matching local acknowledgement/correlation reference;
+- callback ID idempotency;
+- fresh and in-order timestamps;
+- OMS-compatible state or fill quantity mapping.
+
+Status callback event types:
+
+```text
+ibkr.paper.order_status_callback.received
+ibkr.paper.order_status_callback.recorded
+```
+
+Fill callback event types:
+
+```text
+ibkr.paper.fill_callback.received
+ibkr.paper.fill_callback.recorded
+```
+
+Accepted status callbacks map to OMS-compatible states:
+
+- `acknowledged` -> `ACKNOWLEDGED`;
+- `partially_filled` -> `PARTIALLY_FILLED`;
+- `filled` -> `FILLED`;
+- `rejected` -> `REJECTED`.
+
+Accepted fill callbacks map cumulative fill quantity to `PARTIALLY_FILLED` or `FILLED`.
+
+Duplicate callback IDs are accepted only when the canonical callback payload matches the previous
+payload. Reused callback IDs with different payloads are rejected and journaled as
+`blocked_duplicate_conflict`.
+
+Mismatched, stale, out-of-order, invalid, conflicting, disconnected, or reconciliation-required
+callback data is journaled and requires reconciliation.
+
+Callback payloads intentionally omit host, port, account, credential, route, submit, transmit,
+broker order identifier, market-data payload, token, password, certificate, private key, and secret
+fields.
+
+See `docs/IBKR_PAPER_STATUS_FILL_CALLBACKS.md` for the Slice 050 callback-specific safety
+contract.
+
 ## Guarantees
 
 - No IBKR SDK dependency.
@@ -194,9 +250,12 @@ private key, and secret fields.
 - Contract lookup is connector-driven and does not create an order-capable transport.
 - Paper submission is connector-driven, paper-only, and blocked unless risk, approval, OMS,
   contract, idempotency, reconciliation, and protection gates pass.
+- Paper status and fill callbacks are deterministic adapter records and require accepted submission
+  correlation before producing OMS-compatible state names.
 - No real account IDs, credentials, certificates, passwords, private keys, tokens, or secrets.
 - No public IBKR host or port exposure.
-- Unknown state is explicit and blocks local paper order-plan creation and paper submission.
+- Unknown state is explicit and blocks local paper order-plan creation, paper submission, and
+  callback acceptance.
 - Core OMS and risk code remain broker-agnostic.
 
 ## Current Limitations
@@ -205,7 +264,7 @@ private key, and secret fields.
 - No market data.
 - No SDK-backed contract lookup.
 - No built-in SDK-backed paper order transport.
-- No order status or fill callbacks.
+- No SDK/network callback listener registration.
 - No OMS/fake broker/approval orchestration.
 - Reconnect and reconciliation are covered only by the local resilience/chaos harness; there is no
   real IBKR session reconciliation.
