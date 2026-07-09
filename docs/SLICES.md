@@ -1815,9 +1815,11 @@ Acceptance criteria:
 
 ## Slice 046 - IBKR paper transport plan and external review checklist
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: D - requires separate explicit approval
+
+branch: `slice-046-ibkr-paper-transport-plan`
 
 Goal:
 Plan paper-only IBKR transport before implementation.
@@ -1833,6 +1835,20 @@ Non-goals:
 - network transport;
 - order placement;
 - live trading.
+
+Acceptance criteria:
+- [x] Slice 046 ExecPlan exists.
+- [x] External paper-only IBKR transport review checklist exists.
+- [x] Checklist explicitly blocks live trading, real credentials, account identifiers, public IBKR
+  port exposure, production rollout, and order placement.
+- [x] Checklist requires separate Gate E approval before any SDK, connectivity probe, contract
+  lookup, paper order transport, callback handling, or paper trading UI.
+- [x] Planning docs document paper-only safety controls and local-only TWS/Gateway assumptions
+  without adding configurable broker host fields, credentials, account identifiers, or live-mode
+  fields.
+- [x] Verification passes.
+- [x] No IBKR SDK, transport implementation, connectivity probe, order-placement path, secrets,
+  account identifiers, production-readiness work, production rollout, or live trading path is added.
 
 ---
 
