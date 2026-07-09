@@ -1256,8 +1256,9 @@ PaperOrderSubmissionConnector = Callable[
 class IbkrPaperAdapter:
     """Local IBKR paper adapter boundary.
 
-    This class intentionally records local paper adapter state, plans, and paper submission
-    outcomes only. It does not import a broker SDK or expose status/fill callback behavior.
+    This class intentionally records local paper adapter state, plans, paper submission outcomes,
+    and deterministic paper status/fill callback observations. It does not import a broker SDK,
+    authenticate to IBKR, or register network callback listeners.
     """
 
     def __init__(self, journal: JsonlEventJournal, config: IbkrPaperAdapterConfig) -> None:
