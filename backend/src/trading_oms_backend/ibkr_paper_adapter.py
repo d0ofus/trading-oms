@@ -15,6 +15,8 @@ IBKR_PAPER_CONNECTIVITY_PROBE_EVENT_TYPE = "ibkr.paper.connectivity_probe.record
 IBKR_PAPER_CONTRACT_LOOKUP_ATTEMPT_EVENT_TYPE = "ibkr.paper.contract_lookup.attempted"
 IBKR_PAPER_CONTRACT_LOOKUP_RESULT_EVENT_TYPE = "ibkr.paper.contract_lookup.recorded"
 IBKR_PAPER_ORDER_PLAN_EVENT_TYPE = "ibkr.paper.order_plan.created"
+IBKR_PAPER_ORDER_SUBMISSION_ATTEMPT_EVENT_TYPE = "ibkr.paper.order_submission.attempted"
+IBKR_PAPER_ORDER_SUBMISSION_RESULT_EVENT_TYPE = "ibkr.paper.order_submission.recorded"
 
 IBKR_PAPER_ADAPTER_NAME = "ibkr_paper"
 IBKR_PAPER_PORTS = {4002, 7497}
@@ -30,6 +32,17 @@ ConnectionState = Literal[
     "unknown_requires_reconciliation",
 ]
 PaperOrderPlanStatus = Literal["planned_local_only"]
+PaperOrderSubmissionStatus = Literal[
+    "accepted_paper_submission",
+    "duplicate_accepted",
+    "blocked_disconnected",
+    "blocked_reconciliation_required",
+    "blocked_stale_contract",
+    "blocked_contract_mismatch",
+    "blocked_missing_protection",
+    "blocked_duplicate_conflict",
+    "unknown_requires_reconciliation",
+]
 ConnectivityProbeStatus = Literal[
     "reachable_local_paper_endpoint",
     "unreachable_local_paper_endpoint",
@@ -61,6 +74,17 @@ ContractLookupFailureCategory = Literal[
     "disconnected",
     "reconciliation_required",
     "stale_result",
+    "timeout",
+    "os_error",
+    "unexpected_error",
+]
+PaperOrderSubmissionFailureCategory = Literal[
+    "disconnected",
+    "reconciliation_required",
+    "stale_contract",
+    "contract_mismatch",
+    "missing_protection",
+    "duplicate_conflict",
     "timeout",
     "os_error",
     "unexpected_error",
@@ -553,12 +577,270 @@ class IbkrPaperOrderPlan:
         }
 
 
+@dataclass(frozen=True)
+class IbkrPaperOrderSubmissionRequest:
+    submission_id: str
+    requested_at: str
+    reason: str
+    order_plan: IbkrPaperOrderPlan
+    contract: IbkrPaperResolvedContract
+    oms_transition_reference: str
+    idempotency_key: str
+    protective_order_plan_reference: str | None
+    approved_protective_exception_reference: str | None
+    adapter_name: str = IBKR_PAPER_ADAPTER_NAME
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    @property
+    def plan_id(self) -> str:
+        return self.order_plan.plan_id
+
+    @property
+    def client_order_id(self) -> str:
+        return self.order_plan.client_order_id
+
+    @property
+    def symbol(self) -> str:
+        return self.order_plan.symbol
+
+    @property
+    def side(self) -> str:
+        return self.order_plan.side
+
+    @property
+    def quantity(self) -> int:
+        return self.order_plan.quantity
+
+    @property
+    def order_type(self) -> str:
+        return self.order_plan.order_type
+
+    @property
+    def risk_decision_id(self) -> str:
+        return self.order_plan.risk_decision_id
+
+    @property
+    def approval_reference(self) -> str:
+        return self.order_plan.approval_reference
+
+    def validate(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise IbkrPaperAdapterError("schema_version must be 1")
+        if self.adapter_name != IBKR_PAPER_ADAPTER_NAME:
+            raise IbkrPaperAdapterError("adapter_name must be ibkr_paper")
+        _validated_identifier(self.submission_id, "submission_id")
+        _parse_timestamp(self.requested_at, "requested_at")
+        _validated_identifier(self.reason, "reason")
+        if not isinstance(self.order_plan, IbkrPaperOrderPlan):
+            raise IbkrPaperAdapterError("order_plan must be an IbkrPaperOrderPlan")
+        if not isinstance(self.contract, IbkrPaperResolvedContract):
+            raise IbkrPaperAdapterError("contract must be an IbkrPaperResolvedContract")
+        _validated_identifier(self.oms_transition_reference, "oms_transition_reference")
+        _validated_identifier(self.idempotency_key, "idempotency_key")
+        if self.protective_order_plan_reference is not None:
+            _validated_identifier(
+                self.protective_order_plan_reference,
+                "protective_order_plan_reference",
+            )
+        if self.approved_protective_exception_reference is not None:
+            _validated_identifier(
+                self.approved_protective_exception_reference,
+                "approved_protective_exception_reference",
+            )
+        _assert_json_serializable(self.to_json_dict(), "IBKR paper order submission request")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "submission_id": self.submission_id,
+            "requested_at": self.requested_at,
+            "reason": self.reason,
+            "order_plan": self.order_plan.to_json_dict(),
+            "contract": self.contract.to_json_dict(),
+            "oms_transition_reference": self.oms_transition_reference,
+            "idempotency_key": self.idempotency_key,
+            "protective_order_plan_reference": self.protective_order_plan_reference,
+            "approved_protective_exception_reference": (
+                self.approved_protective_exception_reference
+            ),
+        }
+
+
+@dataclass(frozen=True)
+class IbkrPaperOrderSubmissionRecord:
+    submission_id: str
+    requested_at: str
+    recorded_at: str
+    reason: str
+    endpoint_kind: EndpointKind
+    status: PaperOrderSubmissionStatus
+    requires_reconciliation: bool
+    failure_category: PaperOrderSubmissionFailureCategory | None
+    plan_id: str
+    client_order_id: str
+    symbol: str
+    side: str
+    quantity: int
+    order_type: str
+    idempotency_key: str
+    risk_decision_id: str
+    approval_reference: str
+    oms_transition_reference: str
+    contract_id: str
+    protective_order_plan_reference: str | None
+    approved_protective_exception_reference: str | None
+    local_acknowledgement_reference: str | None
+    adapter_name: str = IBKR_PAPER_ADAPTER_NAME
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise IbkrPaperAdapterError("schema_version must be 1")
+        if self.adapter_name != IBKR_PAPER_ADAPTER_NAME:
+            raise IbkrPaperAdapterError("adapter_name must be ibkr_paper")
+        _validated_identifier(self.submission_id, "submission_id")
+        _parse_timestamp(self.requested_at, "requested_at")
+        _parse_timestamp(self.recorded_at, "recorded_at")
+        _validated_identifier(self.reason, "reason")
+        if self.endpoint_kind not in {"tws_paper", "gateway_paper"}:
+            raise IbkrPaperAdapterError("endpoint_kind must be tws_paper or gateway_paper")
+        if self.status not in {
+            "accepted_paper_submission",
+            "duplicate_accepted",
+            "blocked_disconnected",
+            "blocked_reconciliation_required",
+            "blocked_stale_contract",
+            "blocked_contract_mismatch",
+            "blocked_missing_protection",
+            "blocked_duplicate_conflict",
+            "unknown_requires_reconciliation",
+        }:
+            raise IbkrPaperAdapterError("status must be a known paper submission status")
+        _validated_identifier(self.plan_id, "plan_id")
+        _validated_identifier(self.client_order_id, "client_order_id")
+        _validated_symbol(self.symbol)
+        if self.side not in {"buy", "sell"}:
+            raise IbkrPaperAdapterError("side must be one of buy or sell")
+        if (
+            isinstance(self.quantity, bool)
+            or not isinstance(self.quantity, int)
+            or self.quantity < 1
+        ):
+            raise IbkrPaperAdapterError("quantity must be a positive integer")
+        if self.order_type not in {"market", "limit"}:
+            raise IbkrPaperAdapterError("order_type must be one of market or limit")
+        _validated_identifier(self.idempotency_key, "idempotency_key")
+        _validated_identifier(self.risk_decision_id, "risk_decision_id")
+        _validated_identifier(self.approval_reference, "approval_reference")
+        _validated_identifier(self.oms_transition_reference, "oms_transition_reference")
+        _validated_identifier(self.contract_id, "contract_id")
+        if self.protective_order_plan_reference is not None:
+            _validated_identifier(
+                self.protective_order_plan_reference,
+                "protective_order_plan_reference",
+            )
+        if self.approved_protective_exception_reference is not None:
+            _validated_identifier(
+                self.approved_protective_exception_reference,
+                "approved_protective_exception_reference",
+            )
+        if self.local_acknowledgement_reference is not None:
+            _validated_identifier(
+                self.local_acknowledgement_reference,
+                "local_acknowledgement_reference",
+            )
+
+        expected_failure_categories: set[PaperOrderSubmissionFailureCategory | None]
+        expected_reconciliation: bool
+        acknowledgement_required = False
+        if self.status in {"accepted_paper_submission", "duplicate_accepted"}:
+            expected_failure_categories = {None}
+            expected_reconciliation = False
+            acknowledgement_required = True
+        elif self.status == "blocked_disconnected":
+            expected_failure_categories = {"disconnected"}
+            expected_reconciliation = False
+        elif self.status == "blocked_reconciliation_required":
+            expected_failure_categories = {"reconciliation_required"}
+            expected_reconciliation = True
+        elif self.status == "blocked_stale_contract":
+            expected_failure_categories = {"stale_contract"}
+            expected_reconciliation = True
+        elif self.status == "blocked_contract_mismatch":
+            expected_failure_categories = {"contract_mismatch"}
+            expected_reconciliation = False
+        elif self.status == "blocked_missing_protection":
+            expected_failure_categories = {"missing_protection"}
+            expected_reconciliation = False
+        elif self.status == "blocked_duplicate_conflict":
+            expected_failure_categories = {"duplicate_conflict"}
+            expected_reconciliation = False
+        else:
+            expected_failure_categories = {"timeout", "os_error", "unexpected_error"}
+            expected_reconciliation = True
+
+        if self.requires_reconciliation is not expected_reconciliation:
+            raise IbkrPaperAdapterError("requires_reconciliation must match submission status")
+        if self.failure_category not in expected_failure_categories:
+            raise IbkrPaperAdapterError("failure_category must match submission status")
+        if acknowledgement_required:
+            if self.local_acknowledgement_reference is None:
+                raise IbkrPaperAdapterError(
+                    "accepted paper submissions require local acknowledgement"
+                )
+        elif self.local_acknowledgement_reference is not None:
+            raise IbkrPaperAdapterError("blocked submissions must omit local acknowledgement")
+        _assert_json_serializable(self.to_json_dict(), "IBKR paper order submission record")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "submission_id": self.submission_id,
+            "requested_at": self.requested_at,
+            "recorded_at": self.recorded_at,
+            "reason": self.reason,
+            "endpoint_kind": self.endpoint_kind,
+            "status": self.status,
+            "requires_reconciliation": self.requires_reconciliation,
+            "failure_category": self.failure_category,
+            "plan_id": self.plan_id,
+            "client_order_id": self.client_order_id,
+            "symbol": self.symbol,
+            "side": self.side,
+            "quantity": self.quantity,
+            "order_type": self.order_type,
+            "idempotency_key": self.idempotency_key,
+            "risk_decision_id": self.risk_decision_id,
+            "approval_reference": self.approval_reference,
+            "oms_transition_reference": self.oms_transition_reference,
+            "contract_id": self.contract_id,
+            "protective_order_plan_reference": self.protective_order_plan_reference,
+            "approved_protective_exception_reference": (
+                self.approved_protective_exception_reference
+            ),
+            "local_acknowledgement_reference": self.local_acknowledgement_reference,
+        }
+
+
+PaperOrderSubmissionConnector = Callable[
+    [IbkrPaperAdapterConfig, IbkrPaperOrderSubmissionRequest, float],
+    None,
+]
+
+
 class IbkrPaperAdapter:
     """Local IBKR paper adapter boundary.
 
-    This class intentionally records local paper adapter state and plans only. It does not connect
-    to TWS/Gateway, import a broker SDK, or expose any method that sends instructions outside this
-    process.
+    This class intentionally records local paper adapter state, plans, and paper submission
+    outcomes only. It does not import a broker SDK or expose status/fill callback behavior.
     """
 
     def __init__(self, journal: JsonlEventJournal, config: IbkrPaperAdapterConfig) -> None:
@@ -570,6 +852,11 @@ class IbkrPaperAdapter:
         self._config = config
         self._connection_state: ConnectionState = "disconnected"
         self._requires_reconciliation = False
+        self._paper_submission_payloads_by_idempotency: dict[str, str] = {}
+        self._paper_submission_records_by_idempotency: dict[
+            str,
+            IbkrPaperOrderSubmissionRecord,
+        ] = {}
 
     @property
     def config(self) -> IbkrPaperAdapterConfig:
@@ -841,6 +1128,161 @@ class IbkrPaperAdapter:
         )
         return plan
 
+    def record_paper_order_submission(
+        self,
+        request: IbkrPaperOrderSubmissionRequest,
+        *,
+        recorded_at: str,
+        connector: PaperOrderSubmissionConnector | None = None,
+        timeout_seconds: float = 1.0,
+        max_contract_age_seconds: float = 300.0,
+    ) -> IbkrPaperOrderSubmissionRecord:
+        if not isinstance(request, IbkrPaperOrderSubmissionRequest):
+            raise IbkrPaperAdapterError("request must be an IbkrPaperOrderSubmissionRequest")
+        _parse_timestamp(recorded_at, "recorded_at")
+        timeout = _validated_timeout_seconds(timeout_seconds)
+        max_contract_age = _validated_max_result_age_seconds(max_contract_age_seconds)
+        if connector is not None and not callable(connector):
+            raise IbkrPaperAdapterError("connector must be callable")
+
+        endpoint_kind = _endpoint_kind_for_port(self._config.port)
+        self._journal.append(
+            event_type=IBKR_PAPER_ORDER_SUBMISSION_ATTEMPT_EVENT_TYPE,
+            payload=request.to_json_dict() | {"endpoint_kind": endpoint_kind},
+            timestamp=request.requested_at,
+        )
+
+        canonical_payload = _canonical_submission_payload(request)
+        existing_payload = self._paper_submission_payloads_by_idempotency.get(
+            request.idempotency_key
+        )
+        if existing_payload is not None:
+            if existing_payload == canonical_payload:
+                previous_record = self._paper_submission_records_by_idempotency[
+                    request.idempotency_key
+                ]
+                result = _paper_order_submission_record(
+                    request,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="duplicate_accepted",
+                    failure_category=None,
+                    local_acknowledgement_reference=(
+                        previous_record.local_acknowledgement_reference
+                    ),
+                )
+            else:
+                result = _paper_order_submission_record(
+                    request,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="blocked_duplicate_conflict",
+                    failure_category="duplicate_conflict",
+                )
+        elif self._requires_reconciliation:
+            result = _paper_order_submission_record(
+                request,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_reconciliation_required",
+                failure_category="reconciliation_required",
+            )
+        elif self._connection_state != "connected_paper":
+            result = _paper_order_submission_record(
+                request,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_disconnected",
+                failure_category="disconnected",
+            )
+        elif not _paper_submission_contract_matches_order_plan(request):
+            result = _paper_order_submission_record(
+                request,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_contract_mismatch",
+                failure_category="contract_mismatch",
+            )
+        elif _contract_metadata_is_stale(
+            request.contract,
+            recorded_at=recorded_at,
+            max_result_age_seconds=max_contract_age,
+        ):
+            result = _paper_order_submission_record(
+                request,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_stale_contract",
+                failure_category="stale_contract",
+            )
+        elif _paper_submission_missing_required_protection(request):
+            result = _paper_order_submission_record(
+                request,
+                recorded_at=recorded_at,
+                endpoint_kind=endpoint_kind,
+                status="blocked_missing_protection",
+                failure_category="missing_protection",
+            )
+        else:
+            submission_connector = connector or _paper_order_submission_connector_unavailable
+            try:
+                submission_connector(self._config, request, timeout)
+            except TimeoutError:
+                result = _paper_order_submission_record(
+                    request,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="unknown_requires_reconciliation",
+                    failure_category="timeout",
+                )
+            except OSError:
+                result = _paper_order_submission_record(
+                    request,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="unknown_requires_reconciliation",
+                    failure_category="os_error",
+                )
+            except Exception:
+                result = _paper_order_submission_record(
+                    request,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="unknown_requires_reconciliation",
+                    failure_category="unexpected_error",
+                )
+            else:
+                result = _paper_order_submission_record(
+                    request,
+                    recorded_at=recorded_at,
+                    endpoint_kind=endpoint_kind,
+                    status="accepted_paper_submission",
+                    failure_category=None,
+                    local_acknowledgement_reference=(
+                        _local_acknowledgement_reference(request.idempotency_key)
+                    ),
+                )
+                self._paper_submission_payloads_by_idempotency[request.idempotency_key] = (
+                    canonical_payload
+                )
+                self._paper_submission_records_by_idempotency[request.idempotency_key] = result
+
+        self._journal.append(
+            event_type=IBKR_PAPER_ORDER_SUBMISSION_RESULT_EVENT_TYPE,
+            payload=result.to_json_dict(),
+            timestamp=result.recorded_at,
+        )
+        if (
+            result.requires_reconciliation
+            and self._connection_state != "unknown_requires_reconciliation"
+        ):
+            self.record_connection_state(
+                "unknown_requires_reconciliation",
+                recorded_at=result.recorded_at,
+                reason=f"paper_submission_{result.status}",
+            )
+        return result
+
 
 def _validated_identifier(value: str, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
@@ -967,12 +1409,95 @@ def _contract_metadata_is_stale(
     return age_seconds < 0 or age_seconds > max_result_age_seconds
 
 
+def _paper_order_submission_record(
+    request: IbkrPaperOrderSubmissionRequest,
+    *,
+    recorded_at: str,
+    endpoint_kind: EndpointKind,
+    status: PaperOrderSubmissionStatus,
+    failure_category: PaperOrderSubmissionFailureCategory | None,
+    local_acknowledgement_reference: str | None = None,
+) -> IbkrPaperOrderSubmissionRecord:
+    return IbkrPaperOrderSubmissionRecord(
+        submission_id=request.submission_id,
+        requested_at=request.requested_at,
+        recorded_at=recorded_at,
+        reason=request.reason,
+        endpoint_kind=endpoint_kind,
+        status=status,
+        requires_reconciliation=status
+        in {
+            "blocked_reconciliation_required",
+            "blocked_stale_contract",
+            "unknown_requires_reconciliation",
+        },
+        failure_category=failure_category,
+        plan_id=request.plan_id,
+        client_order_id=request.client_order_id,
+        symbol=request.symbol,
+        side=request.side,
+        quantity=request.quantity,
+        order_type=request.order_type,
+        idempotency_key=request.idempotency_key,
+        risk_decision_id=request.risk_decision_id,
+        approval_reference=request.approval_reference,
+        oms_transition_reference=request.oms_transition_reference,
+        contract_id=request.contract.contract_id,
+        protective_order_plan_reference=request.protective_order_plan_reference,
+        approved_protective_exception_reference=(request.approved_protective_exception_reference),
+        local_acknowledgement_reference=local_acknowledgement_reference,
+    )
+
+
+def _paper_submission_contract_matches_order_plan(
+    request: IbkrPaperOrderSubmissionRequest,
+) -> bool:
+    return (
+        request.contract.symbol == request.order_plan.symbol
+        and request.contract.security_type == "stock"
+        and request.contract.currency == "USD"
+    )
+
+
+def _paper_submission_missing_required_protection(
+    request: IbkrPaperOrderSubmissionRequest,
+) -> bool:
+    if request.order_plan.side != "buy":
+        return False
+    return (
+        request.protective_order_plan_reference is None
+        and request.approved_protective_exception_reference is None
+    )
+
+
+def _canonical_submission_payload(request: IbkrPaperOrderSubmissionRequest) -> str:
+    return json.dumps(
+        request.to_json_dict(),
+        allow_nan=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _local_acknowledgement_reference(idempotency_key: str) -> str:
+    _validated_identifier(idempotency_key, "idempotency_key")
+    return f"paper-ack-{idempotency_key}"
+
+
 def _paper_contract_lookup_connector_unavailable(
     config: IbkrPaperAdapterConfig,
     request: IbkrPaperContractLookupRequest,
     timeout_seconds: float,
 ) -> IbkrPaperResolvedContract:
     raise IbkrPaperAdapterError("paper contract lookup connector is unavailable")
+
+
+def _paper_order_submission_connector_unavailable(
+    config: IbkrPaperAdapterConfig,
+    request: IbkrPaperOrderSubmissionRequest,
+    timeout_seconds: float,
+) -> None:
+    raise IbkrPaperAdapterError("paper order submission connector is unavailable")
 
 
 def _probe_local_tcp_endpoint(host: str, port: int, timeout_seconds: float) -> None:

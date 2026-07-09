@@ -2,14 +2,14 @@
 
 Slice 016 introduces the first IBKR paper adapter foundation. Slice 047 adds a local-only TCP
 reachability probe for validated paper TWS/Gateway endpoints. Slice 048 adds adapter-bound paper
-contract lookup records for sanitized stock metadata.
+contract lookup records for sanitized stock metadata. Slice 049 adds guarded adapter-bound paper
+order submission records.
 
 It does not add live trading, live IBKR account mode, real broker credentials, account IDs,
 certificates, private keys, passwords, tokens, public IBKR exposure, an IBKR SDK dependency,
-authenticated TWS/Gateway sessions, IBKR protocol transport, order submission, order placement,
-order transmission, order cancellation, order modification, market-data subscriptions, OMS
-orchestration, approval workflow orchestration, callback handling, paper trading UI, or production
-rollout.
+authenticated TWS/Gateway sessions by default, live order submission, order cancellation, order
+modification, market-data subscriptions, OMS orchestration, approval workflow orchestration, order
+status callbacks, fill callbacks, paper trading UI, or production rollout.
 
 ## Purpose
 
@@ -25,8 +25,10 @@ The current implementation is local only. It can:
 - represent unknown IBKR state as requiring reconciliation;
 - build a local, non-transmitting paper order plan from an already validated
   `BrokerOrderRequest`;
-- append connectivity-probe, contract-lookup, connection-state, and order-plan records to the
-  event journal.
+- record a guarded paper order submission attempt through an injected adapter-bound connector after
+  risk, approval, OMS, contract, idempotency, reconciliation, and protection checks pass;
+- append connectivity-probe, contract-lookup, connection-state, order-plan, and paper submission
+  records to the event journal.
 
 ## Configuration Boundary
 
@@ -132,17 +134,69 @@ Order plans are journaled with event type:
 ibkr.paper.order_plan.created
 ```
 
+## Paper Order Submission
+
+`IbkrPaperAdapter.record_paper_order_submission` accepts an
+`IbkrPaperOrderSubmissionRequest` that references:
+
+- an existing `IbkrPaperOrderPlan`;
+- fresh sanitized `IbkrPaperResolvedContract` metadata;
+- an OMS transition reference;
+- an idempotency key;
+- a protective-order plan reference or approved protective exception for risk-increasing buys.
+
+The adapter journals every submission attempt with:
+
+```text
+ibkr.paper.order_submission.attempted
+```
+
+and every outcome with:
+
+```text
+ibkr.paper.order_submission.recorded
+```
+
+The method uses an injected `PaperOrderSubmissionConnector` only after all safety gates pass. The
+default connector is unavailable and returns an `unknown_requires_reconciliation` outcome rather
+than silently accepting work.
+
+Submission outcomes include:
+
+- `accepted_paper_submission`;
+- `duplicate_accepted`;
+- `blocked_duplicate_conflict`;
+- `blocked_disconnected`;
+- `blocked_reconciliation_required`;
+- `blocked_stale_contract`;
+- `blocked_contract_mismatch`;
+- `blocked_missing_protection`;
+- `unknown_requires_reconciliation`.
+
+Duplicate idempotency keys are accepted only when the canonical submission payload matches the
+previous accepted payload. Reused keys with different payloads are rejected and journaled as
+`blocked_duplicate_conflict`.
+
+Disconnected, unknown, stale, or reconciliation-required state blocks connector use. Stale or
+unknown submission outcomes record adapter state as `unknown_requires_reconciliation`.
+
+Submission payloads intentionally omit host, port, account, credential, route, submit, transmit,
+broker order identifier, order status callback, fill callback, token, password, certificate,
+private key, and secret fields.
+
 ## Guarantees
 
 - No IBKR SDK dependency.
 - No authenticated TWS or IB Gateway session.
-- No IBKR protocol transport.
+- No built-in IBKR protocol transport.
 - Local TCP reachability probe only; it sends no application data.
-- No submit, place, transmit, cancel, or modify methods.
+- No live submit, place, transmit, cancel, or modify methods.
 - Contract lookup is connector-driven and does not create an order-capable transport.
+- Paper submission is connector-driven, paper-only, and blocked unless risk, approval, OMS,
+  contract, idempotency, reconciliation, and protection gates pass.
 - No real account IDs, credentials, certificates, passwords, private keys, tokens, or secrets.
 - No public IBKR host or port exposure.
-- Unknown state is explicit and blocks local paper order-plan creation.
+- Unknown state is explicit and blocks local paper order-plan creation and paper submission.
 - Core OMS and risk code remain broker-agnostic.
 
 ## Current Limitations
@@ -150,7 +204,7 @@ ibkr.paper.order_plan.created
 - No actual IBKR session.
 - No market data.
 - No SDK-backed contract lookup.
-- No paper order transport.
+- No built-in SDK-backed paper order transport.
 - No order status or fill callbacks.
 - No OMS/fake broker/approval orchestration.
 - Reconnect and reconciliation are covered only by the local resilience/chaos harness; there is no

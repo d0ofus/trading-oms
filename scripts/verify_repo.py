@@ -65,10 +65,23 @@ FORBIDDEN_TEXT = [
     "IBKR_ACCOUNT_MODE=live",
 ]
 
+SKIPPED_DIRECTORY_NAMES = {
+    ".git",
+    ".tmp",
+}
+
 
 def fail(message: str) -> None:
     print(f"verify_repo.py: ERROR: {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def _should_skip_path(path: Path) -> bool:
+    try:
+        relative_parts = path.relative_to(ROOT).parts
+    except ValueError:
+        relative_parts = path.parts
+    return any(part in SKIPPED_DIRECTORY_NAMES for part in relative_parts)
 
 
 def main() -> None:
@@ -78,7 +91,9 @@ def main() -> None:
 
     present_forbidden = [path for path in FORBIDDEN_FILES if (ROOT / path).exists()]
     if present_forbidden:
-        fail("Forbidden local/secret files present:\n  " + "\n  ".join(present_forbidden))
+        fail(
+            "Forbidden local/secret files present:\n  " + "\n  ".join(present_forbidden)
+        )
 
     for rel, needles in REQUIRED_TEXT.items():
         text = (ROOT / rel).read_text(encoding="utf-8")
@@ -88,7 +103,7 @@ def main() -> None:
 
     scan_exts = {".md", ".toml", ".example", ".yml", ".yaml", ".py", ".ps1", ""}
     for path in ROOT.rglob("*"):
-        if ".git" in path.parts:
+        if _should_skip_path(path):
             continue
         if not path.is_file() or path.suffix not in scan_exts:
             continue
