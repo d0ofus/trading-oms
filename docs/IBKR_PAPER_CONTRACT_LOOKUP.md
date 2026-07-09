@@ -120,5 +120,6 @@ order, token, password, certificate, private key, and secret fields.
 - Paper order submission is handled separately by Slice 049 and still requires fresh contract
   metadata, risk, approval, OMS, idempotency, connection-state, reconciliation, and protection
   evidence.
-- No order status or fill callbacks.
+- Order status and fill callback records are handled separately by Slice 050 and do not change the
+  contract lookup surface.
 - Tests use injected connectors and do not require a running TWS or IB Gateway process.

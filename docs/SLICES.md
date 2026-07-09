@@ -2030,9 +2030,11 @@ Acceptance criteria:
 
 ## Slice 051 - paper transport chaos tests
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: E - requires separate explicit approval
+
+branch: `slice-051-paper-transport-chaos-tests`
 
 Goal:
 Prove paper transport safety under disconnect, reconnect, duplicates, stale data, and unknown state.
@@ -2043,8 +2045,28 @@ Scope:
 - duplicate callback handling.
 
 Non-goals:
+- SDK/network callback listener registration;
+- market-data subscriptions;
+- paper trading UI;
 - live account testing;
 - live trading.
+
+Acceptance criteria:
+- [x] Slice 051 ExecPlan exists.
+- [x] Deterministic chaos tests cover disconnected paper submission blocking and reconnect
+  recovery after an explicit local paper connectivity observation.
+- [x] Deterministic chaos tests prove unknown/reconciliation-required state blocks local order
+  planning, contract lookup, paper submission, and callback acceptance.
+- [x] Deterministic chaos tests cover duplicate status and fill callback idempotency.
+- [x] Deterministic chaos tests cover conflicting duplicate callbacks requiring reconciliation.
+- [x] Deterministic chaos tests cover stale callback data requiring reconciliation and blocking
+  later paper submission.
+- [x] Deterministic chaos tests cover out-of-order callback data requiring reconciliation.
+- [x] Tests prove no live trading, live account mode, credentials, account IDs, public IBKR host
+  exposure, SDK/network callback listener registration, market-data subscription, paper trading UI,
+  production-readiness work, or production rollout are added.
+- [x] Docs describe that Slice 051 is deterministic local chaos coverage, not real IBKR session
+  reconciliation.
 
 ---
 

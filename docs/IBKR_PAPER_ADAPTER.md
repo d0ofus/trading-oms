@@ -4,6 +4,7 @@ Slice 016 introduces the first IBKR paper adapter foundation. Slice 047 adds a l
 reachability probe for validated paper TWS/Gateway endpoints. Slice 048 adds adapter-bound paper
 contract lookup records for sanitized stock metadata. Slice 049 adds guarded adapter-bound paper
 order submission records. Slice 050 adds correlated paper order status and fill callback records.
+Slice 051 adds deterministic paper transport chaos tests.
 
 It does not add live trading, live IBKR account mode, real broker credentials, account IDs,
 certificates, private keys, passwords, tokens, public IBKR exposure, an IBKR SDK dependency,
@@ -240,6 +241,17 @@ fields.
 See `docs/IBKR_PAPER_STATUS_FILL_CALLBACKS.md` for the Slice 050 callback-specific safety
 contract.
 
+## Paper Transport Chaos Tests
+
+Slice 051 adds deterministic tests for disconnect, reconnect, duplicate callback, stale callback,
+out-of-order callback, conflicting callback, and unknown/reconciliation-required state behavior.
+
+These tests use injected local connector callables and direct deterministic callback records. They
+do not add an IBKR SDK, authenticated broker session, network callback listener, market-data
+subscription, paper trading UI, or production rollout.
+
+See `docs/IBKR_PAPER_TRANSPORT_CHAOS.md` for the Slice 051 chaos-specific safety contract.
+
 ## Guarantees
 
 - No IBKR SDK dependency.
@@ -266,6 +278,6 @@ contract.
 - No built-in SDK-backed paper order transport.
 - No SDK/network callback listener registration.
 - No OMS/fake broker/approval orchestration.
-- Reconnect and reconciliation are covered only by the local resilience/chaos harness; there is no
-  real IBKR session reconciliation.
+- Reconnect and reconciliation are covered by deterministic local chaos tests only; there is no real
+  IBKR session reconciliation.
 - No persistence beyond the event journal records written by callers.
