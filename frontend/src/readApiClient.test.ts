@@ -122,6 +122,22 @@ const sampleSnapshot: OperationsApiSnapshot = {
     live_trading_enabled: false,
     live_trading_authorized: false,
   },
+  paperTrading: {
+    schema_version: 1,
+    adapter_name: "ibkr_paper",
+    paper_mode: "paper",
+    live_trading_enabled: false,
+    connection_state: "unknown_requires_reconciliation",
+    requires_reconciliation: true,
+    reconciliation_summary: "stale_callback_requires_review",
+    order_status: "PARTIALLY_FILLED",
+    order_client_reference: "client-paper-001",
+    status_callback_state: "accepted_status_update",
+    fill_callback_state: "accepted_fill_update",
+    cumulative_filled_quantity: 4,
+    leaves_quantity: 6,
+    updated_at: "2026-07-08T00:06:00Z",
+  },
 };
 
 const responseByEndpoint: Record<string, unknown> = {
@@ -134,6 +150,7 @@ const responseByEndpoint: Record<string, unknown> = {
   [READ_API_ENDPOINTS.positions]: sampleSnapshot.positions,
   [READ_API_ENDPOINTS.alerts]: sampleSnapshot.alerts,
   [READ_API_ENDPOINTS.readiness]: sampleSnapshot.readiness,
+  [READ_API_ENDPOINTS.paperTrading]: sampleSnapshot.paperTrading,
 };
 
 describe("read API client", () => {
@@ -155,6 +172,7 @@ describe("read API client", () => {
     await client.getPositions();
     await client.getAlerts();
     await client.getReadiness();
+    await client.getPaperTrading();
 
     expect(calls.map((call) => call.input)).toEqual(Object.values(READ_API_ENDPOINTS));
     expect(calls.every((call) => call.init?.method === "GET")).toBe(true);
@@ -188,6 +206,9 @@ describe("read API client", () => {
     });
     expect(state.snapshot.safety.live_trading_enabled).toBe(false);
     expect(state.snapshot.safety.broker_connectivity).toBe("not_configured");
+    expect(state.snapshot.paperTrading.paper_mode).toBe("paper");
+    expect(state.snapshot.paperTrading.live_trading_enabled).toBe(false);
+    expect(state.snapshot.paperTrading.requires_reconciliation).toBe(true);
     expect(JSON.stringify(state)).not.toContain("secret-token-value");
   });
 

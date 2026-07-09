@@ -43,6 +43,7 @@ a {
 .audit-explorer-section h2,
 .detail-section h2,
 .protection-monitor-section h2,
+.paper-trading-section h2,
 .approval-inbox-section h2,
 .builder-section h2,
 .builder-node h3,
@@ -216,6 +217,7 @@ dd {
 .audit-explorer-section,
 .detail-section,
 .protection-monitor-section,
+.paper-trading-section,
 .approval-inbox-section,
 .workflow-section {
   border: 1px solid #d9ded5;
@@ -909,6 +911,10 @@ dd {
 }
 
 .protection-monitor-section {
+  overflow: hidden;
+}
+
+.paper-trading-section {
   overflow: hidden;
 }
 

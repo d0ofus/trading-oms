@@ -117,6 +117,11 @@ def get_readiness() -> dict[str, Any]:
     return _operations_read_model().readiness.to_json_dict()
 
 
+@app.get("/api/paper-trading")
+def get_paper_trading() -> dict[str, Any]:
+    return _operations_read_model().paper_trading.to_json_dict()
+
+
 @app.get("/api/audit-export-bundle")
 def get_audit_export_bundle() -> dict[str, Any]:
     try:

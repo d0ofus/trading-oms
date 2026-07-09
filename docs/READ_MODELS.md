@@ -30,6 +30,7 @@ The module provides frozen dataclasses for:
 - positions;
 - alerts;
 - live-readiness status;
+- paper trading operator visibility;
 - aggregate operations view.
 
 Every read model exposes `to_json_dict()` for deterministic JSON-compatible output.
@@ -54,6 +55,8 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
 - Live trading remains disabled in the safety and readiness views.
 - Readiness views always report `live_trading_enabled: false` and
   `live_trading_authorized: false`.
+- Paper trading operator views always require `paper_mode: paper` and
+  `live_trading_enabled: false`.
 - The module contains no network, socket, IBKR SDK, broker transport, or order-submission behavior.
 - The module exposes no submit, approve, reject, cancel, connect, transmit, credential, token,
   password, account, route, host, port, socket, or secret affordance keys.
@@ -63,6 +66,8 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
 - The aggregate assembler is local demo data only.
 - Slice 021 exposes these models through read-only `GET /api/...` endpoints.
 - Frontend screens consume these models for read-only inspection.
+- The paper trading operator read model is representative read-only visibility, not a live IBKR
+  session.
 - SQLite persistence exists as a local foundation, but these read models are not yet backed by it at
   runtime.
 - Position records are inspection summaries only; full simulated position tracking remains a later

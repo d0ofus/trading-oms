@@ -399,6 +399,61 @@ class ReadinessReadModel:
 
 
 @dataclass(frozen=True)
+class PaperTradingOperatorReadModel:
+    adapter_name: str
+    paper_mode: str
+    live_trading_enabled: bool
+    connection_state: str
+    requires_reconciliation: bool
+    reconciliation_summary: str
+    order_status: str
+    order_client_reference: str
+    status_callback_state: str
+    fill_callback_state: str
+    cumulative_filled_quantity: int
+    leaves_quantity: int
+    updated_at: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_identifier(self.adapter_name, "adapter_name")
+        if self.paper_mode != "paper":
+            raise ReadModelError("paper_mode must remain paper")
+        if self.live_trading_enabled is not False:
+            raise ReadModelError("live_trading_enabled must remain false")
+        _validated_identifier(self.connection_state, "connection_state")
+        _validated_bool(self.requires_reconciliation, "requires_reconciliation")
+        _validated_identifier(self.reconciliation_summary, "reconciliation_summary")
+        _validated_identifier(self.order_status, "order_status")
+        _validated_identifier(self.order_client_reference, "order_client_reference")
+        _validated_identifier(self.status_callback_state, "status_callback_state")
+        _validated_identifier(self.fill_callback_state, "fill_callback_state")
+        _nonnegative_integer(self.cumulative_filled_quantity, "cumulative_filled_quantity")
+        _nonnegative_integer(self.leaves_quantity, "leaves_quantity")
+        _parse_timestamp(self.updated_at, "updated_at")
+        _assert_json_serializable(self.to_json_dict(), "paper trading operator read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "paper_mode": self.paper_mode,
+            "live_trading_enabled": self.live_trading_enabled,
+            "connection_state": self.connection_state,
+            "requires_reconciliation": self.requires_reconciliation,
+            "reconciliation_summary": self.reconciliation_summary,
+            "order_status": self.order_status,
+            "order_client_reference": self.order_client_reference,
+            "status_callback_state": self.status_callback_state,
+            "fill_callback_state": self.fill_callback_state,
+            "cumulative_filled_quantity": self.cumulative_filled_quantity,
+            "leaves_quantity": self.leaves_quantity,
+            "updated_at": self.updated_at,
+        }
+
+
+@dataclass(frozen=True)
 class OperationsReadModel:
     safety: SafetyPostureReadModel
     audit_events: tuple[AuditEventReadModel, ...]
@@ -409,6 +464,7 @@ class OperationsReadModel:
     positions: tuple[PositionReadModel, ...]
     alerts: tuple[AlertReadModel, ...]
     readiness: ReadinessReadModel
+    paper_trading: PaperTradingOperatorReadModel
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -426,6 +482,7 @@ class OperationsReadModel:
         _validated_model_tuple(self.positions, PositionReadModel, "positions")
         _validated_model_tuple(self.alerts, AlertReadModel, "alerts")
         _validated_model(self.readiness, ReadinessReadModel, "readiness")
+        _validated_model(self.paper_trading, PaperTradingOperatorReadModel, "paper_trading")
         _assert_json_serializable(self.to_json_dict(), "operations read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -440,6 +497,7 @@ class OperationsReadModel:
             "positions": [position.to_json_dict() for position in self.positions],
             "alerts": [alert.to_json_dict() for alert in self.alerts],
             "readiness": self.readiness.to_json_dict(),
+            "paper_trading": self.paper_trading.to_json_dict(),
         }
 
 
@@ -548,6 +606,21 @@ def build_demo_operations_read_model(settings: Settings | None = None) -> Operat
             result="not_ready",
             failed_checks=("emergency_stop_implemented",),
             required_human_action="collect_missing_evidence",
+        ),
+        paper_trading=PaperTradingOperatorReadModel(
+            adapter_name="ibkr_paper",
+            paper_mode="paper",
+            live_trading_enabled=False,
+            connection_state="unknown_requires_reconciliation",
+            requires_reconciliation=True,
+            reconciliation_summary="stale_callback_requires_review",
+            order_status="PARTIALLY_FILLED",
+            order_client_reference="client-paper-001",
+            status_callback_state="accepted_status_update",
+            fill_callback_state="accepted_fill_update",
+            cumulative_filled_quantity=4,
+            leaves_quantity=6,
+            updated_at="2026-07-08T00:06:00Z",
         ),
     )
 

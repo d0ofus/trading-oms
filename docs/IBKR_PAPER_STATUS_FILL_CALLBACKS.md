@@ -120,6 +120,7 @@ Callback IDs are idempotent per callback type.
 - No SDK-backed paper transport is included by default.
 - No SDK/network callback listener registration.
 - No order cancellation or order modification callbacks.
-- No paper trading UI.
+- This module does not provide a paper trading UI; Slice 052 adds separate read-only operator
+  visibility without callback controls.
 - In-memory callback idempotency and ordering state is process-local until a later persistence or
   reconciliation slice.

@@ -21,6 +21,7 @@ import {
   type ApprovalTicketApiView,
   type AuditEventApiView,
   type OperationsApiSnapshot,
+  type PaperTradingApiView,
   type PositionApiView,
   type ReadApiClient,
   type ReadApiLoadState,
@@ -90,6 +91,7 @@ const auditExplorerSection = "Audit explorer" as const;
 const orderDetailSection = "Order detail" as const;
 const positionDetailSection = "Position detail" as const;
 const protectionMonitoringSection = "Protection monitor" as const;
+const paperTradingSection = "Paper trading" as const;
 
 const workflowSections = [
   "Signals",
@@ -110,6 +112,7 @@ const shellSections = [
   orderDetailSection,
   positionDetailSection,
   protectionMonitoringSection,
+  paperTradingSection,
   ...workflowSections,
 ] as const;
 
@@ -787,6 +790,21 @@ export function App({
             <ProtectionMonitoringDashboard view={protectionMonitoring} />
           </section>
 
+          <section className="paper-trading-section" id={sectionId(paperTradingSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Paper trading</p>
+                <h2>IBKR paper operator</h2>
+              </div>
+              <div className="status-strip" aria-label="Paper trading safety posture">
+                <StatusPill tone="good" label="Paper only" />
+                <StatusPill tone="good" label="Live trading disabled" />
+                <StatusPill tone="neutral" label="Read only" />
+              </div>
+            </div>
+            <PaperTradingOperatorPanel view={snapshot.paperTrading} />
+          </section>
+
           <div className="section-grid">
             {workflowSections.map((section) => {
               const rows = workflowRows[section];
@@ -1135,6 +1153,79 @@ function ProtectionMonitoringDashboard({ view }: { view: ProtectionMonitoringVie
             ))}
           </div>
         )}
+      </article>
+    </div>
+  );
+}
+
+function PaperTradingOperatorPanel({ view }: { view: PaperTradingApiView }) {
+  return (
+    <div className="detail-layout" aria-label="Paper trading operator records">
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Adapter state</p>
+            <h3>{formatIdentifier(view.adapter_name)}</h3>
+          </div>
+          <StatusPill
+            tone={view.requires_reconciliation ? "critical" : "good"}
+            label={formatIdentifier(view.connection_state)}
+          />
+        </div>
+        <dl className="detail-facts">
+          <PostureItem label="Mode" value="Paper only" />
+          <PostureItem
+            label="Live trading"
+            value={view.live_trading_enabled ? "Enabled" : "Live trading disabled"}
+          />
+          <PostureItem label="Connection" value={formatIdentifier(view.connection_state)} />
+          <PostureItem label="Updated" value={view.updated_at} />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Reconciliation</p>
+            <h3>{view.requires_reconciliation ? "Reconciliation required" : "Reconciliation clean"}</h3>
+          </div>
+          <StatusPill
+            tone={view.requires_reconciliation ? "critical" : "good"}
+            label={view.requires_reconciliation ? "review required" : "clean"}
+          />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem label="State" value={formatIdentifier(view.connection_state)} />
+          <PostureItem
+            label="Summary"
+            value={formatIdentifier(view.reconciliation_summary)}
+          />
+          <PostureItem
+            label="Blocking"
+            value={view.requires_reconciliation ? "Risk-increasing steps blocked" : "No block"}
+          />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Paper order callbacks</p>
+            <h3>{view.order_client_reference}</h3>
+          </div>
+          <StatusPill
+            tone={view.leaves_quantity === 0 && !view.requires_reconciliation ? "good" : "warning"}
+            label={view.order_status}
+          />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem label="Status callback" value={formatIdentifier(view.status_callback_state)} />
+          <PostureItem label="Fill callback" value={formatIdentifier(view.fill_callback_state)} />
+          <PostureItem
+            label="Fill summary"
+            value={`${view.cumulative_filled_quantity} filled / ${view.leaves_quantity} leaves`}
+          />
+        </dl>
       </article>
     </div>
   );
