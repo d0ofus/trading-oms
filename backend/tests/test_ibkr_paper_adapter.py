@@ -12,17 +12,25 @@ from trading_oms_backend.fake_broker import BrokerOrderRequest, FakeBrokerError
 from trading_oms_backend.ibkr_paper_adapter import (
     IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE,
     IBKR_PAPER_CONNECTIVITY_PROBE_EVENT_TYPE,
+    IBKR_PAPER_CONTRACT_LOOKUP_ATTEMPT_EVENT_TYPE,
+    IBKR_PAPER_CONTRACT_LOOKUP_RESULT_EVENT_TYPE,
     IBKR_PAPER_ORDER_PLAN_EVENT_TYPE,
     IbkrConnectionStateRecord,
     IbkrPaperAdapter,
     IbkrPaperAdapterConfig,
     IbkrPaperAdapterError,
     IbkrPaperConnectivityProbeResult,
+    IbkrPaperContractAmbiguousError,
+    IbkrPaperContractLookupRequest,
+    IbkrPaperContractLookupResult,
+    IbkrPaperContractNotFoundError,
     IbkrPaperOrderPlan,
+    IbkrPaperResolvedContract,
 )
 
 REQUESTED_AT = "2026-07-06T00:02:00Z"
 RECORDED_AT = "2026-07-06T00:01:00Z"
+LOOKUP_RECORDED_AT = "2026-07-06T00:03:00Z"
 
 
 def order_request(**overrides: Any) -> BrokerOrderRequest:
@@ -41,6 +49,37 @@ def order_request(**overrides: Any) -> BrokerOrderRequest:
     }
     values.update(overrides)
     return BrokerOrderRequest(**values)
+
+
+def contract_lookup_request(**overrides: Any) -> IbkrPaperContractLookupRequest:
+    values: dict[str, Any] = {
+        "lookup_id": "contract-lookup-001",
+        "requested_at": LOOKUP_RECORDED_AT,
+        "reason": "operator_requested_contract_lookup",
+        "symbol": "AAPL",
+        "security_type": "stock",
+        "currency": "USD",
+        "exchange": "SMART",
+    }
+    values.update(overrides)
+    return IbkrPaperContractLookupRequest(**values)
+
+
+def resolved_contract(**overrides: Any) -> IbkrPaperResolvedContract:
+    values: dict[str, Any] = {
+        "contract_id": "ibkr-contract-265598",
+        "symbol": "AAPL",
+        "security_type": "stock",
+        "currency": "USD",
+        "exchange": "SMART",
+        "primary_exchange": "NASDAQ",
+        "local_symbol": "AAPL",
+        "trading_class": "NMS",
+        "min_tick": 0.01,
+        "resolved_at": LOOKUP_RECORDED_AT,
+    }
+    values.update(overrides)
+    return IbkrPaperResolvedContract(**values)
 
 
 def test_ibkr_paper_adapter_config_defaults_to_paper_localhost_tws_port() -> None:
@@ -244,6 +283,249 @@ def test_ibkr_connectivity_probe_records_timeout_as_unknown_reconciliation_requi
         adapter.create_order_plan(order_request())
 
 
+def test_ibkr_contract_lookup_resolves_stock_metadata_and_journals_attempt_and_result(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    connector_calls: list[tuple[str, int, str, float]] = []
+
+    def connector(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperContractLookupRequest,
+        timeout_seconds: float,
+    ) -> IbkrPaperResolvedContract:
+        connector_calls.append((config.host, config.port, request.symbol, timeout_seconds))
+        return resolved_contract()
+
+    result = adapter.lookup_contract(
+        contract_lookup_request(),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=connector,
+        timeout_seconds=0.5,
+    )
+
+    assert connector_calls == [("127.0.0.1", 7497, "AAPL", 0.5)]
+    assert result == IbkrPaperContractLookupResult(
+        lookup_id="contract-lookup-001",
+        requested_at=LOOKUP_RECORDED_AT,
+        recorded_at=LOOKUP_RECORDED_AT,
+        reason="operator_requested_contract_lookup",
+        endpoint_kind="tws_paper",
+        status="resolved",
+        requires_reconciliation=False,
+        failure_category=None,
+        contract=resolved_contract(),
+    )
+    assert adapter.connection_state == "connected_paper"
+    assert adapter.requires_reconciliation is False
+
+    records = journal.read_all()
+    assert [record.event_type for record in records] == [
+        IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE,
+        IBKR_PAPER_CONTRACT_LOOKUP_ATTEMPT_EVENT_TYPE,
+        IBKR_PAPER_CONTRACT_LOOKUP_RESULT_EVENT_TYPE,
+    ]
+    assert records[1].payload == contract_lookup_request().to_json_dict() | {
+        "endpoint_kind": "tws_paper"
+    }
+    assert records[2].payload == result.to_json_dict()
+
+
+def test_ibkr_contract_lookup_records_not_found_and_ambiguous_without_reconciliation(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+
+    def not_found(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperContractLookupRequest,
+        timeout_seconds: float,
+    ) -> IbkrPaperResolvedContract:
+        raise IbkrPaperContractNotFoundError("paper contract not found")
+
+    not_found_result = adapter.lookup_contract(
+        contract_lookup_request(lookup_id="contract-lookup-002", symbol="MSFT"),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=not_found,
+    )
+
+    def ambiguous(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperContractLookupRequest,
+        timeout_seconds: float,
+    ) -> IbkrPaperResolvedContract:
+        raise IbkrPaperContractAmbiguousError("paper contract lookup ambiguous")
+
+    ambiguous_result = adapter.lookup_contract(
+        contract_lookup_request(lookup_id="contract-lookup-003", symbol="BRK.B"),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=ambiguous,
+    )
+
+    assert not_found_result.status == "not_found"
+    assert not_found_result.requires_reconciliation is False
+    assert not_found_result.failure_category == "not_found"
+    assert not_found_result.contract is None
+    assert ambiguous_result.status == "ambiguous"
+    assert ambiguous_result.requires_reconciliation is False
+    assert ambiguous_result.failure_category == "ambiguous"
+    assert ambiguous_result.contract is None
+    assert adapter.connection_state == "connected_paper"
+
+
+def test_ibkr_contract_lookup_rejects_unsupported_instruments_without_connector_call(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    connector_calls: list[str] = []
+
+    def connector(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperContractLookupRequest,
+        timeout_seconds: float,
+    ) -> IbkrPaperResolvedContract:
+        connector_calls.append(request.security_type)
+        return resolved_contract()
+
+    result = adapter.lookup_contract(
+        contract_lookup_request(security_type="option"),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=connector,
+    )
+
+    assert connector_calls == []
+    assert result.status == "unsupported_instrument"
+    assert result.requires_reconciliation is False
+    assert result.failure_category == "unsupported_instrument"
+    assert result.contract is None
+    assert [record.event_type for record in journal.read_all()][-2:] == [
+        IBKR_PAPER_CONTRACT_LOOKUP_ATTEMPT_EVENT_TYPE,
+        IBKR_PAPER_CONTRACT_LOOKUP_RESULT_EVENT_TYPE,
+    ]
+
+
+def test_ibkr_contract_lookup_blocks_disconnected_and_reconciliation_required_state(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    connector_calls: list[str] = []
+
+    def connector(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperContractLookupRequest,
+        timeout_seconds: float,
+    ) -> IbkrPaperResolvedContract:
+        connector_calls.append(request.symbol)
+        return resolved_contract()
+
+    disconnected_result = adapter.lookup_contract(
+        contract_lookup_request(lookup_id="contract-lookup-004"),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=connector,
+    )
+    adapter.record_connection_state(
+        "unknown_requires_reconciliation",
+        recorded_at=LOOKUP_RECORDED_AT,
+        reason="paper_gateway_state_unknown",
+    )
+    reconciliation_result = adapter.lookup_contract(
+        contract_lookup_request(lookup_id="contract-lookup-005"),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=connector,
+    )
+
+    assert connector_calls == []
+    assert disconnected_result.status == "blocked_disconnected"
+    assert disconnected_result.requires_reconciliation is False
+    assert disconnected_result.failure_category == "disconnected"
+    assert reconciliation_result.status == "blocked_reconciliation_required"
+    assert reconciliation_result.requires_reconciliation is True
+    assert reconciliation_result.failure_category == "reconciliation_required"
+
+
+def test_ibkr_contract_lookup_rejects_stale_metadata_and_requires_reconciliation(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+
+    def connector(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperContractLookupRequest,
+        timeout_seconds: float,
+    ) -> IbkrPaperResolvedContract:
+        return resolved_contract(resolved_at="2026-07-06T00:00:00Z")
+
+    result = adapter.lookup_contract(
+        contract_lookup_request(),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=connector,
+        max_result_age_seconds=30,
+    )
+
+    assert result.status == "stale_result_rejected"
+    assert result.requires_reconciliation is True
+    assert result.failure_category == "stale_result"
+    assert result.contract is None
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+    assert adapter.requires_reconciliation is True
+    assert journal.read_all()[-1].event_type == IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE
+
+
+def test_ibkr_contract_lookup_connector_errors_require_reconciliation(tmp_path) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+
+    def connector(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperContractLookupRequest,
+        timeout_seconds: float,
+    ) -> IbkrPaperResolvedContract:
+        raise TimeoutError("paper contract lookup timed out")
+
+    result = adapter.lookup_contract(
+        contract_lookup_request(),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=connector,
+    )
+
+    assert result.status == "unknown_requires_reconciliation"
+    assert result.requires_reconciliation is True
+    assert result.failure_category == "timeout"
+    assert result.contract is None
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+    assert adapter.requires_reconciliation is True
+
+
 def test_ibkr_paper_adapter_builds_and_journals_local_order_plan(tmp_path) -> None:
     journal = JsonlEventJournal(tmp_path / "events.jsonl")
     adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
@@ -372,7 +654,53 @@ def test_ibkr_connectivity_probe_payloads_exclude_accounts_credentials_and_order
         assert forbidden_keys.isdisjoint(_all_payload_keys(payload))
 
 
-def test_ibkr_adapter_has_no_sdk_order_contract_or_market_data_surface(tmp_path) -> None:
+def test_ibkr_contract_lookup_payloads_exclude_accounts_credentials_and_order_fields(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+
+    result = adapter.lookup_contract(
+        contract_lookup_request(),
+        recorded_at=LOOKUP_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: resolved_contract(),
+    )
+
+    forbidden_keys = {
+        "account",
+        "account_id",
+        "api_key",
+        "authorization",
+        "broker_order_id",
+        "certificate",
+        "credential",
+        "host",
+        "order",
+        "order_type",
+        "password",
+        "port",
+        "private_key",
+        "route",
+        "secret",
+        "submit",
+        "token",
+        "transmit",
+    }
+    payloads = [
+        contract_lookup_request().to_json_dict(),
+        result.to_json_dict(),
+        *(record.payload for record in journal.read_all()),
+    ]
+    for payload in payloads:
+        assert forbidden_keys.isdisjoint(_all_payload_keys(payload))
+
+
+def test_ibkr_adapter_has_no_sdk_order_market_data_or_callback_surface(tmp_path) -> None:
     source = inspect.getsource(ibkr_paper_adapter).lower()
     forbidden_source_tokens = [
         "ibapi",
@@ -400,7 +728,6 @@ def test_ibkr_adapter_has_no_sdk_order_contract_or_market_data_surface(tmp_path)
         "transmit_order",
         "cancel_order",
         "modify_order",
-        "lookup_contract",
         "subscribe_market_data",
         "handle_order_status",
         "handle_fill",
