@@ -1,12 +1,14 @@
 # IBKR Paper Adapter
 
-Slice 016 introduces the first IBKR paper adapter foundation.
+Slice 016 introduces the first IBKR paper adapter foundation. Slice 047 adds a local-only TCP
+reachability probe for validated paper TWS/Gateway endpoints.
 
 It does not add live trading, live IBKR account mode, real broker credentials, account IDs,
-certificates, private keys, passwords, tokens, public IBKR exposure, an IBKR SDK dependency, socket
-or network transport, TWS/Gateway connectivity, order submission, order placement, order
-transmission, order cancellation, order modification, market-data subscriptions, contract
-resolution, OMS orchestration, approval workflow orchestration, reconnect/chaos behavior, or UI.
+certificates, private keys, passwords, tokens, public IBKR exposure, an IBKR SDK dependency,
+authenticated TWS/Gateway sessions, IBKR protocol transport, order submission, order placement,
+order transmission, order cancellation, order modification, market-data subscriptions, contract
+resolution, OMS orchestration, approval workflow orchestration, callback handling, paper trading UI,
+or production rollout.
 
 ## Purpose
 
@@ -16,11 +18,12 @@ import IBKR-specific behavior directly.
 The current implementation is local only. It can:
 
 - validate paper-only adapter configuration;
+- probe local TWS/Gateway paper TCP reachability without sending application data;
 - record local IBKR paper connection-state observations;
 - represent unknown IBKR state as requiring reconciliation;
 - build a local, non-transmitting paper order plan from an already validated
   `BrokerOrderRequest`;
-- append connection-state and order-plan records to the event journal.
+- append connectivity-probe, connection-state, and order-plan records to the event journal.
 
 ## Configuration Boundary
 
@@ -50,6 +53,28 @@ Connection-state records are journaled with event type:
 ibkr.paper.connection_state.recorded
 ```
 
+## Connectivity Probe
+
+`IbkrPaperAdapter.probe_local_connectivity` checks whether the validated localhost paper endpoint is
+reachable by opening and closing a short TCP connection. It does not authenticate, send IBKR
+protocol data, subscribe to market data, perform contract lookup, request account state, or place
+orders.
+
+The probe journals event type:
+
+```text
+ibkr.paper.connectivity_probe.recorded
+```
+
+Probe outcomes map to adapter state:
+
+- reachable local paper endpoint -> `connected_paper`;
+- refused local paper endpoint -> `disconnected`;
+- timeout or unexpected OS error -> `unknown_requires_reconciliation`.
+
+Probe payloads intentionally omit host, port, account, credential, route, submit, transmit, and
+secret fields.
+
 ## Paper Order Plans
 
 `IbkrPaperAdapter.create_order_plan` accepts only an existing validated `BrokerOrderRequest`. That
@@ -72,8 +97,9 @@ ibkr.paper.order_plan.created
 ## Guarantees
 
 - No IBKR SDK dependency.
-- No socket or network transport.
-- No TWS or IB Gateway connection attempt.
+- No authenticated TWS or IB Gateway session.
+- No IBKR protocol transport.
+- Local TCP reachability probe only; it sends no application data.
 - No submit, place, transmit, cancel, or modify methods.
 - No real account IDs, credentials, certificates, passwords, private keys, tokens, or secrets.
 - No public IBKR host or port exposure.
