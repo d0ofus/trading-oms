@@ -1895,9 +1895,11 @@ Acceptance criteria:
 
 ## Slice 048 - paper contract lookup
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: E - requires separate explicit approval
+
+branch: `slice-048-paper-contract-lookup`
 
 Goal:
 Resolve paper-mode contract metadata safely.
@@ -1911,6 +1913,24 @@ Non-goals:
 - live account lookup;
 - order placement;
 - live trading.
+
+Acceptance criteria:
+- [x] Slice 048 ExecPlan exists.
+- [x] Paper contract lookup exists behind the IBKR paper adapter boundary.
+- [x] Lookup validates paper-only localhost-only known-paper-port configuration before connector use.
+- [x] Lookup requires local `connected_paper` state before connector use.
+- [x] Lookup journals every attempt and outcome.
+- [x] Unsupported instruments are rejected without connector calls.
+- [x] Stale, timeout, OS, unexpected, unavailable, or existing unknown state is represented as
+  reconciliation-required.
+- [x] Reconciliation-required state continues to block local paper order-plan creation.
+- [x] Lookup payloads exclude host, port, account, credential, route, submit, transmit, order, and
+  secret-shaped fields.
+- [x] Tests cover resolved, not-found, ambiguous, unsupported, disconnected,
+  reconciliation-required, stale, connector-error, safe payload, and forbidden-surface behavior.
+- [x] No IBKR SDK, authentication, account identifiers, credentials, market-data subscription,
+  paper order submission, order status callback, fill callback, paper trading UI,
+  production-readiness work, production rollout, or live trading path is added.
 
 ---
 

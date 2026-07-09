@@ -25,7 +25,7 @@ The probe cannot:
 - use credentials, tokens, passwords, certificates, private keys, or secrets;
 - import or use an IBKR SDK;
 - subscribe to market data;
-- perform contract lookup;
+- perform contract lookup itself;
 - place, submit, transmit, route, cancel, or modify orders;
 - receive order status callbacks;
 - receive fill callbacks;
@@ -85,7 +85,7 @@ secret fields.
 - Live trading remains disabled.
 - No paper order transport is added.
 - No order placement path is added.
-- No market-data or contract lookup path is added.
+- The probe itself performs no market-data or contract lookup work.
 - Unknown state remains explicit and blocks local paper order-plan creation.
 - Core OMS, risk, approval, workflow, and strategy modules remain broker-agnostic.
 

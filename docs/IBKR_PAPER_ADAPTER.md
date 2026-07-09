@@ -1,14 +1,15 @@
 # IBKR Paper Adapter
 
 Slice 016 introduces the first IBKR paper adapter foundation. Slice 047 adds a local-only TCP
-reachability probe for validated paper TWS/Gateway endpoints.
+reachability probe for validated paper TWS/Gateway endpoints. Slice 048 adds adapter-bound paper
+contract lookup records for sanitized stock metadata.
 
 It does not add live trading, live IBKR account mode, real broker credentials, account IDs,
 certificates, private keys, passwords, tokens, public IBKR exposure, an IBKR SDK dependency,
 authenticated TWS/Gateway sessions, IBKR protocol transport, order submission, order placement,
-order transmission, order cancellation, order modification, market-data subscriptions, contract
-resolution, OMS orchestration, approval workflow orchestration, callback handling, paper trading UI,
-or production rollout.
+order transmission, order cancellation, order modification, market-data subscriptions, OMS
+orchestration, approval workflow orchestration, callback handling, paper trading UI, or production
+rollout.
 
 ## Purpose
 
@@ -19,11 +20,13 @@ The current implementation is local only. It can:
 
 - validate paper-only adapter configuration;
 - probe local TWS/Gateway paper TCP reachability without sending application data;
+- resolve supported paper stock contract metadata through an injected adapter-bound connector;
 - record local IBKR paper connection-state observations;
 - represent unknown IBKR state as requiring reconciliation;
 - build a local, non-transmitting paper order plan from an already validated
   `BrokerOrderRequest`;
-- append connectivity-probe, connection-state, and order-plan records to the event journal.
+- append connectivity-probe, contract-lookup, connection-state, and order-plan records to the
+  event journal.
 
 ## Configuration Boundary
 
@@ -75,6 +78,41 @@ Probe outcomes map to adapter state:
 Probe payloads intentionally omit host, port, account, credential, route, submit, transmit, and
 secret fields.
 
+## Contract Lookup
+
+`IbkrPaperAdapter.lookup_contract` accepts a validated `IbkrPaperContractLookupRequest`, requires a
+known local paper endpoint configuration, journals the attempt, and uses an injected
+`ContractLookupConnector` to resolve supported stock contract metadata.
+
+The lookup does not authenticate, import an IBKR SDK, subscribe to market data, request account
+state, or place orders. It does not create order intents, OMS transitions, approval tickets, paper
+orders, order callbacks, or fill callbacks.
+
+Contract lookup event types:
+
+```text
+ibkr.paper.contract_lookup.attempted
+ibkr.paper.contract_lookup.recorded
+```
+
+Lookup outcomes include:
+
+- `resolved`;
+- `not_found`;
+- `ambiguous`;
+- `unsupported_instrument`;
+- `blocked_disconnected`;
+- `blocked_reconciliation_required`;
+- `stale_result_rejected`;
+- `unknown_requires_reconciliation`.
+
+Stale results, timeout, OS errors, unexpected connector errors, and existing unknown state are
+represented as reconciliation-required. Reconciliation-required state continues to block local paper
+order-plan creation.
+
+Lookup payloads intentionally omit host, port, account, credential, route, submit, transmit, order,
+token, password, certificate, private key, and secret fields.
+
 ## Paper Order Plans
 
 `IbkrPaperAdapter.create_order_plan` accepts only an existing validated `BrokerOrderRequest`. That
@@ -101,6 +139,7 @@ ibkr.paper.order_plan.created
 - No IBKR protocol transport.
 - Local TCP reachability probe only; it sends no application data.
 - No submit, place, transmit, cancel, or modify methods.
+- Contract lookup is connector-driven and does not create an order-capable transport.
 - No real account IDs, credentials, certificates, passwords, private keys, tokens, or secrets.
 - No public IBKR host or port exposure.
 - Unknown state is explicit and blocks local paper order-plan creation.
@@ -110,7 +149,7 @@ ibkr.paper.order_plan.created
 
 - No actual IBKR session.
 - No market data.
-- No contract lookup.
+- No SDK-backed contract lookup.
 - No paper order transport.
 - No order status or fill callbacks.
 - No OMS/fake broker/approval orchestration.
