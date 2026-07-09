@@ -11,11 +11,13 @@ from trading_oms_backend.event_journal import JsonlEventJournal
 from trading_oms_backend.fake_broker import BrokerOrderRequest, FakeBrokerError
 from trading_oms_backend.ibkr_paper_adapter import (
     IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE,
+    IBKR_PAPER_CONNECTIVITY_PROBE_EVENT_TYPE,
     IBKR_PAPER_ORDER_PLAN_EVENT_TYPE,
     IbkrConnectionStateRecord,
     IbkrPaperAdapter,
     IbkrPaperAdapterConfig,
     IbkrPaperAdapterError,
+    IbkrPaperConnectivityProbeResult,
     IbkrPaperOrderPlan,
 )
 
@@ -154,6 +156,94 @@ def test_ibkr_unknown_state_requires_reconciliation_and_blocks_order_plans(tmp_p
         adapter.create_order_plan(order_request())
 
 
+def test_ibkr_connectivity_probe_journals_reachable_local_endpoint(tmp_path) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    connector_calls: list[tuple[str, int, float]] = []
+
+    def connector(host: str, port: int, timeout_seconds: float) -> None:
+        connector_calls.append((host, port, timeout_seconds))
+
+    result = adapter.probe_local_connectivity(
+        probe_id="probe-001",
+        recorded_at=RECORDED_AT,
+        reason="operator_requested_local_probe",
+        timeout_seconds=0.25,
+        connector=connector,
+    )
+
+    assert connector_calls == [("127.0.0.1", 7497, 0.25)]
+    assert result == IbkrPaperConnectivityProbeResult(
+        probe_id="probe-001",
+        recorded_at=RECORDED_AT,
+        reason="operator_requested_local_probe",
+        endpoint_kind="tws_paper",
+        status="reachable_local_paper_endpoint",
+        connection_state="connected_paper",
+        requires_reconciliation=False,
+        failure_category=None,
+    )
+    assert adapter.connection_state == "connected_paper"
+    assert adapter.requires_reconciliation is False
+
+    records = journal.read_all()
+    assert [record.event_type for record in records] == [
+        IBKR_PAPER_CONNECTIVITY_PROBE_EVENT_TYPE,
+        IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE,
+    ]
+    assert records[0].payload == result.to_json_dict()
+    assert records[1].payload["state"] == "connected_paper"
+
+
+def test_ibkr_connectivity_probe_records_refused_endpoint_as_disconnected(tmp_path) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig(port=4002))
+
+    def connector(host: str, port: int, timeout_seconds: float) -> None:
+        raise ConnectionRefusedError("local endpoint refused connection")
+
+    result = adapter.probe_local_connectivity(
+        probe_id="probe-002",
+        recorded_at=RECORDED_AT,
+        reason="operator_requested_local_probe",
+        connector=connector,
+    )
+
+    assert result.endpoint_kind == "gateway_paper"
+    assert result.status == "unreachable_local_paper_endpoint"
+    assert result.connection_state == "disconnected"
+    assert result.requires_reconciliation is False
+    assert result.failure_category == "connection_refused"
+    assert adapter.connection_state == "disconnected"
+    assert adapter.requires_reconciliation is False
+
+
+def test_ibkr_connectivity_probe_records_timeout_as_unknown_reconciliation_required(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+
+    def connector(host: str, port: int, timeout_seconds: float) -> None:
+        raise TimeoutError("local paper endpoint timed out")
+
+    result = adapter.probe_local_connectivity(
+        probe_id="probe-003",
+        recorded_at=RECORDED_AT,
+        reason="operator_requested_local_probe",
+        connector=connector,
+    )
+
+    assert result.status == "unknown_requires_reconciliation"
+    assert result.connection_state == "unknown_requires_reconciliation"
+    assert result.requires_reconciliation is True
+    assert result.failure_category == "timeout"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+    assert adapter.requires_reconciliation is True
+    with pytest.raises(IbkrPaperAdapterError, match="reconciliation"):
+        adapter.create_order_plan(order_request())
+
+
 def test_ibkr_paper_adapter_builds_and_journals_local_order_plan(tmp_path) -> None:
     journal = JsonlEventJournal(tmp_path / "events.jsonl")
     adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
@@ -246,15 +336,54 @@ def test_ibkr_paper_payloads_exclude_account_credentials_network_and_submission_
         assert forbidden_keys.isdisjoint(_all_payload_keys(payload))
 
 
-def test_ibkr_adapter_has_no_sdk_network_or_order_transmission_surface(tmp_path) -> None:
+def test_ibkr_connectivity_probe_payloads_exclude_accounts_credentials_and_order_fields(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+
+    result = adapter.probe_local_connectivity(
+        probe_id="probe-004",
+        recorded_at=RECORDED_AT,
+        reason="operator_requested_local_probe",
+        connector=lambda host, port, timeout_seconds: None,
+    )
+
+    forbidden_keys = {
+        "account",
+        "account_id",
+        "api_key",
+        "authorization",
+        "broker_order_id",
+        "certificate",
+        "credential",
+        "host",
+        "password",
+        "port",
+        "private_key",
+        "route",
+        "secret",
+        "submit",
+        "token",
+        "transmit",
+    }
+    payloads = [result.to_json_dict(), *(record.payload for record in journal.read_all())]
+    for payload in payloads:
+        assert forbidden_keys.isdisjoint(_all_payload_keys(payload))
+
+
+def test_ibkr_adapter_has_no_sdk_order_contract_or_market_data_surface(tmp_path) -> None:
     source = inspect.getsource(ibkr_paper_adapter).lower()
     forbidden_source_tokens = [
-        "import socket",
-        "from socket",
         "ibapi",
         "ib_insync",
-        "open_connection",
-        "create_connection",
+        "accountsummary",
+        "placeorder",
+        "reqcontractdetails",
+        "reqmktdata",
+        "sendall",
+        ".send(",
+        ".recv(",
     ]
 
     for token in forbidden_source_tokens:
@@ -271,6 +400,10 @@ def test_ibkr_adapter_has_no_sdk_network_or_order_transmission_surface(tmp_path)
         "transmit_order",
         "cancel_order",
         "modify_order",
+        "lookup_contract",
+        "subscribe_market_data",
+        "handle_order_status",
+        "handle_fill",
     ]:
         assert not hasattr(adapter, method_name)
 

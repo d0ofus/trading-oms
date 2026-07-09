@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
@@ -10,6 +11,7 @@ from trading_oms_backend.event_journal import JsonlEventJournal
 from trading_oms_backend.fake_broker import BrokerOrderRequest
 
 IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE = "ibkr.paper.connection_state.recorded"
+IBKR_PAPER_CONNECTIVITY_PROBE_EVENT_TYPE = "ibkr.paper.connectivity_probe.recorded"
 IBKR_PAPER_ORDER_PLAN_EVENT_TYPE = "ibkr.paper.order_plan.created"
 
 IBKR_PAPER_ADAPTER_NAME = "ibkr_paper"
@@ -26,6 +28,19 @@ ConnectionState = Literal[
     "unknown_requires_reconciliation",
 ]
 PaperOrderPlanStatus = Literal["planned_local_only"]
+ConnectivityProbeStatus = Literal[
+    "reachable_local_paper_endpoint",
+    "unreachable_local_paper_endpoint",
+    "unknown_requires_reconciliation",
+]
+ConnectivityFailureCategory = Literal[
+    "connection_refused",
+    "timeout",
+    "os_error",
+    "unexpected_error",
+]
+EndpointKind = Literal["tws_paper", "gateway_paper"]
+ProbeConnector = Callable[[str, int, float], None]
 
 _FORBIDDEN_TEXT_MARKERS = (
     "account=",
@@ -141,6 +156,79 @@ class IbkrConnectionStateRecord:
             "recorded_at": self.recorded_at,
             "reason": self.reason,
             "requires_reconciliation": self.requires_reconciliation,
+        }
+
+
+@dataclass(frozen=True)
+class IbkrPaperConnectivityProbeResult:
+    probe_id: str
+    recorded_at: str
+    reason: str
+    endpoint_kind: EndpointKind
+    status: ConnectivityProbeStatus
+    connection_state: ConnectionState
+    requires_reconciliation: bool
+    failure_category: ConnectivityFailureCategory | None
+    adapter_name: str = IBKR_PAPER_ADAPTER_NAME
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        if isinstance(self.schema_version, bool) or self.schema_version != 1:
+            raise IbkrPaperAdapterError("schema_version must be 1")
+        if self.adapter_name != IBKR_PAPER_ADAPTER_NAME:
+            raise IbkrPaperAdapterError("adapter_name must be ibkr_paper")
+        _validated_identifier(self.probe_id, "probe_id")
+        _parse_timestamp(self.recorded_at, "recorded_at")
+        _validated_identifier(self.reason, "reason")
+        if self.endpoint_kind not in {"tws_paper", "gateway_paper"}:
+            raise IbkrPaperAdapterError("endpoint_kind must be tws_paper or gateway_paper")
+        if self.status not in {
+            "reachable_local_paper_endpoint",
+            "unreachable_local_paper_endpoint",
+            "unknown_requires_reconciliation",
+        }:
+            raise IbkrPaperAdapterError("status must be a known connectivity probe status")
+        if self.connection_state not in VALID_CONNECTION_STATES:
+            raise IbkrPaperAdapterError("connection_state must be a known connection state")
+
+        expected_state: ConnectionState
+        expected_reconciliation: bool
+        if self.status == "reachable_local_paper_endpoint":
+            expected_state = "connected_paper"
+            expected_reconciliation = False
+            expected_failure_categories: set[ConnectivityFailureCategory | None] = {None}
+        elif self.status == "unreachable_local_paper_endpoint":
+            expected_state = "disconnected"
+            expected_reconciliation = False
+            expected_failure_categories = {"connection_refused"}
+        else:
+            expected_state = "unknown_requires_reconciliation"
+            expected_reconciliation = True
+            expected_failure_categories = {"timeout", "os_error", "unexpected_error"}
+
+        if self.connection_state != expected_state:
+            raise IbkrPaperAdapterError("connection_state must match probe status")
+        if self.requires_reconciliation is not expected_reconciliation:
+            raise IbkrPaperAdapterError("requires_reconciliation must match probe status")
+        if self.failure_category not in expected_failure_categories:
+            raise IbkrPaperAdapterError("failure_category must match probe status")
+        _assert_json_serializable(self.to_json_dict(), "IBKR paper connectivity probe result")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "adapter_name": self.adapter_name,
+            "probe_id": self.probe_id,
+            "recorded_at": self.recorded_at,
+            "reason": self.reason,
+            "endpoint_kind": self.endpoint_kind,
+            "status": self.status,
+            "connection_state": self.connection_state,
+            "requires_reconciliation": self.requires_reconciliation,
+            "failure_category": self.failure_category,
         }
 
 
@@ -290,6 +378,93 @@ class IbkrPaperAdapter:
         self._requires_reconciliation = record.requires_reconciliation
         return record
 
+    def probe_local_connectivity(
+        self,
+        *,
+        probe_id: str,
+        recorded_at: str,
+        reason: str,
+        timeout_seconds: float = 1.0,
+        connector: ProbeConnector | None = None,
+    ) -> IbkrPaperConnectivityProbeResult:
+        _validated_identifier(probe_id, "probe_id")
+        _parse_timestamp(recorded_at, "recorded_at")
+        _validated_identifier(reason, "reason")
+        timeout = _validated_timeout_seconds(timeout_seconds)
+        if connector is not None and not callable(connector):
+            raise IbkrPaperAdapterError("connector must be callable")
+
+        probe_connector = connector or _probe_local_tcp_endpoint
+        try:
+            probe_connector(self._config.host, self._config.port, timeout)
+        except ConnectionRefusedError:
+            result = IbkrPaperConnectivityProbeResult(
+                probe_id=probe_id,
+                recorded_at=recorded_at,
+                reason=reason,
+                endpoint_kind=_endpoint_kind_for_port(self._config.port),
+                status="unreachable_local_paper_endpoint",
+                connection_state="disconnected",
+                requires_reconciliation=False,
+                failure_category="connection_refused",
+            )
+        except TimeoutError:
+            result = IbkrPaperConnectivityProbeResult(
+                probe_id=probe_id,
+                recorded_at=recorded_at,
+                reason=reason,
+                endpoint_kind=_endpoint_kind_for_port(self._config.port),
+                status="unknown_requires_reconciliation",
+                connection_state="unknown_requires_reconciliation",
+                requires_reconciliation=True,
+                failure_category="timeout",
+            )
+        except OSError:
+            result = IbkrPaperConnectivityProbeResult(
+                probe_id=probe_id,
+                recorded_at=recorded_at,
+                reason=reason,
+                endpoint_kind=_endpoint_kind_for_port(self._config.port),
+                status="unknown_requires_reconciliation",
+                connection_state="unknown_requires_reconciliation",
+                requires_reconciliation=True,
+                failure_category="os_error",
+            )
+        except Exception:
+            result = IbkrPaperConnectivityProbeResult(
+                probe_id=probe_id,
+                recorded_at=recorded_at,
+                reason=reason,
+                endpoint_kind=_endpoint_kind_for_port(self._config.port),
+                status="unknown_requires_reconciliation",
+                connection_state="unknown_requires_reconciliation",
+                requires_reconciliation=True,
+                failure_category="unexpected_error",
+            )
+        else:
+            result = IbkrPaperConnectivityProbeResult(
+                probe_id=probe_id,
+                recorded_at=recorded_at,
+                reason=reason,
+                endpoint_kind=_endpoint_kind_for_port(self._config.port),
+                status="reachable_local_paper_endpoint",
+                connection_state="connected_paper",
+                requires_reconciliation=False,
+                failure_category=None,
+            )
+
+        self._journal.append(
+            event_type=IBKR_PAPER_CONNECTIVITY_PROBE_EVENT_TYPE,
+            payload=result.to_json_dict(),
+            timestamp=result.recorded_at,
+        )
+        self.record_connection_state(
+            result.connection_state,
+            recorded_at=result.recorded_at,
+            reason=f"connectivity_probe_{result.status}",
+        )
+        return result
+
     def create_order_plan(self, order: BrokerOrderRequest) -> IbkrPaperOrderPlan:
         if not isinstance(order, BrokerOrderRequest):
             raise IbkrPaperAdapterError("order must be a BrokerOrderRequest")
@@ -331,6 +506,15 @@ def _positive_finite_number(value: Any, field_name: str) -> float:
     return number
 
 
+def _validated_timeout_seconds(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise IbkrPaperAdapterError("timeout_seconds must be a finite number")
+    timeout = float(value)
+    if not (0 < timeout <= 30) or timeout in {float("inf"), float("-inf")}:
+        raise IbkrPaperAdapterError("timeout_seconds must be greater than 0 and no more than 30")
+    return timeout
+
+
 def _parse_timestamp(value: str, field_name: str) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise IbkrPaperAdapterError(f"{field_name} must be a non-empty string")
@@ -347,6 +531,21 @@ def _reject_forbidden_text(value: str, field_name: str) -> None:
     normalized = value.lower()
     if any(marker in normalized for marker in _FORBIDDEN_TEXT_MARKERS):
         raise IbkrPaperAdapterError(f"{field_name} contains credential or transmission text")
+
+
+def _endpoint_kind_for_port(port: int) -> EndpointKind:
+    if port == 7497:
+        return "tws_paper"
+    if port == 4002:
+        return "gateway_paper"
+    raise IbkrPaperAdapterError("port must be a known IBKR paper TWS or Gateway port")
+
+
+def _probe_local_tcp_endpoint(host: str, port: int, timeout_seconds: float) -> None:
+    import socket
+
+    with socket.create_connection((host, port), timeout=timeout_seconds):
+        return
 
 
 def _assert_json_serializable(payload: dict[str, Any], payload_name: str) -> None:

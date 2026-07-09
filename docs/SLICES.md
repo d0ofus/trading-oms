@@ -1854,9 +1854,11 @@ Acceptance criteria:
 
 ## Slice 047 - local IBKR paper connectivity probe
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: E - requires separate explicit approval
+
+branch: `slice-047-local-ibkr-paper-connectivity-probe`
 
 Goal:
 Probe local TWS/Gateway paper connectivity without order placement.
@@ -1872,6 +1874,22 @@ Non-goals:
 - market orders;
 - live account mode;
 - live trading.
+
+Acceptance criteria:
+- [x] Slice 047 ExecPlan exists.
+- [x] Local IBKR paper connectivity probe exists behind the adapter boundary.
+- [x] Probe validates paper-only localhost-only known-paper-port configuration before checking
+  reachability.
+- [x] Probe opens only a short local TCP connection and sends no application data.
+- [x] Probe journals every result and the resulting adapter connection-state observation.
+- [x] Unknown probe state is represented as `unknown_requires_reconciliation`.
+- [x] Probe payloads exclude host, port, account, credential, route, submit, transmit, and secret
+  fields.
+- [x] Tests cover success, refused endpoint, unknown state, unsafe config rejection, safe payload
+  shape, and forbidden SDK/order/contract/market-data surfaces.
+- [x] No IBKR SDK, authentication, account identifiers, credentials, market-data subscription,
+  contract lookup, paper order submission, order status callback, fill callback, paper trading UI,
+  production-readiness work, production rollout, or live trading path is added.
 
 ---
 
