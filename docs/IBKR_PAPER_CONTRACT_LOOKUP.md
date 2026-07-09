@@ -31,8 +31,8 @@ The lookup cannot:
 - subscribe to market data;
 - request account state;
 - place, submit, transmit, route, cancel, or modify orders;
-- receive order status callbacks;
-- receive fill callbacks;
+- register SDK/network order status listeners;
+- register SDK/network fill listeners;
 - expose public IBKR ports;
 - enable live trading.
 
