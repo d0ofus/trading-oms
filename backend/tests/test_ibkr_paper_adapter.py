@@ -15,6 +15,8 @@ from trading_oms_backend.ibkr_paper_adapter import (
     IBKR_PAPER_CONTRACT_LOOKUP_ATTEMPT_EVENT_TYPE,
     IBKR_PAPER_CONTRACT_LOOKUP_RESULT_EVENT_TYPE,
     IBKR_PAPER_ORDER_PLAN_EVENT_TYPE,
+    IBKR_PAPER_ORDER_SUBMISSION_ATTEMPT_EVENT_TYPE,
+    IBKR_PAPER_ORDER_SUBMISSION_RESULT_EVENT_TYPE,
     IbkrConnectionStateRecord,
     IbkrPaperAdapter,
     IbkrPaperAdapterConfig,
@@ -25,12 +27,16 @@ from trading_oms_backend.ibkr_paper_adapter import (
     IbkrPaperContractLookupResult,
     IbkrPaperContractNotFoundError,
     IbkrPaperOrderPlan,
+    IbkrPaperOrderSubmissionRecord,
+    IbkrPaperOrderSubmissionRequest,
     IbkrPaperResolvedContract,
 )
 
 REQUESTED_AT = "2026-07-06T00:02:00Z"
 RECORDED_AT = "2026-07-06T00:01:00Z"
 LOOKUP_RECORDED_AT = "2026-07-06T00:03:00Z"
+SUBMISSION_REQUESTED_AT = "2026-07-06T00:04:00Z"
+SUBMISSION_RECORDED_AT = "2026-07-06T00:04:01Z"
 
 
 def order_request(**overrides: Any) -> BrokerOrderRequest:
@@ -80,6 +86,22 @@ def resolved_contract(**overrides: Any) -> IbkrPaperResolvedContract:
     }
     values.update(overrides)
     return IbkrPaperResolvedContract(**values)
+
+
+def order_submission_request(**overrides: Any) -> IbkrPaperOrderSubmissionRequest:
+    values: dict[str, Any] = {
+        "submission_id": "paper-submission-001",
+        "requested_at": SUBMISSION_REQUESTED_AT,
+        "reason": "operator_requested_paper_submission",
+        "order_plan": IbkrPaperOrderPlan.from_order_request(order_request()),
+        "contract": resolved_contract(),
+        "oms_transition_reference": "oms-submitted-001",
+        "idempotency_key": "idempotency-client-001",
+        "protective_order_plan_reference": "protective-plan-001",
+        "approved_protective_exception_reference": None,
+    }
+    values.update(overrides)
+    return IbkrPaperOrderSubmissionRequest(**values)
 
 
 def test_ibkr_paper_adapter_config_defaults_to_paper_localhost_tws_port() -> None:
@@ -560,6 +582,340 @@ def test_ibkr_paper_adapter_builds_and_journals_local_order_plan(tmp_path) -> No
     ]
     assert records[1].timestamp == REQUESTED_AT
     assert records[1].payload == plan.to_json_dict()
+
+
+def test_ibkr_paper_adapter_records_accepted_paper_submission_with_connector(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    plan = adapter.create_order_plan(order_request())
+    connector_calls: list[tuple[str, int, str, float]] = []
+
+    def connector(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperOrderSubmissionRequest,
+        timeout_seconds: float,
+    ) -> None:
+        connector_calls.append((config.host, config.port, request.idempotency_key, timeout_seconds))
+
+    result = adapter.record_paper_order_submission(
+        order_submission_request(order_plan=plan),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=connector,
+        timeout_seconds=0.5,
+    )
+
+    assert connector_calls == [("127.0.0.1", 7497, "idempotency-client-001", 0.5)]
+    assert result == IbkrPaperOrderSubmissionRecord(
+        submission_id="paper-submission-001",
+        requested_at=SUBMISSION_REQUESTED_AT,
+        recorded_at=SUBMISSION_RECORDED_AT,
+        reason="operator_requested_paper_submission",
+        endpoint_kind="tws_paper",
+        status="accepted_paper_submission",
+        requires_reconciliation=False,
+        failure_category=None,
+        plan_id=plan.plan_id,
+        client_order_id="client-001",
+        symbol="AAPL",
+        side="buy",
+        quantity=10,
+        order_type="limit",
+        idempotency_key="idempotency-client-001",
+        risk_decision_id="risk-001",
+        approval_reference="manual-approval-001",
+        oms_transition_reference="oms-submitted-001",
+        contract_id="ibkr-contract-265598",
+        protective_order_plan_reference="protective-plan-001",
+        approved_protective_exception_reference=None,
+        local_acknowledgement_reference="paper-ack-idempotency-client-001",
+    )
+
+    records = journal.read_all()
+    assert [record.event_type for record in records] == [
+        IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE,
+        IBKR_PAPER_ORDER_PLAN_EVENT_TYPE,
+        IBKR_PAPER_ORDER_SUBMISSION_ATTEMPT_EVENT_TYPE,
+        IBKR_PAPER_ORDER_SUBMISSION_RESULT_EVENT_TYPE,
+    ]
+    assert records[2].payload == order_submission_request(order_plan=plan).to_json_dict() | {
+        "endpoint_kind": "tws_paper"
+    }
+    assert records[3].payload == result.to_json_dict()
+
+
+def test_ibkr_paper_submission_blocks_disconnected_and_reconciliation_required_state(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    disconnected_plan = adapter.create_order_plan(
+        order_request(client_order_id="client-002"),
+    )
+    connector_calls: list[str] = []
+
+    def connector(
+        config: IbkrPaperAdapterConfig,
+        request: IbkrPaperOrderSubmissionRequest,
+        timeout_seconds: float,
+    ) -> None:
+        connector_calls.append(request.client_order_id)
+
+    disconnected = adapter.record_paper_order_submission(
+        order_submission_request(
+            submission_id="paper-submission-002",
+            order_plan=disconnected_plan,
+            idempotency_key="idempotency-client-002",
+        ),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=connector,
+    )
+    adapter.record_connection_state(
+        "unknown_requires_reconciliation",
+        recorded_at=SUBMISSION_RECORDED_AT,
+        reason="paper_gateway_state_unknown",
+    )
+    reconciliation = adapter.record_paper_order_submission(
+        order_submission_request(
+            submission_id="paper-submission-003",
+            order_plan=disconnected_plan,
+            idempotency_key="idempotency-client-003",
+        ),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=connector,
+    )
+
+    assert connector_calls == []
+    assert disconnected.status == "blocked_disconnected"
+    assert disconnected.requires_reconciliation is False
+    assert disconnected.failure_category == "disconnected"
+    assert reconciliation.status == "blocked_reconciliation_required"
+    assert reconciliation.requires_reconciliation is True
+    assert reconciliation.failure_category == "reconciliation_required"
+
+
+def test_ibkr_paper_submission_rejects_stale_contract_and_requires_reconciliation(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    plan = adapter.create_order_plan(order_request(client_order_id="client-004"))
+    connector_calls: list[str] = []
+
+    result = adapter.record_paper_order_submission(
+        order_submission_request(
+            submission_id="paper-submission-004",
+            order_plan=plan,
+            contract=resolved_contract(resolved_at="2026-07-06T00:00:00Z"),
+            idempotency_key="idempotency-client-004",
+        ),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: connector_calls.append(
+            request.client_order_id
+        ),
+        max_contract_age_seconds=30,
+    )
+
+    assert connector_calls == []
+    assert result.status == "blocked_stale_contract"
+    assert result.requires_reconciliation is True
+    assert result.failure_category == "stale_contract"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+    assert adapter.requires_reconciliation is True
+    assert journal.read_all()[-1].event_type == IBKR_PAPER_CONNECTION_STATE_EVENT_TYPE
+
+
+def test_ibkr_paper_submission_rejects_contract_mismatch_and_missing_protection(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    mismatch_plan = adapter.create_order_plan(order_request(client_order_id="client-005"))
+    missing_protection_plan = adapter.create_order_plan(
+        order_request(client_order_id="client-006"),
+    )
+    connector_calls: list[str] = []
+
+    mismatch = adapter.record_paper_order_submission(
+        order_submission_request(
+            submission_id="paper-submission-005",
+            order_plan=mismatch_plan,
+            contract=resolved_contract(symbol="MSFT"),
+            idempotency_key="idempotency-client-005",
+        ),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: connector_calls.append(
+            request.client_order_id
+        ),
+    )
+    missing_protection = adapter.record_paper_order_submission(
+        order_submission_request(
+            submission_id="paper-submission-006",
+            order_plan=missing_protection_plan,
+            idempotency_key="idempotency-client-006",
+            protective_order_plan_reference=None,
+            approved_protective_exception_reference=None,
+        ),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: connector_calls.append(
+            request.client_order_id
+        ),
+    )
+
+    assert connector_calls == []
+    assert mismatch.status == "blocked_contract_mismatch"
+    assert mismatch.failure_category == "contract_mismatch"
+    assert missing_protection.status == "blocked_missing_protection"
+    assert missing_protection.failure_category == "missing_protection"
+
+
+def test_ibkr_paper_submission_is_idempotent_and_rejects_conflicts(tmp_path) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    plan = adapter.create_order_plan(order_request(client_order_id="client-007"))
+    request = order_submission_request(
+        submission_id="paper-submission-007",
+        order_plan=plan,
+        idempotency_key="idempotency-client-007",
+    )
+    connector_calls: list[str] = []
+
+    first = adapter.record_paper_order_submission(
+        request,
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: connector_calls.append(
+            request.client_order_id
+        ),
+    )
+    duplicate = adapter.record_paper_order_submission(
+        request,
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: connector_calls.append(
+            request.client_order_id
+        ),
+    )
+    conflict = adapter.record_paper_order_submission(
+        order_submission_request(
+            submission_id="paper-submission-008",
+            order_plan=plan,
+            idempotency_key="idempotency-client-007",
+            oms_transition_reference="different-oms-transition",
+        ),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: connector_calls.append(
+            request.client_order_id
+        ),
+    )
+
+    assert connector_calls == ["client-007"]
+    assert first.status == "accepted_paper_submission"
+    assert duplicate.status == "duplicate_accepted"
+    assert duplicate.local_acknowledgement_reference == first.local_acknowledgement_reference
+    assert conflict.status == "blocked_duplicate_conflict"
+    assert conflict.failure_category == "duplicate_conflict"
+    assert [record.event_type for record in journal.read_all()].count(
+        IBKR_PAPER_ORDER_SUBMISSION_RESULT_EVENT_TYPE
+    ) == 3
+
+
+def test_ibkr_paper_submission_connector_errors_require_reconciliation(tmp_path) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    plan = adapter.create_order_plan(order_request(client_order_id="client-009"))
+
+    result = adapter.record_paper_order_submission(
+        order_submission_request(
+            submission_id="paper-submission-009",
+            order_plan=plan,
+            idempotency_key="idempotency-client-009",
+        ),
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: (_ for _ in ()).throw(
+            TimeoutError("paper order transport timed out")
+        ),
+    )
+
+    assert result.status == "unknown_requires_reconciliation"
+    assert result.requires_reconciliation is True
+    assert result.failure_category == "timeout"
+    assert adapter.connection_state == "unknown_requires_reconciliation"
+    assert adapter.requires_reconciliation is True
+
+
+def test_ibkr_paper_submission_payloads_exclude_accounts_credentials_and_live_fields(
+    tmp_path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "events.jsonl")
+    adapter = IbkrPaperAdapter(journal, IbkrPaperAdapterConfig())
+    adapter.record_connection_state(
+        "connected_paper",
+        recorded_at=RECORDED_AT,
+        reason="operator_confirmed_local_paper_session",
+    )
+    plan = adapter.create_order_plan(order_request())
+    request = order_submission_request(order_plan=plan)
+    result = adapter.record_paper_order_submission(
+        request,
+        recorded_at=SUBMISSION_RECORDED_AT,
+        connector=lambda config, request, timeout_seconds: None,
+    )
+
+    forbidden_keys = {
+        "account",
+        "account_id",
+        "api_key",
+        "authorization",
+        "broker_order_id",
+        "certificate",
+        "credential",
+        "fill",
+        "host",
+        "order_status",
+        "password",
+        "port",
+        "private_key",
+        "route",
+        "route_live",
+        "secret",
+        "submit",
+        "submit_live",
+        "token",
+        "transmit",
+        "transmit_live",
+    }
+    payloads = [
+        request.to_json_dict(),
+        result.to_json_dict(),
+        *(record.payload for record in journal.read_all()),
+    ]
+    for payload in payloads:
+        assert forbidden_keys.isdisjoint(_all_payload_keys(payload))
 
 
 def test_ibkr_paper_adapter_rejects_unsafe_order_inputs(tmp_path) -> None:

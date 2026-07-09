@@ -1936,9 +1936,11 @@ Acceptance criteria:
 
 ## Slice 049 - paper order submission adapter
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: E - requires separate explicit approval
+
+branch: `slice-049-paper-order-submission-adapter`
 
 Goal:
 Submit paper-only IBKR orders behind the broker adapter boundary.
@@ -1954,6 +1956,30 @@ Non-goals:
 - live order routing;
 - bypassing approval;
 - live trading.
+
+Acceptance criteria:
+- [x] Slice 049 ExecPlan exists.
+- [x] Paper order submission behavior exists behind the IBKR paper adapter boundary.
+- [x] Submission validates paper-only localhost-only known-paper-port configuration through the
+  existing adapter config.
+- [x] Submission requires connected/reconciliation-safe adapter state before connector use.
+- [x] Submission requires fresh sanitized contract metadata that matches the local order plan.
+- [x] Submission requires a passed risk decision, explicit approval reference, OMS transition
+  reference, idempotency key, and protective-order evidence or an approved exception for
+  risk-increasing buys.
+- [x] Every submission attempt and outcome is journaled.
+- [x] Duplicate idempotency keys are accepted only for matching canonical payloads and rejected for
+  conflicts.
+- [x] Disconnected, stale, unknown, timeout, OS, unexpected, unavailable, or reconciliation-required
+  outcomes block connector use or require reconciliation as appropriate.
+- [x] Submission payloads exclude host, port, account, credential, route, submit, transmit, broker
+  order identifier, order status callback, fill callback, and secret-shaped fields.
+- [x] Tests cover accepted, disconnected, reconciliation-required, stale, contract-mismatch,
+  missing-protection, idempotent duplicate, conflicting duplicate, connector-error, safe payload,
+  and forbidden-surface behavior.
+- [x] No live trading, live account mode, credentials, account IDs, market-data subscriptions, order
+  status callbacks, fill callbacks, paper trading UI, production-readiness work, or production
+  rollout are added.
 
 ---
 

@@ -117,6 +117,8 @@ order, token, password, certificate, private key, and secret fields.
 - No authenticated IBKR session.
 - No IBKR SDK dependency.
 - No market data.
-- No paper order transport.
+- Paper order submission is handled separately by Slice 049 and still requires fresh contract
+  metadata, risk, approval, OMS, idempotency, connection-state, reconciliation, and protection
+  evidence.
 - No order status or fill callbacks.
 - Tests use injected connectors and do not require a running TWS or IB Gateway process.

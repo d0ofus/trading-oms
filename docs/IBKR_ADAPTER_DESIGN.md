@@ -5,12 +5,13 @@
 Slice 016 implements the first local IBKR paper adapter foundation in
 `trading_oms_backend.ibkr_paper_adapter`.
 
-The current adapter is intentionally non-transmitting. It validates paper-only local configuration,
-can run a local TCP reachability probe against a validated localhost paper endpoint, can resolve
-sanitized stock contract metadata through an injected adapter-bound connector, records local
-connection-state observations, builds local paper order plans from validated `BrokerOrderRequest`
-records, and journals those records. It does not authenticate with TWS or IB Gateway, does not
-import an IBKR SDK, and does not submit orders.
+The current adapter validates paper-only local configuration, can run a local TCP reachability probe
+against a validated localhost paper endpoint, can resolve sanitized stock contract metadata through
+an injected adapter-bound connector, records local connection-state observations, builds local paper
+order plans from validated `BrokerOrderRequest` records, records guarded paper submission attempts
+through an injected adapter-bound connector, and journals those records. It does not authenticate
+with TWS or IB Gateway by itself, does not import an IBKR SDK, does not expose account identifiers,
+and does not handle order status or fill callbacks.
 
 ## Rules
 
@@ -31,6 +32,8 @@ Current local foundation:
 - Represent unknown state as reconciliation-required.
 - Build local non-transmitting paper order plans from validated risk-passed and approval-referenced
   order requests.
+- Record guarded paper order submission attempts and outcomes only after risk, approval, OMS,
+  contract, idempotency, connection-state, reconciliation, and protection checks pass.
 - Emit structured local events to the event journal.
 
 Future paper transport responsibilities:
@@ -38,7 +41,6 @@ Future paper transport responsibilities:
 - Establish an authenticated paper-only TWS or IB Gateway session.
 - Subscribe to market data.
 - Add SDK-backed contract lookup after separate review if needed.
-- Submit paper orders only.
 - Receive order status updates.
 - Receive fills.
 - Reconcile open orders and positions.
