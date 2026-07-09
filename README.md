@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a read-only protection monitoring dashboard, deterministic local audit export bundles, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a read-only protection monitoring dashboard, a read-only paper trading operator section, deterministic local audit export bundles, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
 
@@ -38,6 +38,8 @@ No live broker integration, production strategy engine, real alert delivery, con
   audit records.
 - Protection monitoring behavior is read-only visibility into expected protection, exceptions,
   missing-protection states, and local critical/emergency alerts.
+- Paper trading operator behavior is read-only paper-state visibility and cannot connect, submit,
+  transmit, route, cancel, modify, or configure broker connectivity.
 - Audit export behavior is deterministic local JSON output with recursive safety scanning and no
   external delivery.
 - Strategy DSL behavior is local replay-only validation and signal generation only.

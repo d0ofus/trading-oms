@@ -19,9 +19,10 @@ The backend exposes:
 - `GET /api/positions`
 - `GET /api/alerts`
 - `GET /api/readiness`
+- `GET /api/paper-trading`
 - `GET /api/audit-export-bundle`
 
-The section routes from `/api/safety` through `/api/readiness` return the matching section from
+The section routes from `/api/safety` through `/api/paper-trading` return the matching section from
 `build_demo_operations_read_model()`.
 
 `GET /api/audit-export-bundle` returns a deterministic local review bundle built from the current
@@ -42,6 +43,7 @@ present.
 - Only `GET` handlers are implemented for these API views.
 - `POST`, `PUT`, `PATCH`, and `DELETE` are not implemented for these routes.
 - Responses expose inspection data only.
+- `GET /api/paper-trading` exposes paper-only operator visibility only, with no broker controls.
 - Responses do not expose submit, approve, reject, cancel, connect, transmit, credential, token,
   password, account, host, port, route, socket, or secret affordance keys.
 - Readiness responses keep `live_trading_enabled: false` and

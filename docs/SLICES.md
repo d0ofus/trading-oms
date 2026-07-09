@@ -2072,7 +2072,7 @@ Acceptance criteria:
 
 ## Slice 052 - paper trading operator UI
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: E - requires separate explicit approval
 
@@ -2084,11 +2084,29 @@ Scope:
 - connection state;
 - order status;
 - reconciliation warnings.
+- read-only backend and frontend visibility for representative paper status/fill callback state.
 
 Non-goals:
 - live trading controls;
 - credential inputs;
 - public broker host configuration.
+- production-readiness planning;
+- production rollout.
+
+Acceptance criteria:
+- [x] Slice 052 ExecPlan exists.
+- [x] `PaperTradingOperatorReadModel` exposes paper-only operator visibility and rejects non-paper
+  or live-enabled states.
+- [x] `GET /api/paper-trading` returns the paper operator read model and remains read-only.
+- [x] The frontend read API client loads `/api/paper-trading` through `GET` only and safe fallback
+  remains paper-only with live trading disabled.
+- [x] The UI renders paper-only labeling, connection state, order status, callback/fill state,
+  reconciliation warnings, and live-trading disabled posture.
+- [x] Tests prove no live controls, credential inputs, public broker host fields, account IDs,
+  submit/transmit/route controls, SDK/network listener registration, production-readiness work, or
+  production rollout are added.
+- [x] Docs describe the paper operator UI as read-only visibility, not a real IBKR session control
+  surface.
 
 ---
 

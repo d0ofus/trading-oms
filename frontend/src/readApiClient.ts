@@ -8,6 +8,7 @@ export const READ_API_ENDPOINTS = {
   positions: "/api/positions",
   alerts: "/api/alerts",
   readiness: "/api/readiness",
+  paperTrading: "/api/paper-trading",
 } as const;
 
 export type SafetyApiView = {
@@ -121,6 +122,23 @@ export type ReadinessApiView = {
   live_trading_authorized: false;
 };
 
+export type PaperTradingApiView = {
+  schema_version: 1;
+  adapter_name: string;
+  paper_mode: "paper";
+  live_trading_enabled: false;
+  connection_state: string;
+  requires_reconciliation: boolean;
+  reconciliation_summary: string;
+  order_status: string;
+  order_client_reference: string;
+  status_callback_state: string;
+  fill_callback_state: string;
+  cumulative_filled_quantity: number;
+  leaves_quantity: number;
+  updated_at: string;
+};
+
 export type OperationsApiSnapshot = {
   safety: SafetyApiView;
   auditEvents: AuditEventApiView[];
@@ -131,6 +149,7 @@ export type OperationsApiSnapshot = {
   positions: PositionApiView[];
   alerts: AlertApiView[];
   readiness: ReadinessApiView;
+  paperTrading: PaperTradingApiView;
 };
 
 export type ReadApiLoadState =
@@ -162,6 +181,7 @@ export type ReadApiClient = {
   getPositions: () => Promise<PositionApiView[]>;
   getAlerts: () => Promise<AlertApiView[]>;
   getReadiness: () => Promise<ReadinessApiView>;
+  getPaperTrading: () => Promise<PaperTradingApiView>;
   getOperationsSnapshot: () => Promise<OperationsApiSnapshot>;
 };
 
@@ -198,6 +218,22 @@ export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
     live_trading_enabled: false,
     live_trading_authorized: false,
   },
+  paperTrading: {
+    schema_version: 1,
+    adapter_name: "ibkr_paper",
+    paper_mode: "paper",
+    live_trading_enabled: false,
+    connection_state: "not_configured",
+    requires_reconciliation: true,
+    reconciliation_summary: "backend_read_api_unavailable",
+    order_status: "unavailable",
+    order_client_reference: "not_recorded",
+    status_callback_state: "unavailable",
+    fill_callback_state: "unavailable",
+    cumulative_filled_quantity: 0,
+    leaves_quantity: 0,
+    updated_at: "2026-07-08T00:00:00Z",
+  },
 };
 
 export const initialReadApiState: ReadApiLoadState = {
@@ -222,6 +258,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
     getPositions: () => request<PositionApiView[]>(READ_API_ENDPOINTS.positions),
     getAlerts: () => request<AlertApiView[]>(READ_API_ENDPOINTS.alerts),
     getReadiness: () => request<ReadinessApiView>(READ_API_ENDPOINTS.readiness),
+    getPaperTrading: () => request<PaperTradingApiView>(READ_API_ENDPOINTS.paperTrading),
     getOperationsSnapshot: async () => {
       const [
         safety,
@@ -233,6 +270,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         positions,
         alerts,
         readiness,
+        paperTrading,
       ] = await Promise.all([
         client.getSafety(),
         client.getAuditEvents(),
@@ -243,6 +281,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         client.getPositions(),
         client.getAlerts(),
         client.getReadiness(),
+        client.getPaperTrading(),
       ]);
 
       return {
@@ -255,6 +294,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         positions,
         alerts,
         readiness,
+        paperTrading,
       };
     },
   };

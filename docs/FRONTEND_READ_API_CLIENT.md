@@ -24,6 +24,7 @@ It provides typed `GET` functions for:
 - `/api/positions`
 - `/api/alerts`
 - `/api/readiness`
+- `/api/paper-trading`
 
 The aggregate loader fetches all sections into a single operations snapshot for future UI wiring.
 
@@ -35,6 +36,9 @@ The frontend read state is explicit:
 - `loaded`: backend read data is available;
 - `empty`: backend is reachable but workflow record lists are empty;
 - `error`: backend read API is unavailable and the UI should show a safe local fallback.
+
+The safe fallback includes paper-only operator visibility with live trading disabled and
+reconciliation required until backend read data is available.
 
 The error state intentionally returns a conservative fallback snapshot with:
 

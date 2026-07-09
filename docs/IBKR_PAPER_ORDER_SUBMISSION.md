@@ -126,5 +126,6 @@ The adapter stores a canonical payload hash per idempotency key in memory.
 - No SDK-backed paper transport is included by default.
 - Accepted submission records are local adapter outcomes, not status or fill confirmations.
 - No SDK/network callback listener registration.
-- No paper trading UI.
+- This module does not provide a paper trading UI; Slice 052 adds separate read-only operator
+  visibility without submission controls.
 - In-memory idempotency state is process-local until a later persistence/reconciliation slice.

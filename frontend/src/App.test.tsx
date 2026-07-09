@@ -27,6 +27,7 @@ describe("App", () => {
     expect(text).toContain("Order detail");
     expect(text).toContain("Position detail");
     expect(text).toContain("Protection monitor");
+    expect(text).toContain("Paper trading");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
     expect(text).toContain("Orders");
@@ -207,6 +208,28 @@ describe("App", () => {
     expect(text).not.toContain("external delivery control");
   });
 
+  it("renders paper-only operator visibility without broker controls", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Paper trading");
+    expect(text).toContain("IBKR paper operator");
+    expect(text).toContain("Paper only");
+    expect(text).toContain("Live trading disabled");
+    expect(text).toContain("ibkr paper");
+    expect(text).toContain("unknown requires reconciliation");
+    expect(text).toContain("Reconciliation required");
+    expect(text).toContain("stale callback requires review");
+    expect(text).toContain("PARTIALLY_FILLED");
+    expect(text).toContain("client-paper-001");
+    expect(text).toContain("accepted status update");
+    expect(text).toContain("accepted fill update");
+    expect(text).toContain("4 filled / 6 leaves");
+    expect(text).not.toContain("Connect broker");
+    expect(text).not.toContain("Submit live");
+    expect(text).not.toContain("Credential");
+  });
+
   it("renders a safe fallback when backend read APIs are unavailable", () => {
     const fallbackState: ReadApiLoadState = {
       status: "error",
@@ -369,6 +392,22 @@ const backendSnapshot: OperationsApiSnapshot = {
     required_human_action: "collect_missing_evidence",
     live_trading_enabled: false,
     live_trading_authorized: false,
+  },
+  paperTrading: {
+    schema_version: 1,
+    adapter_name: "ibkr_paper",
+    paper_mode: "paper",
+    live_trading_enabled: false,
+    connection_state: "unknown_requires_reconciliation",
+    requires_reconciliation: true,
+    reconciliation_summary: "stale_callback_requires_review",
+    order_status: "PARTIALLY_FILLED",
+    order_client_reference: "client-paper-001",
+    status_callback_state: "accepted_status_update",
+    fill_callback_state: "accepted_fill_update",
+    cumulative_filled_quantity: 4,
+    leaves_quantity: 6,
+    updated_at: "2026-07-08T00:06:00Z",
   },
 };
 

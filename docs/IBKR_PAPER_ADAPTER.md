@@ -4,13 +4,14 @@ Slice 016 introduces the first IBKR paper adapter foundation. Slice 047 adds a l
 reachability probe for validated paper TWS/Gateway endpoints. Slice 048 adds adapter-bound paper
 contract lookup records for sanitized stock metadata. Slice 049 adds guarded adapter-bound paper
 order submission records. Slice 050 adds correlated paper order status and fill callback records.
-Slice 051 adds deterministic paper transport chaos tests.
+Slice 051 adds deterministic paper transport chaos tests. Slice 052 adds read-only paper operator
+UI visibility over safe read models.
 
 It does not add live trading, live IBKR account mode, real broker credentials, account IDs,
 certificates, private keys, passwords, tokens, public IBKR exposure, an IBKR SDK dependency,
 authenticated TWS/Gateway sessions by default, live order submission, order cancellation, order
 modification, market-data subscriptions, OMS orchestration, approval workflow orchestration, order
-status/fill network listener registration, paper trading UI, or production rollout.
+status/fill network listener registration, paper trading action controls, or production rollout.
 
 ## Purpose
 
@@ -252,6 +253,16 @@ subscription, paper trading UI, or production rollout.
 
 See `docs/IBKR_PAPER_TRANSPORT_CHAOS.md` for the Slice 051 chaos-specific safety contract.
 
+## Paper Operator UI
+
+Slice 052 exposes paper-only adapter state, callback state, order status, and reconciliation
+warnings through a read-only operations shell section backed by `GET /api/paper-trading`.
+
+The UI does not add connection, credential, host, port, submit, transmit, route, cancel, modify, or
+live-mode controls.
+
+See `docs/IBKR_PAPER_OPERATOR_UI.md` for the Slice 052 UI-specific safety contract.
+
 ## Guarantees
 
 - No IBKR SDK dependency.
@@ -264,6 +275,7 @@ See `docs/IBKR_PAPER_TRANSPORT_CHAOS.md` for the Slice 051 chaos-specific safety
   contract, idempotency, reconciliation, and protection gates pass.
 - Paper status and fill callbacks are deterministic adapter records and require accepted submission
   correlation before producing OMS-compatible state names.
+- The paper operator UI is read-only visibility only and cannot drive broker behavior.
 - No real account IDs, credentials, certificates, passwords, private keys, tokens, or secrets.
 - No public IBKR host or port exposure.
 - Unknown state is explicit and blocks local paper order-plan creation, paper submission, and
@@ -277,6 +289,7 @@ See `docs/IBKR_PAPER_TRANSPORT_CHAOS.md` for the Slice 051 chaos-specific safety
 - No SDK-backed contract lookup.
 - No built-in SDK-backed paper order transport.
 - No SDK/network callback listener registration.
+- No paper trading action controls.
 - No OMS/fake broker/approval orchestration.
 - Reconnect and reconciliation are covered by deterministic local chaos tests only; there is no real
   IBKR session reconciliation.
