@@ -2149,7 +2149,7 @@ Acceptance criteria:
 
 ## Slice 054 - authentication and authorization
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: F - requires separate explicit approval
 
@@ -2164,6 +2164,24 @@ Scope:
 Non-goals:
 - broker credential storage;
 - live trading.
+
+Acceptance criteria:
+- [x] Slice 054 ExecPlan exists.
+- [x] Local typed operator identity and permission models exist.
+- [x] `GET /api/operator-session` exposes safe operator-session inspection data.
+- [x] Read endpoints require `view_operations` while preserving local development usability.
+- [x] Simulation approval decisions require `approve_simulation` and bind decision actor to the
+  authenticated operator.
+- [x] Workflow definition mutation and saved simulation run start require `administer_system`.
+- [x] Privileged authorization decisions are journaled without secret, broker, account, host, port,
+  route, submit, or transmit affordances.
+- [x] Production mode rejects local header authentication instead of treating it as production auth.
+- [x] Frontend renders operator access state and permissions without credential, token, password,
+  live-trading, broker, or production controls.
+- [x] Docs describe the local-auth foundation and hard stops.
+- [x] No production rollout, external identity-provider integration, real credentials, account IDs,
+  secrets, live trading, live account mode, broker controls, market-data subscriptions, or Slice
+  055+ behavior is added.
 
 ---
 

@@ -20,6 +20,17 @@ const sampleSnapshot: OperationsApiSnapshot = {
     approval_mode: "manual_required",
     data_source: "local_read_model",
   },
+  operatorSession: {
+    schema_version: 1,
+    operator_id: "human-operator-001",
+    auth_state: "local_development",
+    auth_method: "local_header",
+    roles: ["admin"],
+    permissions: ["view_operations", "approve_simulation", "administer_system"],
+    can_view_operations: true,
+    can_approve_simulation: true,
+    can_administer_system: true,
+  },
   auditEvents: [
     {
       schema_version: 1,
@@ -142,6 +153,7 @@ const sampleSnapshot: OperationsApiSnapshot = {
 
 const responseByEndpoint: Record<string, unknown> = {
   [READ_API_ENDPOINTS.safety]: sampleSnapshot.safety,
+  [READ_API_ENDPOINTS.operatorSession]: sampleSnapshot.operatorSession,
   [READ_API_ENDPOINTS.auditEvents]: sampleSnapshot.auditEvents,
   [READ_API_ENDPOINTS.signals]: sampleSnapshot.signals,
   [READ_API_ENDPOINTS.riskDecisions]: sampleSnapshot.riskDecisions,
@@ -163,6 +175,7 @@ describe("read API client", () => {
       },
     });
 
+    await client.getOperatorSession();
     await client.getSafety();
     await client.getAuditEvents();
     await client.getSignals();
@@ -206,6 +219,8 @@ describe("read API client", () => {
     });
     expect(state.snapshot.safety.live_trading_enabled).toBe(false);
     expect(state.snapshot.safety.broker_connectivity).toBe("not_configured");
+    expect(state.snapshot.operatorSession.operator_id).toBe("human-operator-001");
+    expect(state.snapshot.operatorSession.can_view_operations).toBe(true);
     expect(state.snapshot.paperTrading.paper_mode).toBe("paper");
     expect(state.snapshot.paperTrading.live_trading_enabled).toBe(false);
     expect(state.snapshot.paperTrading.requires_reconciliation).toBe(true);

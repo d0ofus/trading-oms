@@ -25,7 +25,7 @@ def test_slice_053_deployment_and_secrets_plan_preserves_hard_stops() -> None:
         "IBKR TWS or Gateway API ports must never be exposed to the public internet.",
         "Production-like paper operation requires separate explicit human "
         "approval and external review.",
-        "Authentication and authorization remain future Slice 054 work.",
+        "Slice 054 adds a local operator authentication and authorization foundation.",
         "Rollback planning must preserve the append-only audit trail.",
         "Backup and restore planning must protect journal and persistence "
         "data without exporting secrets.",
@@ -57,7 +57,8 @@ def test_slice_053_is_ready_and_later_slices_remain_not_started() -> None:
     slices_text = SLICES_DOC.read_text(encoding="utf-8")
 
     assert _slice_status(slices_text, "053") == "ready_for_human_review"
-    for slice_id in ("054", "055", "056", "057", "058", "059"):
+    assert _slice_status(slices_text, "054") == "ready_for_human_review"
+    for slice_id in ("055", "056", "057", "058", "059"):
         assert _slice_status(slices_text, slice_id) == "not_started"
 
 

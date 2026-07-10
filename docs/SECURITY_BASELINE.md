@@ -46,5 +46,18 @@ No real broker credentials, account identifiers, passwords, certificates, privat
 
 IBKR TWS or Gateway API ports must never be exposed to the public internet.
 
-Authentication and authorization remain future Slice 054 work. Controlled rollout, emergency stop,
+## Authentication And Authorization
+
+Slice 054 adds a local operator authentication and authorization foundation only.
+
+It is not production authentication and does not add passwords, bearer tokens, cookies, OAuth,
+API keys, certificates, private keys, identity-provider secrets, broker credentials, account
+identifiers, live trading, or production rollout.
+
+Production mode must not silently trust local header authentication.
+
+Authorization decisions for privileged local actions should be journaled without recording secrets,
+broker credentials, account identifiers, broker hosts, or broker ports.
+
+Operator role hardening remains future Slice 055 work. Controlled rollout, emergency stop,
 observability, backup/restore tooling, and live-readiness evidence remain later approved work.

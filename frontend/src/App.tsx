@@ -21,6 +21,7 @@ import {
   type ApprovalTicketApiView,
   type AuditEventApiView,
   type OperationsApiSnapshot,
+  type OperatorSessionApiView,
   type PaperTradingApiView,
   type PositionApiView,
   type ReadApiClient,
@@ -92,6 +93,7 @@ const orderDetailSection = "Order detail" as const;
 const positionDetailSection = "Position detail" as const;
 const protectionMonitoringSection = "Protection monitor" as const;
 const paperTradingSection = "Paper trading" as const;
+const operatorAccessSection = "Operator access" as const;
 
 const workflowSections = [
   "Signals",
@@ -113,6 +115,7 @@ const shellSections = [
   positionDetailSection,
   protectionMonitoringSection,
   paperTradingSection,
+  operatorAccessSection,
   ...workflowSections,
 ] as const;
 
@@ -350,6 +353,10 @@ export function App({
             tone="neutral"
             label={`Broker connectivity ${formatIdentifier(snapshot.safety.broker_connectivity)}`}
           />
+          <StatusPill
+            tone="neutral"
+            label={`Operator ${formatIdentifier(snapshot.operatorSession.operator_id)}`}
+          />
           <StatusPill tone={readStateTone(readState)} label={readStateLabel(readState)} />
         </div>
       </header>
@@ -388,6 +395,10 @@ export function App({
                 value={`Broker connectivity ${formatIdentifier(snapshot.safety.broker_connectivity)}`}
               />
               <PostureItem label="Approval" value={formatApprovalMode(snapshot.safety.approval_mode)} />
+              <PostureItem
+                label="Operator"
+                value={formatIdentifier(snapshot.operatorSession.operator_id)}
+              />
               <PostureItem label="Journal" value="Append-only journal" />
               <PostureItem
                 label="Alert delivery"
@@ -805,6 +816,21 @@ export function App({
             <PaperTradingOperatorPanel view={snapshot.paperTrading} />
           </section>
 
+          <section className="operator-access-section" id={sectionId(operatorAccessSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Operator access</p>
+                <h2>Local development operator</h2>
+              </div>
+              <div className="status-strip" aria-label="Operator access posture">
+                <StatusPill tone="good" label="Local auth foundation" />
+                <StatusPill tone="neutral" label="No credential controls" />
+                <StatusPill tone="neutral" label="No external identity provider" />
+              </div>
+            </div>
+            <OperatorAccessPanel view={snapshot.operatorSession} />
+          </section>
+
           <div className="section-grid">
             {workflowSections.map((section) => {
               const rows = workflowRows[section];
@@ -1153,6 +1179,59 @@ function ProtectionMonitoringDashboard({ view }: { view: ProtectionMonitoringVie
             ))}
           </div>
         )}
+      </article>
+    </div>
+  );
+}
+
+function OperatorAccessPanel({ view }: { view: OperatorSessionApiView }) {
+  return (
+    <div className="detail-layout" aria-label="Operator access records">
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Operator</p>
+            <h3>{formatIdentifier(view.operator_id)}</h3>
+          </div>
+          <StatusPill tone="good" label={formatIdentifier(view.auth_state)} />
+        </div>
+        <dl className="detail-facts">
+          <PostureItem label="Auth method" value={formatIdentifier(view.auth_method)} />
+          <PostureItem label="Roles" value={view.roles.map(formatIdentifier).join(", ")} />
+          <PostureItem
+            label="View operations"
+            value={view.can_view_operations ? "Allowed" : "Denied"}
+          />
+          <PostureItem
+            label="Approve simulation"
+            value={view.can_approve_simulation ? "Allowed" : "Denied"}
+          />
+          <PostureItem
+            label="Administer system"
+            value={view.can_administer_system ? "Allowed" : "Denied"}
+          />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Permissions</p>
+            <h3>Audited local checks</h3>
+          </div>
+          <StatusPill tone="neutral" label={`${view.permissions.length} permissions`} />
+        </div>
+        <div className="record-list compact-list">
+          {view.permissions.map((permission) => (
+            <article className="record-row" key={permission}>
+              <div>
+                <h3>{formatIdentifier(permission)}</h3>
+                <p>Permission is evaluated by the backend before privileged actions.</p>
+              </div>
+              <StatusPill tone="good" label="available" />
+            </article>
+          ))}
+        </div>
       </article>
     </div>
   );

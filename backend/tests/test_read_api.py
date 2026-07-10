@@ -44,6 +44,7 @@ FORBIDDEN_API_AFFORDANCE_KEYS = {
 }
 
 READ_ENDPOINTS = {
+    "/api/operator-session": "operator_session",
     "/api/safety": "safety",
     "/api/audit-events": "audit_events",
     "/api/signals": "signals",
@@ -135,6 +136,30 @@ def test_app_module_does_not_define_mutation_or_transport_routes() -> None:
     ]
     for token in forbidden_source_tokens:
         assert token not in source
+
+
+def test_view_permission_is_required_for_read_api(monkeypatch: MonkeyPatch) -> None:
+    _set_safe_env(monkeypatch)
+    client = TestClient(app)
+
+    allowed = client.get(
+        "/api/safety",
+        headers={
+            "x-operator-id": "viewer-operator-001",
+            "x-operator-roles": "viewer",
+        },
+    )
+    denied = client.get(
+        "/api/safety",
+        headers={
+            "x-operator-id": "invalid-operator-001",
+            "x-operator-roles": "invalid-role",
+        },
+    )
+
+    assert allowed.status_code == 200
+    assert denied.status_code == 401
+    assert "unknown operator role" in denied.json()["detail"]
 
 
 def _set_safe_env(monkeypatch: MonkeyPatch) -> None:

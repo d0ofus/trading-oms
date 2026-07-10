@@ -1,4 +1,5 @@
 export const READ_API_ENDPOINTS = {
+  operatorSession: "/api/operator-session",
   safety: "/api/safety",
   auditEvents: "/api/audit-events",
   signals: "/api/signals",
@@ -20,6 +21,18 @@ export type SafetyApiView = {
   alert_delivery: string;
   approval_mode: string;
   data_source: string;
+};
+
+export type OperatorSessionApiView = {
+  schema_version: 1;
+  operator_id: string;
+  auth_state: "local_development";
+  auth_method: "local_header";
+  roles: string[];
+  permissions: string[];
+  can_view_operations: boolean;
+  can_approve_simulation: boolean;
+  can_administer_system: boolean;
 };
 
 export type AuditEventApiView = {
@@ -141,6 +154,7 @@ export type PaperTradingApiView = {
 
 export type OperationsApiSnapshot = {
   safety: SafetyApiView;
+  operatorSession: OperatorSessionApiView;
   auditEvents: AuditEventApiView[];
   signals: SignalApiView[];
   riskDecisions: RiskDecisionApiView[];
@@ -172,6 +186,7 @@ export type ReadApiLoadState =
 export type ReadApiFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export type ReadApiClient = {
+  getOperatorSession: () => Promise<OperatorSessionApiView>;
   getSafety: () => Promise<SafetyApiView>;
   getAuditEvents: () => Promise<AuditEventApiView[]>;
   getSignals: () => Promise<SignalApiView[]>;
@@ -200,6 +215,17 @@ export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
     alert_delivery: "local_noop",
     approval_mode: "manual_required",
     data_source: "frontend_safe_fallback",
+  },
+  operatorSession: {
+    schema_version: 1,
+    operator_id: "human-operator-001",
+    auth_state: "local_development",
+    auth_method: "local_header",
+    roles: ["admin"],
+    permissions: ["view_operations", "approve_simulation", "administer_system"],
+    can_view_operations: true,
+    can_approve_simulation: true,
+    can_administer_system: true,
   },
   auditEvents: [],
   signals: [],
@@ -248,6 +274,8 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
     requestJson<Payload>(fetchImpl, buildUrl(options.baseUrl ?? "", path), path);
 
   const client: ReadApiClient = {
+    getOperatorSession: () =>
+      request<OperatorSessionApiView>(READ_API_ENDPOINTS.operatorSession),
     getSafety: () => request<SafetyApiView>(READ_API_ENDPOINTS.safety),
     getAuditEvents: () => request<AuditEventApiView[]>(READ_API_ENDPOINTS.auditEvents),
     getSignals: () => request<SignalApiView[]>(READ_API_ENDPOINTS.signals),
@@ -261,6 +289,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
     getPaperTrading: () => request<PaperTradingApiView>(READ_API_ENDPOINTS.paperTrading),
     getOperationsSnapshot: async () => {
       const [
+        operatorSession,
         safety,
         auditEvents,
         signals,
@@ -272,6 +301,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         readiness,
         paperTrading,
       ] = await Promise.all([
+        client.getOperatorSession(),
         client.getSafety(),
         client.getAuditEvents(),
         client.getSignals(),
@@ -285,6 +315,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
       ]);
 
       return {
+        operatorSession,
         safety,
         auditEvents,
         signals,

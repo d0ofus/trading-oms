@@ -159,7 +159,8 @@ reconciled.
 
 ## Future Slice Boundaries
 
-Authentication and authorization remain future Slice 054 work.
+Slice 054 adds a local operator authentication and authorization foundation. It is not production
+authentication and does not approve rollout.
 
 Operator roles and approval permissions remain future Slice 055 work.
 
