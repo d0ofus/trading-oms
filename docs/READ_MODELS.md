@@ -32,6 +32,7 @@ The module provides frozen dataclasses for:
 - alerts;
 - live-readiness status;
 - paper trading operator visibility;
+- operations controls for observability, retention, backup/restore, and incident response;
 - aggregate operations view.
 
 Every read model exposes `to_json_dict()` for deterministic JSON-compatible output.
@@ -58,6 +59,9 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
   `live_trading_authorized: false`.
 - Paper trading operator views always require `paper_mode: paper` and
   `live_trading_enabled: false`.
+- Operational controls always report `live_trading_enabled: false`,
+  `production_rollout_authorized: false`, destructive retention disabled, append-only journal
+  preservation required, and external backup storage unconfigured.
 - Emergency stop views expose local stop status and blocking posture only. They contain no broker
   controls or action URLs.
 - The module contains no network, socket, IBKR SDK, broker transport, or order-submission behavior.
@@ -71,6 +75,8 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
 - Frontend screens consume these models for read-only inspection.
 - The paper trading operator read model is representative read-only visibility, not a live IBKR
   session.
+- The operations controls read model is representative read-only visibility, not external
+  observability, backup execution, restore execution, audit deletion, or production rollout.
 - SQLite persistence exists as a local foundation, but these read models are not yet backed by it at
   runtime.
 - Position records are inspection summaries only; full simulated position tracking remains a later

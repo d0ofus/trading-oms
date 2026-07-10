@@ -594,6 +594,253 @@ class EmergencyStopReadModel:
 
 
 @dataclass(frozen=True)
+class ObservabilityMetricReadModel:
+    metric_name: str
+    metric_value: int
+    unit: str
+    status: str
+    observed_at: str
+    summary: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_operational_text(self.metric_name, "metric_name")
+        _nonnegative_integer(self.metric_value, "metric_value")
+        _validated_operational_text(self.unit, "unit")
+        if self.status not in {"ok", "warning", "critical"}:
+            raise ReadModelError("metric status must be ok, warning, or critical")
+        _parse_timestamp(self.observed_at, "observed_at")
+        _validated_operational_text(self.summary, "summary")
+        _assert_json_serializable(self.to_json_dict(), "observability metric read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "metric_name": self.metric_name,
+            "metric_value": self.metric_value,
+            "unit": self.unit,
+            "status": self.status,
+            "observed_at": self.observed_at,
+            "summary": self.summary,
+        }
+
+
+@dataclass(frozen=True)
+class ObservabilityEventReadModel:
+    event_id: str
+    event_type: str
+    observed_at: str
+    severity: str
+    summary: str
+    journal_reference: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_operational_text(self.event_id, "event_id")
+        _validated_operational_text(self.event_type, "event_type")
+        _parse_timestamp(self.observed_at, "observed_at")
+        if self.severity not in {"informational", "warning", "critical", "emergency"}:
+            raise ReadModelError("event severity must be a known alert severity")
+        _validated_operational_text(self.summary, "summary")
+        _validated_operational_text(self.journal_reference, "journal_reference")
+        _assert_json_serializable(self.to_json_dict(), "observability event read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "event_id": self.event_id,
+            "event_type": self.event_type,
+            "observed_at": self.observed_at,
+            "severity": self.severity,
+            "summary": self.summary,
+            "journal_reference": self.journal_reference,
+        }
+
+
+@dataclass(frozen=True)
+class AuditRetentionReadModel:
+    policy_id: str
+    mode: str
+    minimum_retention_days: int
+    destructive_retention_enabled: bool
+    append_only_journal_required: bool
+    next_review_due_at: str
+    status: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_operational_text(self.policy_id, "policy_id")
+        if self.mode not in {"retain_until_reviewed", "retain_indefinitely"}:
+            raise ReadModelError(
+                "retention mode must be retain_until_reviewed or retain_indefinitely"
+            )
+        _positive_integer(self.minimum_retention_days, "minimum_retention_days")
+        _validated_bool(self.destructive_retention_enabled, "destructive_retention_enabled")
+        if self.destructive_retention_enabled is not False:
+            raise ReadModelError("destructive_retention_enabled must remain false")
+        _validated_bool(self.append_only_journal_required, "append_only_journal_required")
+        if self.append_only_journal_required is not True:
+            raise ReadModelError("append_only_journal_required must remain true")
+        _parse_timestamp(self.next_review_due_at, "next_review_due_at")
+        _validated_operational_text(self.status, "status")
+        _assert_json_serializable(self.to_json_dict(), "audit retention read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "policy_id": self.policy_id,
+            "mode": self.mode,
+            "minimum_retention_days": self.minimum_retention_days,
+            "destructive_retention_enabled": self.destructive_retention_enabled,
+            "append_only_journal_required": self.append_only_journal_required,
+            "next_review_due_at": self.next_review_due_at,
+            "status": self.status,
+        }
+
+
+@dataclass(frozen=True)
+class BackupRestoreReadModel:
+    plan_id: str
+    backup_status: str
+    restore_verification_status: str
+    last_verified_at: str
+    storage_mode: str
+    external_storage_configured: bool
+    redaction_status: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_operational_text(self.plan_id, "plan_id")
+        _validated_operational_text(self.backup_status, "backup_status")
+        _validated_operational_text(
+            self.restore_verification_status,
+            "restore_verification_status",
+        )
+        _parse_timestamp(self.last_verified_at, "last_verified_at")
+        _validated_operational_text(self.storage_mode, "storage_mode")
+        _validated_bool(self.external_storage_configured, "external_storage_configured")
+        if self.external_storage_configured is not False:
+            raise ReadModelError("external_storage_configured must remain false")
+        _validated_operational_text(self.redaction_status, "redaction_status")
+        _assert_json_serializable(self.to_json_dict(), "backup restore read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "plan_id": self.plan_id,
+            "backup_status": self.backup_status,
+            "restore_verification_status": self.restore_verification_status,
+            "last_verified_at": self.last_verified_at,
+            "storage_mode": self.storage_mode,
+            "external_storage_configured": self.external_storage_configured,
+            "redaction_status": self.redaction_status,
+        }
+
+
+@dataclass(frozen=True)
+class IncidentResponseReadModel:
+    plan_id: str
+    active_incident_state: str
+    severity_floor_for_operator_review: str
+    emergency_stop_required_for_critical_incidents: bool
+    post_incident_review_required: bool
+    current_runbook_status: str
+    last_reviewed_at: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_operational_text(self.plan_id, "plan_id")
+        _validated_operational_text(self.active_incident_state, "active_incident_state")
+        if self.severity_floor_for_operator_review not in {
+            "informational",
+            "warning",
+            "critical",
+            "emergency",
+        }:
+            raise ReadModelError("severity_floor_for_operator_review must be a known severity")
+        _validated_bool(
+            self.emergency_stop_required_for_critical_incidents,
+            "emergency_stop_required_for_critical_incidents",
+        )
+        if self.emergency_stop_required_for_critical_incidents is not True:
+            raise ReadModelError("emergency stop must be required for critical incidents")
+        _validated_bool(self.post_incident_review_required, "post_incident_review_required")
+        if self.post_incident_review_required is not True:
+            raise ReadModelError("post incident review must be required")
+        _validated_operational_text(self.current_runbook_status, "current_runbook_status")
+        _parse_timestamp(self.last_reviewed_at, "last_reviewed_at")
+        _assert_json_serializable(self.to_json_dict(), "incident response read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "plan_id": self.plan_id,
+            "active_incident_state": self.active_incident_state,
+            "severity_floor_for_operator_review": self.severity_floor_for_operator_review,
+            "emergency_stop_required_for_critical_incidents": (
+                self.emergency_stop_required_for_critical_incidents
+            ),
+            "post_incident_review_required": self.post_incident_review_required,
+            "current_runbook_status": self.current_runbook_status,
+            "last_reviewed_at": self.last_reviewed_at,
+        }
+
+
+@dataclass(frozen=True)
+class OperationalControlsReadModel:
+    observed_at: str
+    live_trading_enabled: bool
+    production_rollout_authorized: bool
+    metrics: tuple[ObservabilityMetricReadModel, ...]
+    events: tuple[ObservabilityEventReadModel, ...]
+    retention: AuditRetentionReadModel
+    backup_restore: BackupRestoreReadModel
+    incident_response: IncidentResponseReadModel
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _parse_timestamp(self.observed_at, "observed_at")
+        _validated_bool(self.live_trading_enabled, "live_trading_enabled")
+        if self.live_trading_enabled is not False:
+            raise ReadModelError("live_trading_enabled must remain false")
+        _validated_bool(
+            self.production_rollout_authorized,
+            "production_rollout_authorized",
+        )
+        if self.production_rollout_authorized is not False:
+            raise ReadModelError("production_rollout_authorized must remain false")
+        _validated_model_tuple(self.metrics, ObservabilityMetricReadModel, "metrics")
+        _validated_model_tuple(self.events, ObservabilityEventReadModel, "events")
+        if not self.metrics:
+            raise ReadModelError("operational controls must include metrics")
+        if not self.events:
+            raise ReadModelError("operational controls must include events")
+        _validated_model(self.retention, AuditRetentionReadModel, "retention")
+        _validated_model(self.backup_restore, BackupRestoreReadModel, "backup_restore")
+        _validated_model(self.incident_response, IncidentResponseReadModel, "incident_response")
+        _assert_json_serializable(self.to_json_dict(), "operational controls read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "observed_at": self.observed_at,
+            "live_trading_enabled": self.live_trading_enabled,
+            "production_rollout_authorized": self.production_rollout_authorized,
+            "metrics": [metric.to_json_dict() for metric in self.metrics],
+            "events": [event.to_json_dict() for event in self.events],
+            "retention": self.retention.to_json_dict(),
+            "backup_restore": self.backup_restore.to_json_dict(),
+            "incident_response": self.incident_response.to_json_dict(),
+        }
+
+
+@dataclass(frozen=True)
 class OperationsReadModel:
     emergency_stop: EmergencyStopReadModel
     safety: SafetyPostureReadModel
@@ -607,6 +854,7 @@ class OperationsReadModel:
     alerts: tuple[AlertReadModel, ...]
     readiness: ReadinessReadModel
     paper_trading: PaperTradingOperatorReadModel
+    operational_controls: OperationalControlsReadModel
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -627,6 +875,11 @@ class OperationsReadModel:
         _validated_model_tuple(self.alerts, AlertReadModel, "alerts")
         _validated_model(self.readiness, ReadinessReadModel, "readiness")
         _validated_model(self.paper_trading, PaperTradingOperatorReadModel, "paper_trading")
+        _validated_model(
+            self.operational_controls,
+            OperationalControlsReadModel,
+            "operational_controls",
+        )
         _assert_json_serializable(self.to_json_dict(), "operations read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -644,6 +897,7 @@ class OperationsReadModel:
             "alerts": [alert.to_json_dict() for alert in self.alerts],
             "readiness": self.readiness.to_json_dict(),
             "paper_trading": self.paper_trading.to_json_dict(),
+            "operational_controls": self.operational_controls.to_json_dict(),
         }
 
 
@@ -785,6 +1039,98 @@ def build_demo_operations_read_model(
             leaves_quantity=6,
             updated_at="2026-07-08T00:06:00Z",
         ),
+        operational_controls=OperationalControlsReadModel(
+            observed_at="2026-07-08T00:07:00Z",
+            live_trading_enabled=False,
+            production_rollout_authorized=False,
+            metrics=(
+                ObservabilityMetricReadModel(
+                    metric_name="system.health",
+                    metric_value=1,
+                    unit="status",
+                    status="ok",
+                    observed_at="2026-07-08T00:07:00Z",
+                    summary="Local service health is visible",
+                ),
+                ObservabilityMetricReadModel(
+                    metric_name="safety.posture",
+                    metric_value=1,
+                    unit="status",
+                    status="ok",
+                    observed_at="2026-07-08T00:07:00Z",
+                    summary="Simulation and paper safety posture is visible",
+                ),
+                ObservabilityMetricReadModel(
+                    metric_name="emergency_stop.state",
+                    metric_value=0,
+                    unit="active_flag",
+                    status="ok",
+                    observed_at="2026-07-08T00:07:00Z",
+                    summary="Local emergency stop state is inspectable",
+                ),
+                ObservabilityMetricReadModel(
+                    metric_name="audit_journal.health",
+                    metric_value=1,
+                    unit="status",
+                    status="ok",
+                    observed_at="2026-07-08T00:07:00Z",
+                    summary="Append-only journal remains required",
+                ),
+                ObservabilityMetricReadModel(
+                    metric_name="backup.status",
+                    metric_value=0,
+                    unit="configured_external_targets",
+                    status="warning",
+                    observed_at="2026-07-08T00:07:00Z",
+                    summary="Local backup verification is documented only",
+                ),
+                ObservabilityMetricReadModel(
+                    metric_name="incident.response",
+                    metric_value=0,
+                    unit="active_incidents",
+                    status="ok",
+                    observed_at="2026-07-08T00:07:00Z",
+                    summary="No active incident is declared",
+                ),
+            ),
+            events=(
+                ObservabilityEventReadModel(
+                    event_id="observability-event-001",
+                    event_type="system.health",
+                    observed_at="2026-07-08T00:07:00Z",
+                    severity="informational",
+                    summary="Local observability snapshot recorded",
+                    journal_reference="journal_sequence:0",
+                ),
+            ),
+            retention=AuditRetentionReadModel(
+                policy_id="audit-retention-local-001",
+                mode="retain_until_reviewed",
+                minimum_retention_days=365,
+                destructive_retention_enabled=False,
+                append_only_journal_required=True,
+                next_review_due_at="2026-08-08T00:00:00Z",
+                status="planned_local_only",
+            ),
+            backup_restore=BackupRestoreReadModel(
+                plan_id="backup-restore-local-001",
+                backup_status="local_plan_documented",
+                restore_verification_status="local_plan_documented",
+                last_verified_at="2026-07-08T00:07:00Z",
+                storage_mode="local_encrypted_storage_required",
+                external_storage_configured=False,
+                redaction_status="redaction_required",
+            ),
+            incident_response=IncidentResponseReadModel(
+                plan_id="incident-response-local-001",
+                active_incident_state="none_declared",
+                severity_floor_for_operator_review="warning",
+                emergency_stop_required_for_critical_incidents=True,
+                post_incident_review_required=True,
+                current_runbook_status="documented_local_playbook",
+                last_reviewed_at="2026-07-08T00:07:00Z",
+            ),
+        ),
     )
 
 
@@ -816,6 +1162,40 @@ def _validated_text(value: str, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ReadModelError(f"{field_name} must be a non-empty string")
     return value
+
+
+def _validated_operational_text(value: str, field_name: str) -> str:
+    validated = _validated_text(value, field_name)
+    normalized = validated.lower().replace("-", "_")
+    unsafe_tokens = {
+        "account_id",
+        "api_key",
+        "authorization:",
+        "bearer ",
+        "broker_host",
+        "broker_port",
+        "credential",
+        "eval(",
+        "eval:",
+        "host:",
+        "ibkr connect",
+        "javascript:",
+        "password:",
+        "password=",
+        "_".join(("place", "order")),
+        "private_key",
+        "_".join(("route", "order")),
+        "secret:",
+        "secret=",
+        "_".join(("submit", "order")),
+        "token:",
+        "token=",
+        "_".join(("transmit", "order")),
+    }
+    for token in unsafe_tokens:
+        if token in normalized:
+            raise ReadModelError(f"{field_name} contains unsafe observability text")
+    return validated
 
 
 def _validated_symbol(symbol: str) -> str:

@@ -11,6 +11,7 @@ export const READ_API_ENDPOINTS = {
   alerts: "/api/alerts",
   readiness: "/api/readiness",
   paperTrading: "/api/paper-trading",
+  operationalControls: "/api/operational-controls",
 } as const;
 
 export type SafetyApiView = {
@@ -169,6 +170,71 @@ export type PaperTradingApiView = {
   updated_at: string;
 };
 
+export type ObservabilityMetricApiView = {
+  schema_version: 1;
+  metric_name: string;
+  metric_value: number;
+  unit: string;
+  status: "ok" | "warning" | "critical";
+  observed_at: string;
+  summary: string;
+};
+
+export type ObservabilityEventApiView = {
+  schema_version: 1;
+  event_id: string;
+  event_type: string;
+  observed_at: string;
+  severity: "informational" | "warning" | "critical" | "emergency";
+  summary: string;
+  journal_reference: string;
+};
+
+export type AuditRetentionApiView = {
+  schema_version: 1;
+  policy_id: string;
+  mode: "retain_until_reviewed" | "retain_indefinitely";
+  minimum_retention_days: number;
+  destructive_retention_enabled: false;
+  append_only_journal_required: boolean;
+  next_review_due_at: string;
+  status: string;
+};
+
+export type BackupRestoreApiView = {
+  schema_version: 1;
+  plan_id: string;
+  backup_status: string;
+  restore_verification_status: string;
+  last_verified_at: string;
+  storage_mode: string;
+  external_storage_configured: false;
+  redaction_status: string;
+};
+
+export type IncidentResponseApiView = {
+  schema_version: 1;
+  plan_id: string;
+  active_incident_state: string;
+  severity_floor_for_operator_review: "informational" | "warning" | "critical" | "emergency";
+  emergency_stop_required_for_critical_incidents: boolean;
+  post_incident_review_required: boolean;
+  current_runbook_status: string;
+  last_reviewed_at: string;
+};
+
+export type OperationalControlsApiView = {
+  schema_version: 1;
+  observed_at: string;
+  live_trading_enabled: false;
+  production_rollout_authorized: false;
+  metrics: ObservabilityMetricApiView[];
+  events: ObservabilityEventApiView[];
+  retention: AuditRetentionApiView;
+  backup_restore: BackupRestoreApiView;
+  incident_response: IncidentResponseApiView;
+};
+
 export type OperationsApiSnapshot = {
   emergencyStop: EmergencyStopApiView;
   safety: SafetyApiView;
@@ -182,6 +248,7 @@ export type OperationsApiSnapshot = {
   alerts: AlertApiView[];
   readiness: ReadinessApiView;
   paperTrading: PaperTradingApiView;
+  operationalControls: OperationalControlsApiView;
 };
 
 export type ReadApiLoadState =
@@ -216,6 +283,7 @@ export type ReadApiClient = {
   getAlerts: () => Promise<AlertApiView[]>;
   getReadiness: () => Promise<ReadinessApiView>;
   getPaperTrading: () => Promise<PaperTradingApiView>;
+  getOperationalControls: () => Promise<OperationalControlsApiView>;
   getOperationsSnapshot: () => Promise<OperationsApiSnapshot>;
 };
 
@@ -294,6 +362,73 @@ export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
     leaves_quantity: 0,
     updated_at: "2026-07-08T00:00:00Z",
   },
+  operationalControls: {
+    schema_version: 1,
+    observed_at: "2026-07-08T00:00:00Z",
+    live_trading_enabled: false,
+    production_rollout_authorized: false,
+    metrics: [
+      {
+        schema_version: 1,
+        metric_name: "system.health",
+        metric_value: 0,
+        unit: "status",
+        status: "warning",
+        observed_at: "2026-07-08T00:00:00Z",
+        summary: "Backend read API unavailable",
+      },
+      {
+        schema_version: 1,
+        metric_name: "audit_journal.health",
+        metric_value: 0,
+        unit: "status",
+        status: "warning",
+        observed_at: "2026-07-08T00:00:00Z",
+        summary: "Append-only journal visibility unavailable",
+      },
+    ],
+    events: [
+      {
+        schema_version: 1,
+        event_id: "frontend-fallback-operational-event",
+        event_type: "read_api.fallback",
+        observed_at: "2026-07-08T00:00:00Z",
+        severity: "warning",
+        summary: "Frontend rendered safe operational fallback",
+        journal_reference: "journal_sequence:0",
+      },
+    ],
+    retention: {
+      schema_version: 1,
+      policy_id: "audit-retention-local-fallback",
+      mode: "retain_until_reviewed",
+      minimum_retention_days: 365,
+      destructive_retention_enabled: false,
+      append_only_journal_required: true,
+      next_review_due_at: "2026-08-08T00:00:00Z",
+      status: "fallback_planned_local_only",
+    },
+    backup_restore: {
+      schema_version: 1,
+      plan_id: "backup-restore-local-fallback",
+      backup_status: "backend_unavailable",
+      restore_verification_status: "backend_unavailable",
+      last_verified_at: "2026-07-08T00:00:00Z",
+      storage_mode: "local_encrypted_storage_required",
+      external_storage_configured: false,
+      redaction_status: "redaction_required",
+    },
+    incident_response: {
+      schema_version: 1,
+      plan_id: "incident-response-local-fallback",
+      active_incident_state: "none_declared",
+      severity_floor_for_operator_review: "warning",
+      emergency_stop_required_for_critical_incidents: true,
+      post_incident_review_required: true,
+      current_runbook_status: "documented_local_playbook",
+      last_reviewed_at: "2026-07-08T00:00:00Z",
+    },
+  },
 };
 
 export const initialReadApiState: ReadApiLoadState = {
@@ -322,6 +457,8 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
     getAlerts: () => request<AlertApiView[]>(READ_API_ENDPOINTS.alerts),
     getReadiness: () => request<ReadinessApiView>(READ_API_ENDPOINTS.readiness),
     getPaperTrading: () => request<PaperTradingApiView>(READ_API_ENDPOINTS.paperTrading),
+    getOperationalControls: () =>
+      request<OperationalControlsApiView>(READ_API_ENDPOINTS.operationalControls),
     getOperationsSnapshot: async () => {
       const [
         emergencyStop,
@@ -336,6 +473,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         alerts,
         readiness,
         paperTrading,
+        operationalControls,
       ] = await Promise.all([
         client.getEmergencyStop(),
         client.getOperatorSession(),
@@ -349,6 +487,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         client.getAlerts(),
         client.getReadiness(),
         client.getPaperTrading(),
+        client.getOperationalControls(),
       ]);
 
       return {
@@ -364,6 +503,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         alerts,
         readiness,
         paperTrading,
+        operationalControls,
       };
     },
   };

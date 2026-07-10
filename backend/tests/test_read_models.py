@@ -351,6 +351,7 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
         "approval_tickets",
         "audit_events",
         "emergency_stop",
+        "operational_controls",
         "operator_session",
         "orders",
         "paper_trading",
@@ -380,6 +381,10 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
     assert payload["emergency_stop"]["blocking_risk_increasing_actions"] is False
     assert payload["paper_trading"]["live_trading_enabled"] is False
     assert payload["paper_trading"]["requires_reconciliation"] is True
+    assert payload["operational_controls"]["live_trading_enabled"] is False
+    assert payload["operational_controls"]["production_rollout_authorized"] is False
+    assert payload["operational_controls"]["backup_restore"]["external_storage_configured"] is False
+    assert payload["operational_controls"]["retention"]["destructive_retention_enabled"] is False
     assert payload["readiness"]["live_trading_authorized"] is False
 
 

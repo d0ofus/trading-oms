@@ -30,6 +30,7 @@ describe("App", () => {
     expect(text).toContain("Protection monitor");
     expect(text).toContain("Emergency stop");
     expect(text).toContain("Paper trading");
+    expect(text).toContain("Operational controls");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
     expect(text).toContain("Orders");
@@ -257,6 +258,28 @@ describe("App", () => {
     expect(text).not.toContain("Enable live trading");
   });
 
+  it("renders operational controls without rollout or external backup controls", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Operational controls");
+    expect(text).toContain("Observability");
+    expect(text).toContain("Audit retention");
+    expect(text).toContain("Backup and restore");
+    expect(text).toContain("Incident response");
+    expect(text).toContain("system health");
+    expect(text).toContain("No destructive retention");
+    expect(text).toContain("Append-only journal required");
+    expect(text).toContain("Local backup verification");
+    expect(text).toContain("No external storage configured");
+    expect(text).toContain("No active incident");
+    expect(text).toContain("Emergency stop required");
+    expect(text).toContain("production rollout not authorized");
+    expect(text).not.toContain("Upload backup");
+    expect(text).not.toContain("External storage");
+    expect(text).not.toContain("Credential");
+  });
+
   it("renders operator access state without credential controls", () => {
     const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -479,6 +502,73 @@ const backendSnapshot: OperationsApiSnapshot = {
     cumulative_filled_quantity: 4,
     leaves_quantity: 6,
     updated_at: "2026-07-08T00:06:00Z",
+  },
+  operationalControls: {
+    schema_version: 1,
+    observed_at: "2026-07-08T00:07:00Z",
+    live_trading_enabled: false,
+    production_rollout_authorized: false,
+    metrics: [
+      {
+        schema_version: 1,
+        metric_name: "system.health",
+        metric_value: 1,
+        unit: "status",
+        status: "ok",
+        observed_at: "2026-07-08T00:07:00Z",
+        summary: "Local service health is visible",
+      },
+      {
+        schema_version: 1,
+        metric_name: "audit_journal.health",
+        metric_value: 1,
+        unit: "status",
+        status: "ok",
+        observed_at: "2026-07-08T00:07:00Z",
+        summary: "Append-only journal remains required",
+      },
+    ],
+    events: [
+      {
+        schema_version: 1,
+        event_id: "observability-event-001",
+        event_type: "system.health",
+        observed_at: "2026-07-08T00:07:00Z",
+        severity: "informational",
+        summary: "Local observability snapshot recorded",
+        journal_reference: "journal_sequence:0",
+      },
+    ],
+    retention: {
+      schema_version: 1,
+      policy_id: "audit-retention-local-001",
+      mode: "retain_until_reviewed",
+      minimum_retention_days: 365,
+      destructive_retention_enabled: false,
+      append_only_journal_required: true,
+      next_review_due_at: "2026-08-08T00:00:00Z",
+      status: "planned_local_only",
+    },
+    backup_restore: {
+      schema_version: 1,
+      plan_id: "backup-restore-local-001",
+      backup_status: "local_plan_documented",
+      restore_verification_status: "local_plan_documented",
+      last_verified_at: "2026-07-08T00:07:00Z",
+      storage_mode: "local_encrypted_storage_required",
+      external_storage_configured: false,
+      redaction_status: "redaction_required",
+    },
+    incident_response: {
+      schema_version: 1,
+      plan_id: "incident-response-local-001",
+      active_incident_state: "none_declared",
+      severity_floor_for_operator_review: "warning",
+      emergency_stop_required_for_critical_incidents: true,
+      post_incident_review_required: true,
+      current_runbook_status: "documented_local_playbook",
+      last_reviewed_at: "2026-07-08T00:07:00Z",
+    },
   },
 };
 

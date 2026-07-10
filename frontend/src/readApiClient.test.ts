@@ -164,6 +164,64 @@ const sampleSnapshot: OperationsApiSnapshot = {
     leaves_quantity: 6,
     updated_at: "2026-07-08T00:06:00Z",
   },
+  operationalControls: {
+    schema_version: 1,
+    observed_at: "2026-07-08T00:07:00Z",
+    live_trading_enabled: false,
+    production_rollout_authorized: false,
+    metrics: [
+      {
+        schema_version: 1,
+        metric_name: "system.health",
+        metric_value: 1,
+        unit: "status",
+        status: "ok",
+        observed_at: "2026-07-08T00:07:00Z",
+        summary: "Local service health is visible",
+      },
+    ],
+    events: [
+      {
+        schema_version: 1,
+        event_id: "observability-event-001",
+        event_type: "system.health",
+        observed_at: "2026-07-08T00:07:00Z",
+        severity: "informational",
+        summary: "Local observability snapshot recorded",
+        journal_reference: "journal_sequence:0",
+      },
+    ],
+    retention: {
+      schema_version: 1,
+      policy_id: "audit-retention-local-001",
+      mode: "retain_until_reviewed",
+      minimum_retention_days: 365,
+      destructive_retention_enabled: false,
+      append_only_journal_required: true,
+      next_review_due_at: "2026-08-08T00:00:00Z",
+      status: "planned_local_only",
+    },
+    backup_restore: {
+      schema_version: 1,
+      plan_id: "backup-restore-local-001",
+      backup_status: "local_plan_documented",
+      restore_verification_status: "local_plan_documented",
+      last_verified_at: "2026-07-08T00:07:00Z",
+      storage_mode: "local_encrypted_storage_required",
+      external_storage_configured: false,
+      redaction_status: "redaction_required",
+    },
+    incident_response: {
+      schema_version: 1,
+      plan_id: "incident-response-local-001",
+      active_incident_state: "none_declared",
+      severity_floor_for_operator_review: "warning",
+      emergency_stop_required_for_critical_incidents: true,
+      post_incident_review_required: true,
+      current_runbook_status: "documented_local_playbook",
+      last_reviewed_at: "2026-07-08T00:07:00Z",
+    },
+  },
 };
 
 const responseByEndpoint: Record<string, unknown> = {
@@ -179,6 +237,7 @@ const responseByEndpoint: Record<string, unknown> = {
   [READ_API_ENDPOINTS.alerts]: sampleSnapshot.alerts,
   [READ_API_ENDPOINTS.readiness]: sampleSnapshot.readiness,
   [READ_API_ENDPOINTS.paperTrading]: sampleSnapshot.paperTrading,
+  [READ_API_ENDPOINTS.operationalControls]: sampleSnapshot.operationalControls,
 };
 
 describe("read API client", () => {
@@ -203,6 +262,7 @@ describe("read API client", () => {
     await client.getAlerts();
     await client.getReadiness();
     await client.getPaperTrading();
+    await client.getOperationalControls();
 
     expect(calls.map((call) => call.input)).toEqual(Object.values(READ_API_ENDPOINTS));
     expect(calls.every((call) => call.init?.method === "GET")).toBe(true);
@@ -245,6 +305,11 @@ describe("read API client", () => {
     expect(state.snapshot.paperTrading.paper_mode).toBe("paper");
     expect(state.snapshot.paperTrading.live_trading_enabled).toBe(false);
     expect(state.snapshot.paperTrading.requires_reconciliation).toBe(true);
+    expect(state.snapshot.operationalControls.live_trading_enabled).toBe(false);
+    expect(state.snapshot.operationalControls.production_rollout_authorized).toBe(false);
+    expect(state.snapshot.operationalControls.backup_restore.external_storage_configured).toBe(
+      false,
+    );
     expect(JSON.stringify(state)).not.toContain("secret-token-value");
   });
 

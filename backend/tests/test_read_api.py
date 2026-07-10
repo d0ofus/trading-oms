@@ -56,6 +56,7 @@ READ_ENDPOINTS = {
     "/api/alerts": "alerts",
     "/api/readiness": "readiness",
     "/api/paper-trading": "paper_trading",
+    "/api/operational-controls": "operational_controls",
 }
 
 
