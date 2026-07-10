@@ -18,8 +18,9 @@ simulation, audit export, paper-only IBKR adapter boundaries, local paper transp
 coverage, and a read-only paper operator UI.
 
 This document does not add deployment automation, authentication, authorization, roles, emergency
-stop behavior, observability, backup tooling, secret manager integration, real IBKR credentials,
-account identifiers, live account mode, market-data subscriptions, or broker control surfaces.
+stop behavior, production observability, backup tooling, secret manager integration, real IBKR
+credentials, account identifiers, live account mode, market-data subscriptions, or broker control
+surfaces.
 
 ## Deployment Architecture Options
 
@@ -166,8 +167,10 @@ Slice 056 adds a local emergency stop that blocks risk-increasing simulation and
 while active. It does not add broker-side liquidation, live cancel, live flatten, broker transport,
 or production rollout.
 
-Observability, audit retention, backup/restore tooling, and incident response remain future Slice
-057 work.
+Slice 057 adds read-only local operating-control visibility for observability, audit-retention
+metadata, backup/restore posture, and incident response. It does not add external observability,
+backup execution, restore execution, audit deletion, external storage, production rollout, or live
+trading.
 
 Live-readiness evidence dashboards remain future Slice 058 work.
 

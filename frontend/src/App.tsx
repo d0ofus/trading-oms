@@ -22,6 +22,7 @@ import {
   type AuditEventApiView,
   type EmergencyStopApiView,
   type OperationsApiSnapshot,
+  type OperationalControlsApiView,
   type OperatorSessionApiView,
   type PaperTradingApiView,
   type PositionApiView,
@@ -95,6 +96,7 @@ const positionDetailSection = "Position detail" as const;
 const protectionMonitoringSection = "Protection monitor" as const;
 const emergencyStopSection = "Emergency stop" as const;
 const paperTradingSection = "Paper trading" as const;
+const operationalControlsSection = "Operational controls" as const;
 const operatorAccessSection = "Operator access" as const;
 
 const workflowSections = [
@@ -118,6 +120,7 @@ const shellSections = [
   protectionMonitoringSection,
   emergencyStopSection,
   paperTradingSection,
+  operationalControlsSection,
   operatorAccessSection,
   ...workflowSections,
 ] as const;
@@ -879,6 +882,24 @@ export function App({
             <PaperTradingOperatorPanel view={snapshot.paperTrading} />
           </section>
 
+          <section
+            className="operational-controls-section"
+            id={sectionId(operationalControlsSection)}
+          >
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Operational controls</p>
+                <h2>Observability and response posture</h2>
+              </div>
+              <div className="status-strip" aria-label="Operational controls posture">
+                <StatusPill tone="good" label="Read only" />
+                <StatusPill tone="neutral" label="Local verification" />
+                <StatusPill tone="good" label="production rollout not authorized" />
+              </div>
+            </div>
+            <OperationalControlsPanel view={snapshot.operationalControls} />
+          </section>
+
           <section className="operator-access-section" id={sectionId(operatorAccessSection)}>
             <div className="section-heading">
               <div>
@@ -1452,6 +1473,148 @@ function PaperTradingOperatorPanel({ view }: { view: PaperTradingApiView }) {
   );
 }
 
+function OperationalControlsPanel({ view }: { view: OperationalControlsApiView }) {
+  return (
+    <div className="detail-layout" aria-label="Operational control records">
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Observability</p>
+            <h3>Local metrics and events</h3>
+          </div>
+          <StatusPill tone="neutral" label={`${view.metrics.length} metrics`} />
+        </div>
+        <div className="record-list compact-list">
+          {view.metrics.map((metric) => (
+            <article className="record-row" key={metric.metric_name}>
+              <div>
+                <h3>{formatOperationalLabel(metric.metric_name)}</h3>
+                <p>{metric.summary}</p>
+              </div>
+              <StatusPill tone={operationalStatusTone(metric.status)} label={metric.status} />
+            </article>
+          ))}
+        </div>
+        <div className="record-list compact-list">
+          {view.events.map((event) => (
+            <article className="record-row" key={event.event_id}>
+              <div>
+                <h3>{formatOperationalLabel(event.event_type)}</h3>
+                <p>{event.summary}</p>
+              </div>
+              <StatusPill tone={alertSeverityTone(event.severity)} label={event.severity} />
+            </article>
+          ))}
+        </div>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Audit retention</p>
+            <h3>{formatIdentifier(view.retention.policy_id)}</h3>
+          </div>
+          <StatusPill tone="good" label="No destructive retention" />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem label="Mode" value={formatIdentifier(view.retention.mode)} />
+          <PostureItem
+            label="Minimum days"
+            value={`${view.retention.minimum_retention_days}`}
+          />
+          <PostureItem
+            label="Journal"
+            value={
+              view.retention.append_only_journal_required
+                ? "Append-only journal required"
+                : "Journal review required"
+            }
+          />
+          <PostureItem label="Next review" value={view.retention.next_review_due_at} />
+          <PostureItem label="Status" value={formatIdentifier(view.retention.status)} />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Backup and restore</p>
+            <h3>Local backup verification</h3>
+          </div>
+          <StatusPill
+            tone={view.backup_restore.external_storage_configured ? "critical" : "good"}
+            label={
+              view.backup_restore.external_storage_configured
+                ? "review required"
+                : "No external storage configured"
+            }
+          />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem
+            label="Backup"
+            value={formatIdentifier(view.backup_restore.backup_status)}
+          />
+          <PostureItem
+            label="Restore"
+            value={formatIdentifier(view.backup_restore.restore_verification_status)}
+          />
+          <PostureItem
+            label="Storage"
+            value={formatIdentifier(view.backup_restore.storage_mode)}
+          />
+          <PostureItem
+            label="Redaction"
+            value={formatIdentifier(view.backup_restore.redaction_status)}
+          />
+          <PostureItem label="Verified" value={view.backup_restore.last_verified_at} />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Incident response</p>
+            <h3>
+              {view.incident_response.active_incident_state === "none_declared"
+                ? "No active incident"
+                : formatIdentifier(view.incident_response.active_incident_state)}
+            </h3>
+          </div>
+          <StatusPill tone="good" label="Emergency stop required" />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem
+            label="Review floor"
+            value={view.incident_response.severity_floor_for_operator_review}
+          />
+          <PostureItem
+            label="Stop rule"
+            value={
+              view.incident_response.emergency_stop_required_for_critical_incidents
+                ? "Emergency stop required"
+                : "Operator review required"
+            }
+          />
+          <PostureItem
+            label="Post review"
+            value={
+              view.incident_response.post_incident_review_required
+                ? "Post-incident review required"
+                : "Review missing"
+            }
+          />
+          <PostureItem
+            label="Runbook"
+            value={formatIdentifier(view.incident_response.current_runbook_status)}
+          />
+          <PostureItem label="Reviewed" value={view.incident_response.last_reviewed_at} />
+        </dl>
+      </article>
+    </div>
+  );
+}
+
 function ProtectionSummaryCard({
   label,
   metric,
@@ -1600,6 +1763,10 @@ function formatIdentifier(value: string) {
   return value.toLowerCase().replace(/[_-]+/g, " ");
 }
 
+function formatOperationalLabel(value: string) {
+  return value.toLowerCase().replace(/[._-]+/g, " ");
+}
+
 function formatCount(count: number, singular: string, plural: string) {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -1678,6 +1845,26 @@ function alertTone(alert: AlertApiView): Tone {
     return "critical";
   }
   if (alert.severity === "warning") {
+    return "warning";
+  }
+  return "info";
+}
+
+function operationalStatusTone(status: string): Tone {
+  if (status === "critical") {
+    return "critical";
+  }
+  if (status === "warning") {
+    return "warning";
+  }
+  return "good";
+}
+
+function alertSeverityTone(severity: string): Tone {
+  if (severity === "critical" || severity === "emergency") {
+    return "critical";
+  }
+  if (severity === "warning") {
     return "warning";
   }
   return "info";

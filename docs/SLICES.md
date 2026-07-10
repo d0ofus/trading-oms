@@ -2265,7 +2265,7 @@ Acceptance criteria:
 
 ## Slice 057 - observability, retention, backup, and incident response
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: F - requires separate explicit approval
 
@@ -2281,6 +2281,23 @@ Scope:
 Non-goals:
 - live trading;
 - production rollout.
+
+Acceptance criteria:
+- [x] Slice 057 ExecPlan exists.
+- [x] Read-only operating-control read models expose local observability metrics/events, audit
+  retention metadata, backup/restore posture, and incident-response status.
+- [x] `GET /api/operational-controls` returns the operating-control view and mutation methods are
+  not implemented for that route.
+- [x] The frontend renders operational controls without rollout, broker, credential, external
+  storage, upload, deletion, restore-command, or live-trading controls.
+- [x] Audit retention keeps destructive retention disabled and append-only journal preservation
+  required.
+- [x] Backup/restore posture remains local verification only with external storage unconfigured.
+- [x] Incident response requires emergency-stop preservation for critical incidents and post-
+  incident review.
+- [x] No live trading, broker transport, broker-side emergency action, production rollout,
+  credentials, account IDs, secrets, external observability, backup executor, restore executor, or
+  audit-deletion executor is added.
 
 ---
 

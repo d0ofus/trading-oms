@@ -21,9 +21,10 @@ The backend exposes:
 - `GET /api/alerts`
 - `GET /api/readiness`
 - `GET /api/paper-trading`
+- `GET /api/operational-controls`
 - `GET /api/audit-export-bundle`
 
-The section routes from `/api/emergency-stop` through `/api/paper-trading` return the matching
+The section routes from `/api/emergency-stop` through `/api/operational-controls` return the matching
 section from `build_demo_operations_read_model()` or current local in-process state.
 
 `GET /api/audit-export-bundle` returns a deterministic local review bundle built from the current
@@ -47,6 +48,9 @@ present.
 - `GET /api/emergency-stop` exposes local emergency stop state only; admin-only activation and
   deactivation endpoints are documented in `docs/EMERGENCY_STOP.md`.
 - `GET /api/paper-trading` exposes paper-only operator visibility only, with no broker controls.
+- `GET /api/operational-controls` exposes local observability, retention, backup/restore, and
+  incident-response posture only, with no external sinks, deletion executors, backup executors,
+  restore commands, rollout controls, or broker controls.
 - Responses do not expose submit, approve, reject, cancel, connect, transmit, credential, token,
   password, account, host, port, route, socket, or secret affordance keys.
 - Readiness responses keep `live_trading_enabled: false` and
@@ -66,3 +70,6 @@ present.
 - Orders are visible for inspection only; no order submission, cancellation, or broker route exists.
 - The audit export endpoint uses current in-process stores; SQLite-backed export orchestration is
   future work.
+- Operational controls are safe local read-model data only; production observability, backup
+  execution, restore execution, audit-retention execution, and controlled paper rollout remain
+  future approved work.

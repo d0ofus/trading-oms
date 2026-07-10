@@ -45,6 +45,7 @@ a {
 .protection-monitor-section h2,
 .emergency-stop-section h2,
 .paper-trading-section h2,
+.operational-controls-section h2,
 .approval-inbox-section h2,
 .builder-section h2,
 .builder-node h3,
@@ -220,6 +221,7 @@ dd {
 .protection-monitor-section,
 .emergency-stop-section,
 .paper-trading-section,
+.operational-controls-section,
 .approval-inbox-section,
 .workflow-section {
   border: 1px solid #d9ded5;
@@ -934,6 +936,10 @@ dd {
 }
 
 .paper-trading-section {
+  overflow: hidden;
+}
+
+.operational-controls-section {
   overflow: hidden;
 }
 
