@@ -2226,7 +2226,7 @@ Acceptance criteria:
 
 ## Slice 056 - emergency stop implementation
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: F - requires separate explicit approval
 
@@ -2242,6 +2242,24 @@ Scope:
 Non-goals:
 - live trading;
 - broker-side liquidation.
+
+Acceptance criteria:
+- [x] Slice 056 ExecPlan exists.
+- [x] Local emergency stop state exists and starts inactive.
+- [x] Emergency stop activation and deactivation are journaled.
+- [x] `GET /api/emergency-stop` exposes safe read-only emergency stop state.
+- [x] Admin-only local activation/deactivation endpoints bind the request actor to the
+  authenticated operator.
+- [x] Active emergency stop blocks simulation approval approval, saved workflow simulation run
+  start, and approved-order execution before OMS or fake-broker advancement.
+- [x] Rejection of a pending simulation ticket remains allowed while active.
+- [x] Blocked risk-increasing attempts are journaled.
+- [x] Frontend shows emergency stop state and blocking posture without action buttons or broker
+  controls.
+- [x] Tests cover domain state, API authorization, actor binding, block journaling, orchestration
+  bypass prevention, read models, and frontend visibility.
+- [x] No live trading, live broker transport, broker-side liquidation, live cancel, live flatten,
+  credentials, account IDs, secrets, production rollout behavior, or Slice 057+ behavior is added.
 
 ---
 

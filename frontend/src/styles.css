@@ -43,6 +43,7 @@ a {
 .audit-explorer-section h2,
 .detail-section h2,
 .protection-monitor-section h2,
+.emergency-stop-section h2,
 .paper-trading-section h2,
 .approval-inbox-section h2,
 .builder-section h2,
@@ -217,6 +218,7 @@ dd {
 .audit-explorer-section,
 .detail-section,
 .protection-monitor-section,
+.emergency-stop-section,
 .paper-trading-section,
 .approval-inbox-section,
 .workflow-section {
@@ -924,6 +926,10 @@ dd {
 }
 
 .protection-monitor-section {
+  overflow: hidden;
+}
+
+.emergency-stop-section {
   overflow: hidden;
 }
 

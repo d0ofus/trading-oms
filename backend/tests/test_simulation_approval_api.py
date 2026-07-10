@@ -8,6 +8,7 @@ from pytest import MonkeyPatch
 from trading_oms_backend.app import (
     app,
     operator_auth_journal_records,
+    reset_emergency_stop_service,
     reset_operator_auth_service,
     reset_simulation_approval_service,
 )
@@ -256,6 +257,7 @@ def approver_headers() -> dict[str, str]:
 
 
 def _set_safe_env(monkeypatch: MonkeyPatch) -> None:
+    reset_emergency_stop_service()
     monkeypatch.delenv("APP_ENV", raising=False)
     monkeypatch.delenv("APP_MODE", raising=False)
     monkeypatch.delenv("LIVE_TRADING_ENABLED", raising=False)

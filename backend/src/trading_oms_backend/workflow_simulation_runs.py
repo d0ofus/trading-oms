@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from trading_oms_backend.bar_builder import Bar
+from trading_oms_backend.emergency_stop import EmergencyStopError, EmergencyStopService
 from trading_oms_backend.event_journal import JournalRecord, JsonlEventJournal
 from trading_oms_backend.market_data_replay import MarketDataReplayEvent
 from trading_oms_backend.product_strategy import HistoricalVolumeSession
@@ -142,13 +143,25 @@ class WorkflowSimulationRunRecord:
 
 
 class WorkflowSimulationRunner:
-    def __init__(self, store: WorkflowDefinitionStore, journal: JsonlEventJournal) -> None:
+    def __init__(
+        self,
+        store: WorkflowDefinitionStore,
+        journal: JsonlEventJournal,
+        *,
+        emergency_stop_service: EmergencyStopService | None = None,
+    ) -> None:
         if not isinstance(store, WorkflowDefinitionStore):
             raise WorkflowSimulationRunError("store must be WorkflowDefinitionStore")
         if not isinstance(journal, JsonlEventJournal):
             raise WorkflowSimulationRunError("journal must be JsonlEventJournal")
+        if emergency_stop_service is not None and not isinstance(
+            emergency_stop_service,
+            EmergencyStopService,
+        ):
+            raise WorkflowSimulationRunError("emergency_stop_service must be EmergencyStopService")
         self._store = store
         self._journal = journal
+        self._emergency_stop_service = emergency_stop_service
         self._payloads: dict[str, dict[str, Any]] = {}
         self._results: dict[str, WorkflowSimulationRunRecord] = {}
 
@@ -156,10 +169,23 @@ class WorkflowSimulationRunner:
         self,
         workflow_id: str,
         request: WorkflowSimulationRunRequest,
+        *,
+        requested_by: str = "system",
     ) -> WorkflowSimulationRunRecord:
         _validated_identifier(workflow_id, "workflow_id")
         if not isinstance(request, WorkflowSimulationRunRequest):
             raise WorkflowSimulationRunError("request must be WorkflowSimulationRunRequest")
+        _validated_identifier(requested_by, "requested_by")
+        if self._emergency_stop_service is not None:
+            try:
+                self._emergency_stop_service.ensure_risk_increasing_allowed(
+                    resource=f"workflow_simulation_run.{workflow_id}",
+                    action="start",
+                    checked_at=request.requested_at,
+                    actor=requested_by,
+                )
+            except EmergencyStopError as exc:
+                raise WorkflowSimulationRunError(str(exc)) from exc
 
         payload = {"workflow_id": workflow_id, **request.to_payload()}
         existing_payload = self._payloads.get(request.run_id)
@@ -169,13 +195,17 @@ class WorkflowSimulationRunner:
             return self._results[request.run_id]
 
         workflow = self._load_valid_workflow(workflow_id)
-        orchestrator = ReplayToApprovalOrchestrator(self._journal)
+        orchestrator = ReplayToApprovalOrchestrator(
+            self._journal,
+            emergency_stop_service=self._emergency_stop_service,
+        )
         try:
             result = orchestrator.run(
                 replay_events=_deterministic_replay_events(),
                 historical_sessions=_historical_sessions(),
                 risk_policy=_risk_policy(),
                 config=_orchestration_config(request),
+                requested_by=requested_by,
             )
         except SimulationOrchestrationError as exc:
             raise WorkflowSimulationRunError(str(exc)) from exc

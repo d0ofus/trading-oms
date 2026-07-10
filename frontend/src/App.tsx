@@ -20,6 +20,7 @@ import {
   type AlertApiView,
   type ApprovalTicketApiView,
   type AuditEventApiView,
+  type EmergencyStopApiView,
   type OperationsApiSnapshot,
   type OperatorSessionApiView,
   type PaperTradingApiView,
@@ -92,6 +93,7 @@ const auditExplorerSection = "Audit explorer" as const;
 const orderDetailSection = "Order detail" as const;
 const positionDetailSection = "Position detail" as const;
 const protectionMonitoringSection = "Protection monitor" as const;
+const emergencyStopSection = "Emergency stop" as const;
 const paperTradingSection = "Paper trading" as const;
 const operatorAccessSection = "Operator access" as const;
 
@@ -114,6 +116,7 @@ const shellSections = [
   orderDetailSection,
   positionDetailSection,
   protectionMonitoringSection,
+  emergencyStopSection,
   paperTradingSection,
   operatorAccessSection,
   ...workflowSections,
@@ -357,6 +360,12 @@ export function App({
             tone="neutral"
             label={`Operator ${formatIdentifier(snapshot.operatorSession.operator_id)}`}
           />
+          <StatusPill
+            tone={emergencyStopTone(snapshot.emergencyStop)}
+            label={
+              snapshot.emergencyStop.active ? "Emergency stop active" : "Emergency stop inactive"
+            }
+          />
           <StatusPill tone={readStateTone(readState)} label={readStateLabel(readState)} />
         </div>
       </header>
@@ -400,6 +409,14 @@ export function App({
                 value={formatIdentifier(snapshot.operatorSession.operator_id)}
               />
               <PostureItem label="Journal" value="Append-only journal" />
+              <PostureItem
+                label="Emergency stop"
+                value={
+                  snapshot.emergencyStop.active
+                    ? "Emergency stop active"
+                    : "Emergency stop inactive"
+                }
+              />
               <PostureItem
                 label="Alert delivery"
                 value={`Alert delivery ${formatIdentifier(snapshot.safety.alert_delivery)}`}
@@ -812,6 +829,39 @@ export function App({
               />
             </div>
             <ProtectionMonitoringDashboard view={protectionMonitoring} />
+          </section>
+
+          <section className="emergency-stop-section" id={sectionId(emergencyStopSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Emergency stop</p>
+                <h2>Local emergency stop</h2>
+              </div>
+              <div className="status-strip" aria-label="Emergency stop posture">
+                <StatusPill
+                  tone={emergencyStopTone(snapshot.emergencyStop)}
+                  label={
+                    snapshot.emergencyStop.active
+                      ? "Emergency stop active"
+                      : "Emergency stop inactive"
+                  }
+                />
+                <StatusPill
+                  tone={
+                    snapshot.emergencyStop.blocking_risk_increasing_actions
+                      ? "critical"
+                      : "good"
+                  }
+                  label={
+                    snapshot.emergencyStop.blocking_risk_increasing_actions
+                      ? "Risk-increasing steps blocked"
+                      : "Risk-increasing steps available"
+                  }
+                />
+                <StatusPill tone="neutral" label="No broker controls" />
+              </div>
+            </div>
+            <EmergencyStopPanel view={snapshot.emergencyStop} />
           </section>
 
           <section className="paper-trading-section" id={sectionId(paperTradingSection)}>
@@ -1252,6 +1302,83 @@ function OperatorAccessPanel({ view }: { view: OperatorSessionApiView }) {
   );
 }
 
+function EmergencyStopPanel({ view }: { view: EmergencyStopApiView }) {
+  return (
+    <div className="detail-layout" aria-label="Emergency stop records">
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">State</p>
+            <h3>{view.active ? "Emergency stop active" : "Emergency stop inactive"}</h3>
+          </div>
+          <StatusPill tone={emergencyStopTone(view)} label={formatIdentifier(view.status)} />
+        </div>
+        <dl className="detail-facts">
+          <PostureItem
+            label="Blocking"
+            value={
+              view.blocking_risk_increasing_actions
+                ? "Risk-increasing steps blocked"
+                : "Risk-increasing steps available"
+            }
+          />
+          <PostureItem label="Updated" value={view.updated_at} />
+          <PostureItem
+            label="Activated"
+            value={view.activated_at ? view.activated_at : "No activation recorded"}
+          />
+          <PostureItem
+            label="Activated by"
+            value={view.activated_by ? formatIdentifier(view.activated_by) : "No activation actor"}
+          />
+          <PostureItem
+            label="Reason"
+            value={
+              view.activation_reason
+                ? formatIdentifier(view.activation_reason)
+                : "No activation reason"
+            }
+          />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Boundary</p>
+            <h3>Simulation and paper safety gate</h3>
+          </div>
+          <StatusPill tone="neutral" label="No broker controls" />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem label="Live trading" value="Live trading disabled" />
+          <PostureItem label="Broker transport" value="No broker connectivity" />
+          <PostureItem
+            label="Deactivated"
+            value={view.deactivated_at ? view.deactivated_at : "No deactivation recorded"}
+          />
+          <PostureItem
+            label="Deactivated by"
+            value={
+              view.deactivated_by
+                ? formatIdentifier(view.deactivated_by)
+                : "No deactivation actor"
+            }
+          />
+          <PostureItem
+            label="Deactivation reason"
+            value={
+              view.deactivation_reason
+                ? formatIdentifier(view.deactivation_reason)
+                : "No deactivation reason"
+            }
+          />
+        </dl>
+      </article>
+    </div>
+  );
+}
+
 function PaperTradingOperatorPanel({ view }: { view: PaperTradingApiView }) {
   return (
     <div className="detail-layout" aria-label="Paper trading operator records">
@@ -1554,6 +1681,10 @@ function alertTone(alert: AlertApiView): Tone {
     return "warning";
   }
   return "info";
+}
+
+function emergencyStopTone(view: EmergencyStopApiView): Tone {
+  return view.active ? "critical" : "good";
 }
 
 function auditSeverityTone(event: AuditEventApiView): Tone {

@@ -159,12 +159,12 @@ reconciled.
 
 ## Future Slice Boundaries
 
-Slice 054 adds a local operator authentication and authorization foundation. It is not production
-authentication and does not approve rollout.
+Slice 054 adds a local operator authentication and authorization foundation. Slice 055 hardens local
+operator roles and approval permissions. Neither is production authentication or rollout approval.
 
-Operator roles and approval permissions remain future Slice 055 work.
-
-Emergency stop implementation remains future Slice 056 work.
+Slice 056 adds a local emergency stop that blocks risk-increasing simulation and paper-mode work
+while active. It does not add broker-side liquidation, live cancel, live flatten, broker transport,
+or production rollout.
 
 Observability, audit retention, backup/restore tooling, and incident response remain future Slice
 057 work.

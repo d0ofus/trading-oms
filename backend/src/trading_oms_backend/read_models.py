@@ -538,7 +538,64 @@ class PaperTradingOperatorReadModel:
 
 
 @dataclass(frozen=True)
+class EmergencyStopReadModel:
+    active: bool
+    status: str
+    updated_at: str
+    activated_at: str | None
+    activated_by: str | None
+    activation_reason: str | None
+    deactivated_at: str | None
+    deactivated_by: str | None
+    deactivation_reason: str | None
+    blocking_risk_increasing_actions: bool
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_bool(self.active, "active")
+        if self.status not in {"active", "inactive"}:
+            raise ReadModelError("status must be active or inactive")
+        if self.active and self.status != "active":
+            raise ReadModelError("active emergency stop must have active status")
+        if not self.active and self.status != "inactive":
+            raise ReadModelError("inactive emergency stop must have inactive status")
+        _parse_timestamp(self.updated_at, "updated_at")
+        _validated_optional_timestamp(self.activated_at, "activated_at")
+        _validated_optional_identifier(self.activated_by, "activated_by")
+        _validated_optional_identifier(self.activation_reason, "activation_reason")
+        _validated_optional_timestamp(self.deactivated_at, "deactivated_at")
+        _validated_optional_identifier(self.deactivated_by, "deactivated_by")
+        _validated_optional_identifier(self.deactivation_reason, "deactivation_reason")
+        _validated_bool(
+            self.blocking_risk_increasing_actions,
+            "blocking_risk_increasing_actions",
+        )
+        if self.active and not self.blocking_risk_increasing_actions:
+            raise ReadModelError("active emergency stop must block risk-increasing actions")
+        if not self.active and self.blocking_risk_increasing_actions:
+            raise ReadModelError("inactive emergency stop must not block risk-increasing actions")
+        _assert_json_serializable(self.to_json_dict(), "emergency stop read model")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "active": self.active,
+            "status": self.status,
+            "updated_at": self.updated_at,
+            "activated_at": self.activated_at,
+            "activated_by": self.activated_by,
+            "activation_reason": self.activation_reason,
+            "deactivated_at": self.deactivated_at,
+            "deactivated_by": self.deactivated_by,
+            "deactivation_reason": self.deactivation_reason,
+            "blocking_risk_increasing_actions": self.blocking_risk_increasing_actions,
+        }
+
+
+@dataclass(frozen=True)
 class OperationsReadModel:
+    emergency_stop: EmergencyStopReadModel
     safety: SafetyPostureReadModel
     operator_session: OperatorSessionReadModel
     audit_events: tuple[AuditEventReadModel, ...]
@@ -554,6 +611,7 @@ class OperationsReadModel:
 
     def __post_init__(self) -> None:
         _validate_schema_version(self.schema_version)
+        _validated_model(self.emergency_stop, EmergencyStopReadModel, "emergency_stop")
         _validated_model(self.safety, SafetyPostureReadModel, "safety")
         _validated_model(self.operator_session, OperatorSessionReadModel, "operator_session")
         _validated_model_tuple(self.audit_events, AuditEventReadModel, "audit_events")
@@ -574,6 +632,7 @@ class OperationsReadModel:
     def to_json_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
+            "emergency_stop": self.emergency_stop.to_json_dict(),
             "safety": self.safety.to_json_dict(),
             "operator_session": self.operator_session.to_json_dict(),
             "audit_events": [event.to_json_dict() for event in self.audit_events],
@@ -588,9 +647,25 @@ class OperationsReadModel:
         }
 
 
-def build_demo_operations_read_model(settings: Settings | None = None) -> OperationsReadModel:
+def build_demo_operations_read_model(
+    settings: Settings | None = None,
+    emergency_stop: EmergencyStopReadModel | None = None,
+) -> OperationsReadModel:
     safety = SafetyPostureReadModel.from_settings(settings or get_settings())
     return OperationsReadModel(
+        emergency_stop=emergency_stop
+        or EmergencyStopReadModel(
+            active=False,
+            status="inactive",
+            updated_at="2026-07-08T00:00:00Z",
+            activated_at=None,
+            activated_by=None,
+            activation_reason=None,
+            deactivated_at=None,
+            deactivated_by=None,
+            deactivation_reason=None,
+            blocking_risk_increasing_actions=False,
+        ),
         safety=safety,
         operator_session=OperatorSessionReadModel.from_identity(local_development_operator()),
         audit_events=(
@@ -730,6 +805,11 @@ def _validated_optional_identifier(value: str | None, field_name: str) -> str | 
     if value is None:
         return None
     return _validated_identifier(value, field_name)
+
+
+def _validated_optional_timestamp(value: str | None, field_name: str) -> None:
+    if value is not None:
+        _parse_timestamp(value, field_name)
 
 
 def _validated_text(value: str, field_name: str) -> str:

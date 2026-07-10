@@ -49,7 +49,7 @@ simulation run.
 | UI shell | Read-only shell exists. | Connect shell to backend read APIs and add workflow-specific views. |
 | Visual workflow builder | Local fixed replay DSL preview exists. | Add React Flow style drag/drop graph editing, validation, DSL compilation, persistence, and simulation-only execution. |
 | IBKR paper adapter | Local adapter boundary exists without transport. | Add paper-only transport only after a separate explicit human approval and review. |
-| Production readiness | Checklist evaluator exists. | Add deployment plan, auth, emergency stop, observability, backup/restore, and external review evidence. |
+| Production readiness | Checklist evaluator, deployment plan, local auth/roles, and local emergency stop exist. | Add observability, backup/restore, incident response, evidence dashboard, rollout checklist, and external review evidence. |
 
 ## Visual Builder Clarification
 
