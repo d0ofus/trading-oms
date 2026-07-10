@@ -749,6 +749,19 @@ dd {
   outline-offset: 1px;
 }
 
+.approval-actions button:disabled {
+  border-color: #d8dee2;
+  background: #eef1f3;
+  color: #6d7780;
+  cursor: not-allowed;
+}
+
+.approval-actions button:disabled:hover,
+.approval-actions button:disabled:focus-visible {
+  border-color: #d8dee2;
+  outline: none;
+}
+
 .approval-feedback {
   margin: 0;
   color: #5e6873;

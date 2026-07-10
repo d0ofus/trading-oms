@@ -574,6 +574,7 @@ export function App({
               ) : (
                 pendingApprovalTickets.map((ticket) => {
                   const formState = approvalFormState(approvalForms, ticket.ticket_id);
+                  const canApproveSimulation = snapshot.operatorSession.can_approve_simulation;
                   return (
                     <article className="approval-ticket-card" key={ticket.ticket_id}>
                       <div className="panel-heading">
@@ -590,6 +591,14 @@ export function App({
                         <PostureItem label="Quantity" value={`${ticket.quantity}`} />
                         <PostureItem label="Risk" value={safeApprovalInboxText(ticket.risk_decision_id)} />
                         <PostureItem label="Expires" value={ticket.expires_at} />
+                        <PostureItem
+                          label="Approval role"
+                          value={
+                            canApproveSimulation
+                              ? "Dedicated approver allowed"
+                              : "Approval requires approver"
+                          }
+                        />
                       </dl>
                       <form
                         className="approval-form"
@@ -625,6 +634,7 @@ export function App({
                         </label>
                         <div className="approval-actions">
                           <button
+                            disabled={!canApproveSimulation}
                             onClick={(event) =>
                               applySimulationDecision(event, ticket, "approve")
                             }
@@ -633,6 +643,7 @@ export function App({
                             Approve simulation
                           </button>
                           <button
+                            disabled={!canApproveSimulation}
                             onClick={(event) => applySimulationDecision(event, ticket, "reject")}
                             type="button"
                           >
@@ -640,7 +651,9 @@ export function App({
                           </button>
                         </div>
                         <p className="approval-feedback">
-                          {approvalFeedback[ticket.ticket_id] ??
+                          {!canApproveSimulation
+                            ? "Approval requires approver"
+                            : approvalFeedback[ticket.ticket_id] ??
                             `Idempotency key ${ticket.ticket_id}-approve-decision or ${ticket.ticket_id}-reject-decision`}
                         </p>
                       </form>
@@ -1198,6 +1211,8 @@ function OperatorAccessPanel({ view }: { view: OperatorSessionApiView }) {
         <dl className="detail-facts">
           <PostureItem label="Auth method" value={formatIdentifier(view.auth_method)} />
           <PostureItem label="Roles" value={view.roles.map(formatIdentifier).join(", ")} />
+          <PostureItem label="Approval role" value={formatIdentifier(view.approval_role_required)} />
+          <PostureItem label="Role separation" value={formatIdentifier(view.role_separation)} />
           <PostureItem
             label="View operations"
             value={view.can_view_operations ? "Allowed" : "Denied"}

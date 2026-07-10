@@ -22,7 +22,7 @@ from trading_oms_backend.operator_auth import (
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_default_local_operator_has_view_approval_and_admin_permissions() -> None:
+def test_default_local_operator_has_view_and_admin_permissions_without_approval() -> None:
     identity = local_development_operator()
 
     assert identity.to_json_dict() == {
@@ -33,13 +33,34 @@ def test_default_local_operator_has_view_approval_and_admin_permissions() -> Non
         "roles": ["admin"],
         "permissions": [
             "view_operations",
-            "approve_simulation",
             "administer_system",
         ],
         "can_view_operations": True,
-        "can_approve_simulation": True,
+        "can_approve_simulation": False,
         "can_administer_system": True,
+        "approval_role_required": "approver",
+        "role_separation": "admin_approver_separated",
     }
+
+
+def test_approver_role_has_approval_permission_without_admin_permission() -> None:
+    identity = operator_identity_from_headers(
+        {
+            "x-operator-id": "approver-operator-001",
+            "x-operator-roles": "approver",
+        },
+        settings=Settings(app_env="development"),
+    )
+
+    assert identity.operator_id == "approver-operator-001"
+    assert identity.roles == ("approver",)
+    assert identity.permissions == (
+        VIEW_OPERATIONS_PERMISSION,
+        APPROVE_SIMULATION_PERMISSION,
+    )
+    assert identity.can_view_operations is True
+    assert identity.can_approve_simulation is True
+    assert identity.can_administer_system is False
 
 
 def test_operator_identity_from_headers_derives_viewer_permissions() -> None:
@@ -63,6 +84,12 @@ def test_operator_identity_rejects_unknown_roles_secret_shapes_and_production_lo
     with pytest.raises(OperatorAuthError, match="unknown operator role"):
         operator_identity_from_headers(
             {"x-operator-roles": "superuser"},
+            settings=Settings(app_env="development"),
+        )
+
+    with pytest.raises(OperatorAuthError, match="separated"):
+        operator_identity_from_headers(
+            {"x-operator-roles": "admin,approver"},
             settings=Settings(app_env="development"),
         )
 
@@ -121,6 +148,9 @@ def test_authorize_operator_records_allowed_and_denied_decisions() -> None:
     assert records[0].payload["result"] == "allowed"
     assert records[1].payload["result"] == "denied"
     assert records[1].payload["permission"] == APPROVE_SIMULATION_PERMISSION
+    assert records[1].payload["operator_roles"] == ["viewer"]
+    assert records[1].payload["required_role"] == "approver"
+    assert records[1].payload["role_separation"] == "admin_approver_separated"
 
 
 def test_auth_payloads_exclude_broker_live_network_and_secret_affordances() -> None:

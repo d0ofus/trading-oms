@@ -155,6 +155,33 @@ def test_workflow_api_requires_admin_permission_for_definition_mutations(
     assert "administer_system" in updated.json()["detail"]
 
 
+def test_workflow_api_rejects_approver_for_definition_mutations(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    client = TestClient(app)
+    headers = {
+        "x-operator-id": "approver-operator-001",
+        "x-operator-roles": "approver",
+    }
+
+    created = client.post("/api/workflows", headers=headers, json=_workflow_body())
+    updated = client.put(
+        "/api/workflows/workflow-001",
+        headers=headers,
+        json=_workflow_body(
+            description="Updated local visual workflow definition",
+            requested_at="2026-07-08T00:05:00Z",
+        ),
+    )
+
+    assert created.status_code == 403
+    assert "administer_system" in created.json()["detail"]
+    assert updated.status_code == 403
+    assert "administer_system" in updated.json()["detail"]
+
+
 def test_workflow_api_does_not_expose_execution_delete_or_broker_secret_affordances(
     monkeypatch: MonkeyPatch,
 ) -> None:

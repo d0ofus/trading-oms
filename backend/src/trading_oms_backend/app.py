@@ -354,7 +354,7 @@ def approve_simulation_ticket(
     identity = _authorize_request(
         request,
         permission=APPROVE_SIMULATION_PERMISSION,
-        resource="approval_ticket",
+        resource=f"approval_ticket.{ticket_id}",
         action="approve",
     )
     return _apply_simulation_approval_decision(ticket_id, "approved", decision, identity)
@@ -369,7 +369,7 @@ def reject_simulation_ticket(
     identity = _authorize_request(
         request,
         permission=APPROVE_SIMULATION_PERMISSION,
-        resource="approval_ticket",
+        resource=f"approval_ticket.{ticket_id}",
         action="reject",
     )
     return _apply_simulation_approval_decision(ticket_id, "rejected", decision, identity)

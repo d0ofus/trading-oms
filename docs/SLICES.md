@@ -2187,7 +2187,7 @@ Acceptance criteria:
 
 ## Slice 055 - operator roles and approval permissions
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: F - requires separate explicit approval
 
@@ -2202,6 +2202,25 @@ Scope:
 Non-goals:
 - live trading approval;
 - production rollout.
+
+Acceptance criteria:
+- [x] Slice 055 ExecPlan exists.
+- [x] The dedicated local `approver` role grants `approve_simulation` without
+  `administer_system`.
+- [x] The local `admin` role grants `administer_system` without `approve_simulation`.
+- [x] Local identities combining `admin` and `approver` roles are rejected.
+- [x] Simulation approval and rejection endpoints require the dedicated approver permission and
+  bind the decision actor to the authenticated operator.
+- [x] Workflow definition mutation and saved workflow simulation run start reject approver-only
+  identities and require administration permission.
+- [x] Authorization journal records include safe role-policy evidence for privileged approval
+  decisions without secret, broker, account, host, port, route, submit, or transmit affordances.
+- [x] Frontend operator access and approval inbox views show the role policy and disable
+  simulation approval actions when the current operator is not an approver.
+- [x] Docs describe the local role policy and hard stops.
+- [x] No production rollout, external identity-provider integration, real credentials, account IDs,
+  secrets, live trading, live account mode, broker controls, market-data subscriptions, or Slice
+  056+ behavior is added.
 
 ---
 
