@@ -10,6 +10,7 @@ simulation-only approval decision endpoints documented in `docs/SIMULATION_APPRO
 
 The backend exposes:
 
+- `GET /api/emergency-stop`
 - `GET /api/safety`
 - `GET /api/audit-events`
 - `GET /api/signals`
@@ -22,8 +23,8 @@ The backend exposes:
 - `GET /api/paper-trading`
 - `GET /api/audit-export-bundle`
 
-The section routes from `/api/safety` through `/api/paper-trading` return the matching section from
-`build_demo_operations_read_model()`.
+The section routes from `/api/emergency-stop` through `/api/paper-trading` return the matching
+section from `build_demo_operations_read_model()` or current local in-process state.
 
 `GET /api/audit-export-bundle` returns a deterministic local review bundle built from the current
 read-model snapshot, workflow definitions, workflow simulation run records, and journal records. It
@@ -43,6 +44,8 @@ present.
 - Only `GET` handlers are implemented for these API views.
 - `POST`, `PUT`, `PATCH`, and `DELETE` are not implemented for these routes.
 - Responses expose inspection data only.
+- `GET /api/emergency-stop` exposes local emergency stop state only; admin-only activation and
+  deactivation endpoints are documented in `docs/EMERGENCY_STOP.md`.
 - `GET /api/paper-trading` exposes paper-only operator visibility only, with no broker controls.
 - Responses do not expose submit, approve, reject, cancel, connect, transmit, credential, token,
   password, account, host, port, route, socket, or secret affordance keys.

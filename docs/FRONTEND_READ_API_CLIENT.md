@@ -15,6 +15,7 @@ frontend/src/readApiClient.ts
 
 It provides typed `GET` functions for:
 
+- `/api/emergency-stop`
 - `/api/safety`
 - `/api/audit-events`
 - `/api/signals`
@@ -37,14 +38,15 @@ The frontend read state is explicit:
 - `empty`: backend is reachable but workflow record lists are empty;
 - `error`: backend read API is unavailable and the UI should show a safe local fallback.
 
-The safe fallback includes paper-only operator visibility with live trading disabled and
-reconciliation required until backend read data is available.
+The safe fallback includes inactive emergency stop state, paper-only operator visibility with live
+trading disabled, and reconciliation required until backend read data is available.
 
 The error state intentionally returns a conservative fallback snapshot with:
 
 - paper mode;
 - live trading disabled;
 - broker connectivity not configured;
+- emergency stop inactive;
 - readiness not ready;
 - no workflow records.
 

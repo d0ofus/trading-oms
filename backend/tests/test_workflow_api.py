@@ -205,6 +205,8 @@ def test_app_module_limits_workflow_mutations_to_save_and_update_routes() -> Non
     assert post_routes == {
         "/api/approval-tickets/{ticket_id}/approve",
         "/api/approval-tickets/{ticket_id}/reject",
+        "/api/emergency-stop/activate",
+        "/api/emergency-stop/deactivate",
         "/api/workflows",
         "/api/workflows/{workflow_id}/simulation-runs",
     }

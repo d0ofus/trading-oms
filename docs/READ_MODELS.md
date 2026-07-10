@@ -21,6 +21,7 @@ trading_oms_backend.read_models
 
 The module provides frozen dataclasses for:
 
+- emergency stop state;
 - safety posture;
 - audit events;
 - strategy signals;
@@ -57,6 +58,8 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
   `live_trading_authorized: false`.
 - Paper trading operator views always require `paper_mode: paper` and
   `live_trading_enabled: false`.
+- Emergency stop views expose local stop status and blocking posture only. They contain no broker
+  controls or action URLs.
 - The module contains no network, socket, IBKR SDK, broker transport, or order-submission behavior.
 - The module exposes no submit, approve, reject, cancel, connect, transmit, credential, token,
   password, account, route, host, port, socket, or secret affordance keys.

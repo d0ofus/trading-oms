@@ -48,7 +48,9 @@ IBKR TWS or Gateway API ports must never be exposed to the public internet.
 
 ## Authentication And Authorization
 
-Slice 054 adds a local operator authentication and authorization foundation. Slice 055 hardens local operator roles and approval permissions only.
+Slice 054 adds a local operator authentication and authorization foundation. Slice 055 hardens
+local operator roles and approval permissions only. Slice 056 adds a local emergency stop for
+simulation and paper-mode risk-increasing work.
 
 It is not production authentication and does not add passwords, bearer tokens, cookies, OAuth,
 API keys, certificates, private keys, identity-provider secrets, broker credentials, account
@@ -63,5 +65,10 @@ Simulation approval requires the dedicated local `approver` role. Local `admin` 
 administer workflow definitions and saved simulation workflow runs, but cannot approve or reject
 simulation tickets. A local identity cannot combine `admin` and `approver` roles.
 
-Controlled rollout, emergency stop,
-observability, backup/restore tooling, and live-readiness evidence remain later approved work.
+Emergency stop activation/deactivation is local admin-only, journaled, and blocks risk-increasing
+simulation or paper-mode work while active. It does not add broker-side liquidation, live cancel,
+live flatten, live order submission, broker transport, production rollout, credentials, account
+identifiers, or secrets.
+
+Controlled rollout, observability, backup/restore tooling, incident response, and live-readiness
+evidence remain later approved work.

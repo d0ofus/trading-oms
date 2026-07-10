@@ -1,4 +1,5 @@
 export const READ_API_ENDPOINTS = {
+  emergencyStop: "/api/emergency-stop",
   operatorSession: "/api/operator-session",
   safety: "/api/safety",
   auditEvents: "/api/audit-events",
@@ -35,6 +36,20 @@ export type OperatorSessionApiView = {
   can_administer_system: boolean;
   approval_role_required: string;
   role_separation: string;
+};
+
+export type EmergencyStopApiView = {
+  schema_version: 1;
+  active: boolean;
+  status: "active" | "inactive";
+  updated_at: string;
+  activated_at: string | null;
+  activated_by: string | null;
+  activation_reason: string | null;
+  deactivated_at: string | null;
+  deactivated_by: string | null;
+  deactivation_reason: string | null;
+  blocking_risk_increasing_actions: boolean;
 };
 
 export type AuditEventApiView = {
@@ -155,6 +170,7 @@ export type PaperTradingApiView = {
 };
 
 export type OperationsApiSnapshot = {
+  emergencyStop: EmergencyStopApiView;
   safety: SafetyApiView;
   operatorSession: OperatorSessionApiView;
   auditEvents: AuditEventApiView[];
@@ -188,6 +204,7 @@ export type ReadApiLoadState =
 export type ReadApiFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export type ReadApiClient = {
+  getEmergencyStop: () => Promise<EmergencyStopApiView>;
   getOperatorSession: () => Promise<OperatorSessionApiView>;
   getSafety: () => Promise<SafetyApiView>;
   getAuditEvents: () => Promise<AuditEventApiView[]>;
@@ -208,6 +225,19 @@ type ReadApiClientOptions = {
 };
 
 export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
+  emergencyStop: {
+    schema_version: 1,
+    active: false,
+    status: "inactive",
+    updated_at: "2026-07-08T00:00:00Z",
+    activated_at: null,
+    activated_by: null,
+    activation_reason: null,
+    deactivated_at: null,
+    deactivated_by: null,
+    deactivation_reason: null,
+    blocking_risk_increasing_actions: false,
+  },
   safety: {
     schema_version: 1,
     app_env: "development",
@@ -278,6 +308,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
     requestJson<Payload>(fetchImpl, buildUrl(options.baseUrl ?? "", path), path);
 
   const client: ReadApiClient = {
+    getEmergencyStop: () => request<EmergencyStopApiView>(READ_API_ENDPOINTS.emergencyStop),
     getOperatorSession: () =>
       request<OperatorSessionApiView>(READ_API_ENDPOINTS.operatorSession),
     getSafety: () => request<SafetyApiView>(READ_API_ENDPOINTS.safety),
@@ -293,6 +324,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
     getPaperTrading: () => request<PaperTradingApiView>(READ_API_ENDPOINTS.paperTrading),
     getOperationsSnapshot: async () => {
       const [
+        emergencyStop,
         operatorSession,
         safety,
         auditEvents,
@@ -305,6 +337,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         readiness,
         paperTrading,
       ] = await Promise.all([
+        client.getEmergencyStop(),
         client.getOperatorSession(),
         client.getSafety(),
         client.getAuditEvents(),
@@ -319,6 +352,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
       ]);
 
       return {
+        emergencyStop,
         operatorSession,
         safety,
         auditEvents,

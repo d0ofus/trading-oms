@@ -12,6 +12,7 @@ from trading_oms_backend.approval_tickets import (
     ApprovalTicketCreateRequest,
 )
 from trading_oms_backend.bar_builder import Bar, BarBuilderConfig, build_time_bars
+from trading_oms_backend.emergency_stop import EmergencyStopError, EmergencyStopService
 from trading_oms_backend.event_journal import JsonlEventJournal
 from trading_oms_backend.fake_broker import (
     BrokerOrderRequest,
@@ -177,10 +178,23 @@ class ApprovedOrderExecutionResult:
 
 
 class ReplayToApprovalOrchestrator:
-    def __init__(self, journal: JsonlEventJournal) -> None:
+    def __init__(
+        self,
+        journal: JsonlEventJournal,
+        *,
+        emergency_stop_service: EmergencyStopService | None = None,
+    ) -> None:
         if not isinstance(journal, JsonlEventJournal):
             raise SimulationOrchestrationError("journal must be JsonlEventJournal")
+        if emergency_stop_service is not None and not isinstance(
+            emergency_stop_service,
+            EmergencyStopService,
+        ):
+            raise SimulationOrchestrationError(
+                "emergency_stop_service must be EmergencyStopService"
+            )
         self._journal = journal
+        self._emergency_stop_service = emergency_stop_service
         self._runs = SimulationRunBook(journal)
         self._proposals = OrderIntentProposalBook(journal)
         self._orders = OrderStateMachine(journal)
@@ -197,11 +211,19 @@ class ReplayToApprovalOrchestrator:
         historical_sessions: Iterable[HistoricalVolumeSession],
         risk_policy: RiskPolicy,
         config: ReplayToApprovalConfig,
+        requested_by: str = "system",
     ) -> ReplayToApprovalResult:
         if not isinstance(config, ReplayToApprovalConfig):
             raise SimulationOrchestrationError("config must be ReplayToApprovalConfig")
         if not isinstance(risk_policy, RiskPolicy):
             raise SimulationOrchestrationError("risk_policy must be RiskPolicy")
+        _validated_identifier(requested_by, "requested_by")
+        self._ensure_risk_increasing_allowed(
+            resource=f"simulation_orchestration.{config.run_id}",
+            action="run",
+            checked_at=config.requested_at,
+            actor=requested_by,
+        )
 
         self._runs.create_run(
             SimulationRunCreateRequest(
@@ -459,6 +481,12 @@ class ReplayToApprovalOrchestrator:
             if existing_payload != request_payload:
                 raise SimulationOrchestrationError("conflicting execution_id")
             return self._execution_results[request.execution_id]
+        self._ensure_risk_increasing_allowed(
+            resource=f"approved_order_execution.{request.execution_id}",
+            action="execute",
+            checked_at=request.decided_at,
+            actor=request.actor,
+        )
 
         snapshot = self._orders.current_snapshot(request.order_id)
         if snapshot.state != "PENDING_APPROVAL":
@@ -547,6 +575,26 @@ class ReplayToApprovalOrchestrator:
         self._execution_payloads[request.execution_id] = request_payload
         self._execution_results[request.execution_id] = result
         return result
+
+    def _ensure_risk_increasing_allowed(
+        self,
+        *,
+        resource: str,
+        action: str,
+        checked_at: str,
+        actor: str,
+    ) -> None:
+        if self._emergency_stop_service is None:
+            return
+        try:
+            self._emergency_stop_service.ensure_risk_increasing_allowed(
+                resource=resource,
+                action=action,
+                checked_at=checked_at,
+                actor=actor,
+            )
+        except EmergencyStopError as exc:
+            raise SimulationOrchestrationError(str(exc)) from exc
 
     def _reject_submitted_order(
         self,

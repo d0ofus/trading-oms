@@ -7,11 +7,17 @@ from typing import Any
 import pytest
 
 from trading_oms_backend.bar_builder import Bar
+from trading_oms_backend.emergency_stop import (
+    EMERGENCY_STOP_BLOCKED_EVENT_TYPE,
+    EmergencyStopChangeRequest,
+    EmergencyStopService,
+)
 from trading_oms_backend.event_journal import JsonlEventJournal
 from trading_oms_backend.market_data_replay import MarketDataReplayEvent
 from trading_oms_backend.product_strategy import HistoricalVolumeSession
 from trading_oms_backend.risk_engine import RiskPolicy
 from trading_oms_backend.simulation_orchestration import (
+    ApprovedOrderExecutionRequest,
     ReplayToApprovalConfig,
     ReplayToApprovalOrchestrator,
     SimulationOrchestrationError,
@@ -154,6 +160,52 @@ def test_replay_to_approval_orchestration_blocks_duplicate_order_intent_ids(
     assert event_types.count("order_intent.proposed") == 1
     assert event_types[-1] == "simulation_run.status_changed"
     assert journal.read_all()[-1].payload["status"] == "failed"
+
+
+def test_active_emergency_stop_blocks_approved_execution_before_oms_and_fake_broker(
+    tmp_path: Path,
+) -> None:
+    journal = JsonlEventJournal(tmp_path / "journal.jsonl")
+    emergency_stop = EmergencyStopService(journal)
+    orchestrator = ReplayToApprovalOrchestrator(
+        journal,
+        emergency_stop_service=emergency_stop,
+    )
+    result = orchestrator.run(
+        replay_events=replay_events(),
+        historical_sessions=historical_sessions(),
+        risk_policy=risk_policy(),
+        config=orchestration_config(),
+    )
+    assert result.pending_approval_transition is not None
+    emergency_stop.activate(
+        EmergencyStopChangeRequest(
+            event_id="emergency-stop-activate-001",
+            requested_at="2026-07-08T13:45:30Z",
+            actor="admin-operator-001",
+            reason="operator_review",
+        ),
+    )
+
+    with pytest.raises(SimulationOrchestrationError, match="emergency stop is active"):
+        orchestrator.execute_approved_order(
+            ApprovedOrderExecutionRequest(
+                execution_id="execution-001",
+                order_id="order-001",
+                ticket_id="approval-ticket-001",
+                decision_id="approval-decision-001",
+                decided_at="2026-07-08T13:46:00Z",
+                actor="approver-operator-001",
+                decision_reference="manual-simulation-approval-001",
+                reason="operator_reviewed_simulation_ticket",
+            ),
+        )
+
+    event_types = [record.event_type for record in journal.read_all()]
+    assert EMERGENCY_STOP_BLOCKED_EVENT_TYPE in event_types
+    assert "approval.ticket.decided" not in event_types
+    assert event_types.count("oms.order.transitioned") == 2
+    assert "fake_broker.order.transitioned" not in event_types
 
 
 def test_replay_to_approval_config_rejects_invalid_values() -> None:

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
 
 from trading_oms_backend import app as app_module
-from trading_oms_backend.app import app
+from trading_oms_backend.app import app, reset_emergency_stop_service
 from trading_oms_backend.read_models import build_demo_operations_read_model
 
 FORBIDDEN_API_AFFORDANCE_KEYS = {
@@ -44,6 +44,7 @@ FORBIDDEN_API_AFFORDANCE_KEYS = {
 }
 
 READ_ENDPOINTS = {
+    "/api/emergency-stop": "emergency_stop",
     "/api/operator-session": "operator_session",
     "/api/safety": "safety",
     "/api/audit-events": "audit_events",
@@ -62,6 +63,7 @@ def test_read_only_api_endpoints_return_expected_read_model_sections(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
+    reset_emergency_stop_service()
     client = TestClient(app)
     expected = build_demo_operations_read_model().to_json_dict()
 
@@ -76,6 +78,7 @@ def test_read_only_api_endpoints_do_not_implement_mutation_methods(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
+    reset_emergency_stop_service()
     client = TestClient(app)
 
     for path in READ_ENDPOINTS:
@@ -89,6 +92,7 @@ def test_read_only_api_responses_exclude_action_broker_network_and_secret_afford
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
+    reset_emergency_stop_service()
     monkeypatch.setenv("DATABASE_URL", "postgresql://example:placeholder@localhost:5432/app")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "placeholder-token-value")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "placeholder-chat-id")
@@ -114,6 +118,8 @@ def test_app_module_does_not_define_mutation_or_transport_routes() -> None:
     assert post_routes == {
         "/api/approval-tickets/{ticket_id}/approve",
         "/api/approval-tickets/{ticket_id}/reject",
+        "/api/emergency-stop/activate",
+        "/api/emergency-stop/deactivate",
         "/api/workflows",
         "/api/workflows/{workflow_id}/simulation-runs",
     }
@@ -140,6 +146,7 @@ def test_app_module_does_not_define_mutation_or_transport_routes() -> None:
 
 def test_view_permission_is_required_for_read_api(monkeypatch: MonkeyPatch) -> None:
     _set_safe_env(monkeypatch)
+    reset_emergency_stop_service()
     client = TestClient(app)
 
     allowed = client.get(

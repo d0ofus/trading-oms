@@ -6,15 +6,17 @@ PLAN_DOC = ROOT / "docs" / "DEPLOYMENT_AND_SECRETS_MANAGEMENT_PLAN.md"
 SLICES_DOC = ROOT / "docs" / "SLICES.md"
 SECURITY_DOC = ROOT / "docs" / "SECURITY_BASELINE.md"
 EXECPLAN_DOC = ROOT / "docs" / "execplans" / "slice-053-deployment-secrets-management-plan.md"
+EMERGENCY_STOP_DOC = ROOT / "docs" / "EMERGENCY_STOP.md"
 
 
 def test_slice_053_deployment_and_secrets_plan_preserves_hard_stops() -> None:
-    for path in (PLAN_DOC, SECURITY_DOC, EXECPLAN_DOC):
+    for path in (PLAN_DOC, SECURITY_DOC, EXECPLAN_DOC, EMERGENCY_STOP_DOC):
         assert path.exists(), f"{path.relative_to(ROOT)} is missing"
 
     plan_text = PLAN_DOC.read_text(encoding="utf-8")
     security_text = SECURITY_DOC.read_text(encoding="utf-8")
-    combined = f"{plan_text}\n{security_text}"
+    emergency_stop_text = EMERGENCY_STOP_DOC.read_text(encoding="utf-8")
+    combined = f"{plan_text}\n{security_text}\n{emergency_stop_text}"
 
     required_phrases = [
         "Planning only: this document does not approve production rollout.",
@@ -26,7 +28,10 @@ def test_slice_053_deployment_and_secrets_plan_preserves_hard_stops() -> None:
         "Production-like paper operation requires separate explicit human "
         "approval and external review.",
         "Slice 054 adds a local operator authentication and authorization foundation.",
-        "Slice 055 hardens local operator roles and approval permissions only.",
+        "Slice 055 hardens",
+        "Slice 056 adds a local emergency stop",
+        "No broker-side liquidation, flatten, live cancel, live route, "
+        "live submit, or live transmit",
         "Simulation approval requires the dedicated local `approver` role.",
         "Rollback planning must preserve the append-only audit trail.",
         "Backup and restore planning must protect journal and persistence "
@@ -55,13 +60,14 @@ def test_slice_053_plan_does_not_document_secret_values_or_live_enablement() -> 
         assert re.search(pattern, combined, flags=re.IGNORECASE) is None
 
 
-def test_slice_055_is_ready_and_later_slices_remain_not_started() -> None:
+def test_slice_056_is_ready_and_later_slices_remain_not_started() -> None:
     slices_text = SLICES_DOC.read_text(encoding="utf-8")
 
     assert _slice_status(slices_text, "053") == "ready_for_human_review"
     assert _slice_status(slices_text, "054") == "ready_for_human_review"
     assert _slice_status(slices_text, "055") == "ready_for_human_review"
-    for slice_id in ("056", "057", "058", "059"):
+    assert _slice_status(slices_text, "056") == "ready_for_human_review"
+    for slice_id in ("057", "058", "059"):
         assert _slice_status(slices_text, slice_id) == "not_started"
 
 

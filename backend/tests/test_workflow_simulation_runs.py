@@ -8,6 +8,11 @@ from typing import Any
 
 import pytest
 
+from trading_oms_backend.emergency_stop import (
+    EMERGENCY_STOP_BLOCKED_EVENT_TYPE,
+    EmergencyStopChangeRequest,
+    EmergencyStopService,
+)
 from trading_oms_backend.event_journal import JsonlEventJournal
 from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionSaveRequest,
@@ -136,6 +141,40 @@ def test_workflow_simulation_runner_revalidates_saved_workflow_before_running(
 
     with pytest.raises(WorkflowSimulationRunError, match="live_trading_enabled"):
         runner.start_run("workflow-001", _run_request())
+
+
+def test_workflow_simulation_runner_blocks_start_when_emergency_stop_is_active(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    journal = JsonlEventJournal(journal_path)
+    emergency_stop = EmergencyStopService(journal)
+    emergency_stop.activate(
+        EmergencyStopChangeRequest(
+            event_id="emergency-stop-activate-001",
+            requested_at="2026-07-08T13:45:00Z",
+            actor="admin-operator-001",
+            reason="operator_review",
+        ),
+    )
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        journal,
+        emergency_stop_service=emergency_stop,
+    )
+
+    with pytest.raises(WorkflowSimulationRunError, match="emergency stop is active"):
+        runner.start_run(
+            "workflow-001",
+            _run_request(),
+            requested_by="admin-operator-001",
+        )
+
+    event_types = [event.event_type for event in journal.read_all()]
+    assert event_types == [
+        "emergency_stop.activated",
+        EMERGENCY_STOP_BLOCKED_EVENT_TYPE,
+    ]
 
 
 def test_workflow_simulation_run_payloads_exclude_broker_network_and_secret_affordances(

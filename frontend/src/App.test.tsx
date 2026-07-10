@@ -28,6 +28,7 @@ describe("App", () => {
     expect(text).toContain("Order detail");
     expect(text).toContain("Position detail");
     expect(text).toContain("Protection monitor");
+    expect(text).toContain("Emergency stop");
     expect(text).toContain("Paper trading");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
@@ -93,6 +94,8 @@ describe("App", () => {
     expect(text).toContain("Manual approval required");
     expect(text).toContain("Append-only journal");
     expect(text).toContain("Alert delivery local noop");
+    expect(text).toContain("Emergency stop active");
+    expect(text).toContain("Risk-increasing steps blocked");
     expect(text).toContain("Local development operator");
     expect(text).toContain("human operator 001");
     expect(text).toContain("view operations");
@@ -237,6 +240,23 @@ describe("App", () => {
     expect(text).not.toContain("Credential");
   });
 
+  it("renders emergency stop visibility without broker or live controls", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Emergency stop");
+    expect(text).toContain("Local emergency stop");
+    expect(text).toContain("Emergency stop active");
+    expect(text).toContain("Risk-increasing steps blocked");
+    expect(text).toContain("operator review");
+    expect(text).toContain("admin operator 001");
+    expect(text).toContain("No broker controls");
+    expect(text).not.toContain("Flatten");
+    expect(text).not.toContain("Liquidate");
+    expect(text).not.toContain("Cancel live");
+    expect(text).not.toContain("Enable live trading");
+  });
+
   it("renders operator access state without credential controls", () => {
     const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -306,6 +326,19 @@ describe("App", () => {
 });
 
 const backendSnapshot: OperationsApiSnapshot = {
+  emergencyStop: {
+    schema_version: 1,
+    active: true,
+    status: "active",
+    updated_at: "2026-07-08T13:45:00Z",
+    activated_at: "2026-07-08T13:45:00Z",
+    activated_by: "admin-operator-001",
+    activation_reason: "operator_review",
+    deactivated_at: null,
+    deactivated_by: null,
+    deactivation_reason: null,
+    blocking_risk_increasing_actions: true,
+  },
   safety: {
     schema_version: 1,
     app_env: "development",

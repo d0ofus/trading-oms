@@ -12,6 +12,7 @@ from trading_oms_backend.read_models import (
     AlertReadModel,
     ApprovalTicketReadModel,
     AuditEventReadModel,
+    EmergencyStopReadModel,
     OperationsReadModel,
     OperatorSessionReadModel,
     OrderReadModel,
@@ -244,6 +245,49 @@ def test_read_model_json_shapes_are_stable() -> None:
     }
 
 
+def test_emergency_stop_read_model_is_visible_local_state_only() -> None:
+    emergency_stop = EmergencyStopReadModel(
+        active=True,
+        status="active",
+        updated_at="2026-07-08T13:45:00Z",
+        activated_at="2026-07-08T13:45:00Z",
+        activated_by="admin-operator-001",
+        activation_reason="operator_review",
+        deactivated_at=None,
+        deactivated_by=None,
+        deactivation_reason=None,
+        blocking_risk_increasing_actions=True,
+    )
+
+    assert emergency_stop.to_json_dict() == {
+        "schema_version": 1,
+        "active": True,
+        "status": "active",
+        "updated_at": "2026-07-08T13:45:00Z",
+        "activated_at": "2026-07-08T13:45:00Z",
+        "activated_by": "admin-operator-001",
+        "activation_reason": "operator_review",
+        "deactivated_at": None,
+        "deactivated_by": None,
+        "deactivation_reason": None,
+        "blocking_risk_increasing_actions": True,
+    }
+
+    with pytest.raises(ReadModelError, match="active emergency stop must block"):
+        EmergencyStopReadModel(
+            active=True,
+            status="active",
+            updated_at="2026-07-08T13:45:00Z",
+            activated_at="2026-07-08T13:45:00Z",
+            activated_by="admin-operator-001",
+            activation_reason="operator_review",
+            deactivated_at=None,
+            deactivated_by=None,
+            deactivation_reason=None,
+            blocking_risk_increasing_actions=False,
+        )
+
+
 def test_paper_trading_operator_read_model_blocks_live_or_non_paper_modes() -> None:
     with pytest.raises(ReadModelError, match="paper_mode must remain paper"):
         PaperTradingOperatorReadModel(
@@ -306,6 +350,7 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
         "alerts",
         "approval_tickets",
         "audit_events",
+        "emergency_stop",
         "operator_session",
         "orders",
         "paper_trading",
@@ -330,6 +375,9 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
     assert payload["operator_session"]["can_administer_system"] is True
     assert payload["operator_session"]["approval_role_required"] == "approver"
     assert payload["operator_session"]["role_separation"] == "admin_approver_separated"
+    assert payload["emergency_stop"]["active"] is False
+    assert payload["emergency_stop"]["status"] == "inactive"
+    assert payload["emergency_stop"]["blocking_risk_increasing_actions"] is False
     assert payload["paper_trading"]["live_trading_enabled"] is False
     assert payload["paper_trading"]["requires_reconciliation"] is True
     assert payload["readiness"]["live_trading_authorized"] is False

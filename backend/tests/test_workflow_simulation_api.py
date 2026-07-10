@@ -10,6 +10,7 @@ from pytest import MonkeyPatch
 from trading_oms_backend import app as app_module
 from trading_oms_backend.app import (
     app,
+    reset_emergency_stop_service,
     reset_workflow_definition_service,
     reset_workflow_simulation_runner_service,
 )
@@ -196,6 +197,8 @@ def test_app_module_allows_only_known_simulation_mutation_routes() -> None:
     assert post_routes == {
         "/api/approval-tickets/{ticket_id}/approve",
         "/api/approval-tickets/{ticket_id}/reject",
+        "/api/emergency-stop/activate",
+        "/api/emergency-stop/deactivate",
         "/api/workflows",
         "/api/workflows/{workflow_id}/simulation-runs",
     }
@@ -320,6 +323,7 @@ def _valid_workflow_dsl() -> dict[str, object]:
 
 
 def _set_safe_env(monkeypatch: MonkeyPatch) -> None:
+    reset_emergency_stop_service()
     monkeypatch.delenv("APP_ENV", raising=False)
     monkeypatch.delenv("APP_MODE", raising=False)
     monkeypatch.delenv("LIVE_TRADING_ENABLED", raising=False)

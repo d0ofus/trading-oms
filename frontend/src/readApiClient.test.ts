@@ -10,6 +10,19 @@ import {
 } from "./readApiClient";
 
 const sampleSnapshot: OperationsApiSnapshot = {
+  emergencyStop: {
+    schema_version: 1,
+    active: true,
+    status: "active",
+    updated_at: "2026-07-08T13:45:00Z",
+    activated_at: "2026-07-08T13:45:00Z",
+    activated_by: "admin-operator-001",
+    activation_reason: "operator_review",
+    deactivated_at: null,
+    deactivated_by: null,
+    deactivation_reason: null,
+    blocking_risk_increasing_actions: true,
+  },
   safety: {
     schema_version: 1,
     app_env: "development",
@@ -154,6 +167,7 @@ const sampleSnapshot: OperationsApiSnapshot = {
 };
 
 const responseByEndpoint: Record<string, unknown> = {
+  [READ_API_ENDPOINTS.emergencyStop]: sampleSnapshot.emergencyStop,
   [READ_API_ENDPOINTS.safety]: sampleSnapshot.safety,
   [READ_API_ENDPOINTS.operatorSession]: sampleSnapshot.operatorSession,
   [READ_API_ENDPOINTS.auditEvents]: sampleSnapshot.auditEvents,
@@ -177,6 +191,7 @@ describe("read API client", () => {
       },
     });
 
+    await client.getEmergencyStop();
     await client.getOperatorSession();
     await client.getSafety();
     await client.getAuditEvents();
@@ -225,6 +240,8 @@ describe("read API client", () => {
     expect(state.snapshot.operatorSession.can_view_operations).toBe(true);
     expect(state.snapshot.operatorSession.can_approve_simulation).toBe(false);
     expect(state.snapshot.operatorSession.approval_role_required).toBe("approver");
+    expect(state.snapshot.emergencyStop.active).toBe(false);
+    expect(state.snapshot.emergencyStop.blocking_risk_increasing_actions).toBe(false);
     expect(state.snapshot.paperTrading.paper_mode).toBe("paper");
     expect(state.snapshot.paperTrading.live_trading_enabled).toBe(false);
     expect(state.snapshot.paperTrading.requires_reconciliation).toBe(true);

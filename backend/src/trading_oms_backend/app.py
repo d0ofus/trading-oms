@@ -10,6 +10,11 @@ from pydantic import BaseModel
 
 from trading_oms_backend.audit_export import AuditExportError, build_audit_export_bundle
 from trading_oms_backend.config import get_settings
+from trading_oms_backend.emergency_stop import (
+    EmergencyStopChangeRequest,
+    EmergencyStopError,
+    EmergencyStopService,
+)
 from trading_oms_backend.event_journal import JournalRecord, JsonlEventJournal
 from trading_oms_backend.operator_auth import (
     ADMINISTER_SYSTEM_PERMISSION,
@@ -21,6 +26,7 @@ from trading_oms_backend.operator_auth import (
     operator_identity_from_headers,
 )
 from trading_oms_backend.read_models import (
+    EmergencyStopReadModel,
     OperationsReadModel,
     OperatorSessionReadModel,
     build_demo_operations_read_model,
@@ -72,6 +78,14 @@ class WorkflowSimulationRunBody(BaseModel):
     schema_version: int = 1
 
 
+class EmergencyStopChangeBody(BaseModel):
+    event_id: str
+    requested_at: str
+    actor: str
+    reason: str
+    schema_version: int = 1
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str | bool]:
     settings = get_settings()
@@ -94,6 +108,17 @@ def get_operator_session(request: Request) -> dict[str, Any]:
         action="view",
     )
     return OperatorSessionReadModel.from_identity(identity).to_json_dict()
+
+
+@app.get("/api/emergency-stop")
+def get_emergency_stop(request: Request) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="emergency_stop",
+        action="view",
+    )
+    return _emergency_stop_read_model().to_json_dict()
 
 
 @app.get("/api/safety")
@@ -282,7 +307,7 @@ def start_workflow_simulation_run(
     workflow_id: str,
     run: WorkflowSimulationRunBody,
 ) -> dict[str, Any]:
-    _authorize_request(
+    identity = _authorize_request(
         request,
         permission=ADMINISTER_SYSTEM_PERMISSION,
         resource="workflow_simulation_run",
@@ -290,8 +315,14 @@ def start_workflow_simulation_run(
     )
     try:
         request = _workflow_simulation_run_request(run)
-        record = get_workflow_simulation_runner().start_run(workflow_id, request)
+        record = get_workflow_simulation_runner().start_run(
+            workflow_id,
+            request,
+            requested_by=identity.operator_id,
+        )
     except WorkflowSimulationRunError as exc:
+        if "emergency stop is active" in str(exc):
+            raise HTTPException(status_code=423, detail=str(exc)) from exc
         status_code = 404 if "unknown workflow_id" in str(exc) else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return record.to_json_dict()
@@ -345,6 +376,34 @@ def update_workflow(
     return record.to_json_dict()
 
 
+@app.post("/api/emergency-stop/activate")
+def activate_emergency_stop(
+    request: Request,
+    change: EmergencyStopChangeBody,
+) -> dict[str, Any]:
+    identity = _authorize_request(
+        request,
+        permission=ADMINISTER_SYSTEM_PERMISSION,
+        resource="emergency_stop",
+        action="activate",
+    )
+    return _apply_emergency_stop_change("activate", change, identity)
+
+
+@app.post("/api/emergency-stop/deactivate")
+def deactivate_emergency_stop(
+    request: Request,
+    change: EmergencyStopChangeBody,
+) -> dict[str, Any]:
+    identity = _authorize_request(
+        request,
+        permission=ADMINISTER_SYSTEM_PERMISSION,
+        resource="emergency_stop",
+        action="deactivate",
+    )
+    return _apply_emergency_stop_change("deactivate", change, identity)
+
+
 @app.post("/api/approval-tickets/{ticket_id}/approve")
 def approve_simulation_ticket(
     request: Request,
@@ -376,7 +435,26 @@ def reject_simulation_ticket(
 
 
 def _operations_read_model() -> OperationsReadModel:
-    return build_demo_operations_read_model(get_settings())
+    return build_demo_operations_read_model(
+        get_settings(),
+        emergency_stop=_emergency_stop_read_model(),
+    )
+
+
+def _emergency_stop_read_model() -> EmergencyStopReadModel:
+    state = get_emergency_stop_service().current_state()
+    return EmergencyStopReadModel(
+        active=state.active,
+        status=state.status,
+        updated_at=state.updated_at,
+        activated_at=state.activated_at,
+        activated_by=state.activated_by,
+        activation_reason=state.activation_reason,
+        deactivated_at=state.deactivated_at,
+        deactivated_by=state.deactivated_by,
+        deactivation_reason=state.deactivation_reason,
+        blocking_risk_increasing_actions=state.blocking_risk_increasing_actions,
+    )
 
 
 def reset_simulation_approval_service() -> None:
@@ -385,6 +463,9 @@ def reset_simulation_approval_service() -> None:
 
 _operator_auth_temp_dir: TemporaryDirectory[str] | None = None
 _operator_auth_journal: JsonlEventJournal | None = None
+_emergency_stop_temp_dir: TemporaryDirectory[str] | None = None
+_emergency_stop_journal: JsonlEventJournal | None = None
+_emergency_stop_service: EmergencyStopService | None = None
 _workflow_temp_dir: TemporaryDirectory[str] | None = None
 _workflow_store: WorkflowDefinitionStore | None = None
 _workflow_simulation_temp_dir: TemporaryDirectory[str] | None = None
@@ -419,6 +500,32 @@ def get_operator_auth_journal() -> JsonlEventJournal:
     return _operator_auth_journal
 
 
+def get_emergency_stop_service() -> EmergencyStopService:
+    global _emergency_stop_service
+    if _emergency_stop_service is None:
+        _emergency_stop_service = _build_emergency_stop_service()
+    return _emergency_stop_service
+
+
+def get_emergency_stop_journal() -> JsonlEventJournal:
+    global _emergency_stop_journal
+    if _emergency_stop_journal is None:
+        _emergency_stop_journal = _build_emergency_stop_journal()
+    return _emergency_stop_journal
+
+
+def reset_emergency_stop_service() -> EmergencyStopService:
+    global _emergency_stop_journal, _emergency_stop_service, _workflow_simulation_runner
+    _emergency_stop_journal = _build_emergency_stop_journal()
+    _emergency_stop_service = EmergencyStopService(_emergency_stop_journal)
+    _workflow_simulation_runner = None
+    return _emergency_stop_service
+
+
+def emergency_stop_journal_records() -> tuple[JournalRecord, ...]:
+    return tuple(get_emergency_stop_journal().read_all())
+
+
 def reset_operator_auth_service() -> JsonlEventJournal:
     global _operator_auth_journal
     _operator_auth_journal = _build_operator_auth_journal()
@@ -446,6 +553,16 @@ def _apply_simulation_approval_decision(
             status_code=400,
             detail="actor must match authenticated operator",
         )
+    if action == "approved":
+        try:
+            get_emergency_stop_service().ensure_risk_increasing_allowed(
+                resource=f"approval_ticket.{ticket_id}",
+                action="approve",
+                checked_at=decision.decided_at,
+                actor=identity.operator_id,
+            )
+        except EmergencyStopError as exc:
+            raise HTTPException(status_code=423, detail=str(exc)) from exc
     service = get_simulation_approval_service()
     decision_input = SimulationApprovalDecisionInput(
         decision_id=decision.decision_id,
@@ -460,6 +577,33 @@ def _apply_simulation_approval_decision(
         else:
             record = service.reject(ticket_id, decision_input)
     except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
+def _apply_emergency_stop_change(
+    action: str,
+    change: EmergencyStopChangeBody,
+    identity: OperatorIdentity,
+) -> dict[str, Any]:
+    if change.actor != identity.operator_id:
+        raise HTTPException(
+            status_code=400,
+            detail="actor must match authenticated operator",
+        )
+    try:
+        request = EmergencyStopChangeRequest(
+            schema_version=change.schema_version,
+            event_id=change.event_id,
+            requested_at=change.requested_at,
+            actor=change.actor,
+            reason=change.reason,
+        )
+        if action == "activate":
+            record = get_emergency_stop_service().activate(request)
+        else:
+            record = get_emergency_stop_service().deactivate(request)
+    except EmergencyStopError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return record.to_json_dict()
 
@@ -537,6 +681,20 @@ def _build_operator_auth_journal() -> JsonlEventJournal:
     return JsonlEventJournal(journal_path)
 
 
+def _build_emergency_stop_journal() -> JsonlEventJournal:
+    global _emergency_stop_temp_dir
+    if _emergency_stop_temp_dir is None:
+        _emergency_stop_temp_dir = tempfile.TemporaryDirectory(prefix="trading-oms-emergency-stop-")
+    journal_path = Path(_emergency_stop_temp_dir.name) / "emergency-stop-journal.jsonl"
+    if journal_path.exists():
+        journal_path.unlink()
+    return JsonlEventJournal(journal_path)
+
+
+def _build_emergency_stop_service() -> EmergencyStopService:
+    return EmergencyStopService(get_emergency_stop_journal())
+
+
 def _build_workflow_simulation_runner() -> WorkflowSimulationRunner:
     global _workflow_simulation_temp_dir
     if _workflow_simulation_temp_dir is None:
@@ -547,5 +705,7 @@ def _build_workflow_simulation_runner() -> WorkflowSimulationRunner:
     if journal_path.exists():
         journal_path.unlink()
     return WorkflowSimulationRunner(
-        get_workflow_definition_store(), JsonlEventJournal(journal_path)
+        get_workflow_definition_store(),
+        JsonlEventJournal(journal_path),
+        emergency_stop_service=get_emergency_stop_service(),
     )

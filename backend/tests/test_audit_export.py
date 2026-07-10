@@ -11,6 +11,7 @@ from pytest import MonkeyPatch
 
 from trading_oms_backend.app import (
     app,
+    reset_emergency_stop_service,
     reset_workflow_definition_service,
     reset_workflow_simulation_runner_service,
 )
@@ -159,6 +160,7 @@ def test_audit_export_api_returns_read_only_bundle_with_workflow_references(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
+    reset_emergency_stop_service()
     reset_workflow_definition_service()
     reset_workflow_simulation_runner_service()
     client = TestClient(app)
