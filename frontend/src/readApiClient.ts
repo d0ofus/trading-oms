@@ -33,6 +33,8 @@ export type OperatorSessionApiView = {
   can_view_operations: boolean;
   can_approve_simulation: boolean;
   can_administer_system: boolean;
+  approval_role_required: string;
+  role_separation: string;
 };
 
 export type AuditEventApiView = {
@@ -222,10 +224,12 @@ export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
     auth_state: "local_development",
     auth_method: "local_header",
     roles: ["admin"],
-    permissions: ["view_operations", "approve_simulation", "administer_system"],
+    permissions: ["view_operations", "administer_system"],
     can_view_operations: true,
-    can_approve_simulation: true,
+    can_approve_simulation: false,
     can_administer_system: true,
+    approval_role_required: "approver",
+    role_separation: "admin_approver_separated",
   },
   auditEvents: [],
   signals: [],

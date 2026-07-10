@@ -9,7 +9,9 @@ from typing import Any
 from trading_oms_backend.config import Settings, get_settings
 from trading_oms_backend.operator_auth import (
     ADMINISTER_SYSTEM_PERMISSION,
+    APPROVAL_ROLE_REQUIRED,
     APPROVE_SIMULATION_PERMISSION,
+    ROLE_SEPARATION_POLICY,
     VIEW_OPERATIONS_PERMISSION,
     OperatorIdentity,
     local_development_operator,
@@ -74,6 +76,8 @@ class OperatorSessionReadModel:
     auth_method: str
     roles: tuple[str, ...]
     permissions: tuple[str, ...]
+    approval_role_required: str = APPROVAL_ROLE_REQUIRED
+    role_separation: str = ROLE_SEPARATION_POLICY
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -94,6 +98,10 @@ class OperatorSessionReadModel:
                 ADMINISTER_SYSTEM_PERMISSION,
             }:
                 raise ReadModelError("permissions must be known operator permissions")
+        if self.approval_role_required != APPROVAL_ROLE_REQUIRED:
+            raise ReadModelError("approval_role_required must be approver")
+        if self.role_separation != ROLE_SEPARATION_POLICY:
+            raise ReadModelError("role_separation must match role policy")
         _assert_json_serializable(self.to_json_dict(), "operator session read model")
 
     @classmethod
@@ -131,6 +139,8 @@ class OperatorSessionReadModel:
             "can_view_operations": self.can_view_operations,
             "can_approve_simulation": self.can_approve_simulation,
             "can_administer_system": self.can_administer_system,
+            "approval_role_required": self.approval_role_required,
+            "role_separation": self.role_separation,
         }
 
 

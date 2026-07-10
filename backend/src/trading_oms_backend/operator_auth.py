@@ -14,6 +14,8 @@ AUTHZ_DECISION_EVENT_TYPE = "authz.decision.evaluated"
 VIEW_OPERATIONS_PERMISSION = "view_operations"
 APPROVE_SIMULATION_PERMISSION = "approve_simulation"
 ADMINISTER_SYSTEM_PERMISSION = "administer_system"
+APPROVAL_ROLE_REQUIRED = "approver"
+ROLE_SEPARATION_POLICY = "admin_approver_separated"
 
 VALID_PERMISSIONS = (
     VIEW_OPERATIONS_PERMISSION,
@@ -26,7 +28,10 @@ ROLE_PERMISSIONS = {
         VIEW_OPERATIONS_PERMISSION,
         APPROVE_SIMULATION_PERMISSION,
     ),
-    "admin": VALID_PERMISSIONS,
+    "admin": (
+        VIEW_OPERATIONS_PERMISSION,
+        ADMINISTER_SYSTEM_PERMISSION,
+    ),
 }
 DEFAULT_LOCAL_OPERATOR_ID = "human-operator-001"
 DEFAULT_LOCAL_OPERATOR_ROLES = ("admin",)
@@ -100,6 +105,8 @@ class OperatorIdentity:
             "can_view_operations": self.can_view_operations,
             "can_approve_simulation": self.can_approve_simulation,
             "can_administer_system": self.can_administer_system,
+            "approval_role_required": APPROVAL_ROLE_REQUIRED,
+            "role_separation": ROLE_SEPARATION_POLICY,
         }
 
 
@@ -111,6 +118,9 @@ class AuthzDecision:
     permission: str
     resource: str
     action: str
+    operator_roles: tuple[str, ...]
+    required_role: str
+    role_separation: str
     result: str
     reason: str
     auth_state: str
@@ -126,6 +136,10 @@ class AuthzDecision:
         _validated_permission(self.permission)
         _validated_identifier(self.resource, "resource")
         _validated_identifier(self.action, "action")
+        _validated_role_tuple(self.operator_roles)
+        _validated_identifier(self.required_role, "required_role")
+        if self.role_separation != ROLE_SEPARATION_POLICY:
+            raise OperatorAuthError("role_separation must match policy")
         if self.result not in {"allowed", "denied"}:
             raise OperatorAuthError("result must be allowed or denied")
         if self.reason not in {"permission_present", "missing_permission"}:
@@ -145,6 +159,9 @@ class AuthzDecision:
             "permission": self.permission,
             "resource": self.resource,
             "action": self.action,
+            "operator_roles": list(self.operator_roles),
+            "required_role": self.required_role,
+            "role_separation": self.role_separation,
             "result": self.result,
             "reason": self.reason,
             "auth_state": self.auth_state,
@@ -215,6 +232,9 @@ def authorize_operator(
         permission=permission,
         resource=resource,
         action=action,
+        operator_roles=identity.roles,
+        required_role=required_role_for_permission(permission),
+        role_separation=ROLE_SEPARATION_POLICY,
         result="allowed" if allowed else "denied",
         reason="permission_present" if allowed else "missing_permission",
         auth_state=identity.auth_state,
@@ -227,6 +247,15 @@ def authorize_operator(
             timestamp=decision.evaluated_at,
         )
     return decision
+
+
+def required_role_for_permission(permission: str) -> str:
+    _validated_permission(permission)
+    if permission == APPROVE_SIMULATION_PERMISSION:
+        return APPROVAL_ROLE_REQUIRED
+    if permission == ADMINISTER_SYSTEM_PERMISSION:
+        return "admin"
+    return "viewer_or_higher"
 
 
 def _roles_from_header(raw_roles: str | None) -> tuple[str, ...]:
@@ -250,9 +279,13 @@ def _validated_role_tuple(roles: tuple[str, ...]) -> tuple[str, ...]:
         raise OperatorAuthError("roles must be a tuple")
     if not roles:
         raise OperatorAuthError("roles must not be empty")
+    if len(set(roles)) != len(roles):
+        raise OperatorAuthError("roles must not contain duplicates")
     for role in roles:
         if role not in ROLE_PERMISSIONS:
             raise OperatorAuthError(f"unknown operator role: {role}")
+    if "admin" in roles and "approver" in roles:
+        raise OperatorAuthError("admin and approver roles must remain separated")
     return roles
 
 

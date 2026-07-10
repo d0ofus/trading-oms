@@ -1,6 +1,7 @@
 # Authentication And Authorization
 
-Slice 054 adds a local operator authentication and authorization foundation.
+Slice 054 adds a local operator authentication and authorization foundation. Slice 055 hardens the
+local role policy for approval and administration separation.
 
 This is not production authentication.
 
@@ -25,8 +26,8 @@ Default development and test mode use the local operator:
 human-operator-001
 ```
 
-with the local `admin` role. This keeps local development usable while later slices harden
-production identity, separation of duties, and operator approval permissions.
+with the local `admin` role. Slice 055 keeps that local admin useful for read and workflow
+administration work, but the local admin role cannot approve or reject simulation tickets.
 
 Optional local request headers can be used in tests and local inspection:
 
@@ -41,7 +42,7 @@ real identity provider.
 
 ## Permissions
 
-The Slice 054 permission set is intentionally small:
+The permission set is intentionally small:
 
 | Permission | Purpose |
 | --- | --- |
@@ -49,8 +50,28 @@ The Slice 054 permission set is intentionally small:
 | `approve_simulation` | Approve or reject simulation approval tickets only. |
 | `administer_system` | Create/update local workflow definitions and start saved simulation workflow runs. |
 
-These permissions are a foundation. Slice 055 remains responsible for role hardening, separation of
-duties, and final approval-permission policy.
+Slice 055 binds these permissions to separated local roles.
+
+## Role Policy
+
+Slice 055 defines three local roles:
+
+| Role | Permissions |
+| --- | --- |
+| `viewer` | `view_operations` |
+| `approver` | `view_operations`, `approve_simulation` |
+| `admin` | `view_operations`, `administer_system` |
+
+The approval role policy is:
+
+- simulation approval and rejection require the dedicated `approver` role;
+- the local `admin` role cannot approve or reject simulation tickets;
+- a local identity cannot combine `admin` and `approver` roles;
+- `approver` cannot create/update workflow definitions or start saved workflow simulation runs;
+- `admin` remains able to administer local workflow definitions and saved simulation workflow runs.
+
+This is local role hardening only. It is not production authentication, it does not create live
+trading approval, and it does not add broker or credential controls.
 
 ## API Boundaries
 
@@ -87,6 +108,9 @@ The journal payload records:
 - requested permission;
 - resource;
 - action;
+- operator roles;
+- required role;
+- role-separation policy;
 - allowed or denied result;
 - reason.
 
@@ -97,7 +121,6 @@ identifiers, broker hosts, or broker ports.
 
 Production-like paper operation still requires later approved work:
 
-- Slice 055 operator roles and approval permissions;
 - Slice 056 emergency stop;
 - Slice 057 observability, retention, backup, and incident response;
 - Slice 058 live-readiness evidence dashboard;

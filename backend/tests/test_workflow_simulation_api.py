@@ -132,6 +132,28 @@ def test_workflow_simulation_api_requires_admin_permission_for_run_start(
     assert "administer_system" in response.json()["detail"]
 
 
+def test_workflow_simulation_api_rejects_approver_for_run_start(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+
+    response = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        headers={
+            "x-operator-id": "approver-operator-001",
+            "x-operator-roles": "approver",
+        },
+        json=_run_body(),
+    )
+
+    assert response.status_code == 403
+    assert "administer_system" in response.json()["detail"]
+
+
 def test_workflow_simulation_api_response_excludes_broker_secret_and_execution_affordances(
     monkeypatch: MonkeyPatch,
 ) -> None:

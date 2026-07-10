@@ -26,6 +26,8 @@ def test_slice_053_deployment_and_secrets_plan_preserves_hard_stops() -> None:
         "Production-like paper operation requires separate explicit human "
         "approval and external review.",
         "Slice 054 adds a local operator authentication and authorization foundation.",
+        "Slice 055 hardens local operator roles and approval permissions only.",
+        "Simulation approval requires the dedicated local `approver` role.",
         "Rollback planning must preserve the append-only audit trail.",
         "Backup and restore planning must protect journal and persistence "
         "data without exporting secrets.",
@@ -53,12 +55,13 @@ def test_slice_053_plan_does_not_document_secret_values_or_live_enablement() -> 
         assert re.search(pattern, combined, flags=re.IGNORECASE) is None
 
 
-def test_slice_053_is_ready_and_later_slices_remain_not_started() -> None:
+def test_slice_055_is_ready_and_later_slices_remain_not_started() -> None:
     slices_text = SLICES_DOC.read_text(encoding="utf-8")
 
     assert _slice_status(slices_text, "053") == "ready_for_human_review"
     assert _slice_status(slices_text, "054") == "ready_for_human_review"
-    for slice_id in ("055", "056", "057", "058", "059"):
+    assert _slice_status(slices_text, "055") == "ready_for_human_review"
+    for slice_id in ("056", "057", "058", "059"):
         assert _slice_status(slices_text, slice_id) == "not_started"
 
 

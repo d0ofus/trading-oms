@@ -163,7 +163,6 @@ def test_read_model_json_shapes_are_stable() -> None:
         roles=("admin",),
         permissions=(
             "view_operations",
-            "approve_simulation",
             "administer_system",
         ),
     )
@@ -219,12 +218,13 @@ def test_read_model_json_shapes_are_stable() -> None:
         "roles": ["admin"],
         "permissions": [
             "view_operations",
-            "approve_simulation",
             "administer_system",
         ],
         "can_view_operations": True,
-        "can_approve_simulation": True,
+        "can_approve_simulation": False,
         "can_administer_system": True,
+        "approval_role_required": "approver",
+        "role_separation": "admin_approver_separated",
     }
     assert paper_trading.to_json_dict() == {
         "schema_version": 1,
@@ -326,8 +326,10 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
     assert payload["paper_trading"]["paper_mode"] == "paper"
     assert payload["operator_session"]["operator_id"] == "human-operator-001"
     assert payload["operator_session"]["can_view_operations"] is True
-    assert payload["operator_session"]["can_approve_simulation"] is True
+    assert payload["operator_session"]["can_approve_simulation"] is False
     assert payload["operator_session"]["can_administer_system"] is True
+    assert payload["operator_session"]["approval_role_required"] == "approver"
+    assert payload["operator_session"]["role_separation"] == "admin_approver_separated"
     assert payload["paper_trading"]["live_trading_enabled"] is False
     assert payload["paper_trading"]["requires_reconciliation"] is True
     assert payload["readiness"]["live_trading_authorized"] is False

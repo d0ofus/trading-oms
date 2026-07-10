@@ -96,7 +96,7 @@ describe("App", () => {
     expect(text).toContain("Local development operator");
     expect(text).toContain("human operator 001");
     expect(text).toContain("view operations");
-    expect(text).toContain("approve simulation");
+    expect(text).toContain("Approve simulation");
     expect(text).toContain("administer system");
   });
 
@@ -168,9 +168,10 @@ describe("App", () => {
     expect(text).toContain("Reason");
     expect(text).toContain("Approve simulation");
     expect(text).toContain("Reject simulation");
-    expect(text).toContain("Idempotency key");
     expect(html).toContain("<form");
     expect(html).toContain("<button");
+    expect(html).toContain("disabled");
+    expect(text).toContain("Approval requires approver");
     expect(text).not.toContain("transmit order");
     expect(text).not.toContain("connect broker");
   });
@@ -245,8 +246,10 @@ describe("App", () => {
     expect(text).toContain("human operator 001");
     expect(text).toContain("admin");
     expect(text).toContain("view operations");
-    expect(text).toContain("approve simulation");
+    expect(text).toContain("Approve simulation");
     expect(text).toContain("administer system");
+    expect(text).toContain("approver");
+    expect(text).toContain("admin approver separated");
     expect(text).not.toContain("Password");
     expect(text).not.toContain("Token");
     expect(text).not.toContain("Sign in");
@@ -319,10 +322,12 @@ const backendSnapshot: OperationsApiSnapshot = {
     auth_state: "local_development",
     auth_method: "local_header",
     roles: ["admin"],
-    permissions: ["view_operations", "approve_simulation", "administer_system"],
+    permissions: ["view_operations", "administer_system"],
     can_view_operations: true,
-    can_approve_simulation: true,
+    can_approve_simulation: false,
     can_administer_system: true,
+    approval_role_required: "approver",
+    role_separation: "admin_approver_separated",
   },
   auditEvents: [
     {

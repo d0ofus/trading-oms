@@ -26,10 +26,12 @@ const sampleSnapshot: OperationsApiSnapshot = {
     auth_state: "local_development",
     auth_method: "local_header",
     roles: ["admin"],
-    permissions: ["view_operations", "approve_simulation", "administer_system"],
+    permissions: ["view_operations", "administer_system"],
     can_view_operations: true,
-    can_approve_simulation: true,
+    can_approve_simulation: false,
     can_administer_system: true,
+    approval_role_required: "approver",
+    role_separation: "admin_approver_separated",
   },
   auditEvents: [
     {
@@ -221,6 +223,8 @@ describe("read API client", () => {
     expect(state.snapshot.safety.broker_connectivity).toBe("not_configured");
     expect(state.snapshot.operatorSession.operator_id).toBe("human-operator-001");
     expect(state.snapshot.operatorSession.can_view_operations).toBe(true);
+    expect(state.snapshot.operatorSession.can_approve_simulation).toBe(false);
+    expect(state.snapshot.operatorSession.approval_role_required).toBe("approver");
     expect(state.snapshot.paperTrading.paper_mode).toBe("paper");
     expect(state.snapshot.paperTrading.live_trading_enabled).toBe(false);
     expect(state.snapshot.paperTrading.requires_reconciliation).toBe(true);

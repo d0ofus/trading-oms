@@ -22,6 +22,7 @@ def test_simulation_approval_endpoint_approves_pending_ticket(
 
     response = client.post(
         "/api/approval-tickets/approval-ticket-001/approve",
+        headers=approver_headers(),
         json=decision_body(decision_id="approval-decision-approve-001"),
     )
 
@@ -43,6 +44,7 @@ def test_simulation_approval_endpoint_rejects_pending_ticket(
 
     response = client.post(
         "/api/approval-tickets/approval-ticket-001/reject",
+        headers=approver_headers(),
         json=decision_body(decision_id="approval-decision-reject-001"),
     )
 
@@ -60,8 +62,16 @@ def test_simulation_approval_endpoint_is_idempotent_for_same_decision_payload(
     client = TestClient(app)
     body = decision_body(decision_id="approval-decision-idempotent-001")
 
-    first = client.post("/api/approval-tickets/approval-ticket-001/approve", json=body)
-    second = client.post("/api/approval-tickets/approval-ticket-001/approve", json=body)
+    first = client.post(
+        "/api/approval-tickets/approval-ticket-001/approve",
+        headers=approver_headers(),
+        json=body,
+    )
+    second = client.post(
+        "/api/approval-tickets/approval-ticket-001/approve",
+        headers=approver_headers(),
+        json=body,
+    )
 
     assert first.status_code == 200
     assert second.status_code == 200
@@ -77,10 +87,12 @@ def test_simulation_approval_endpoint_rejects_second_different_decision(
 
     approved = client.post(
         "/api/approval-tickets/approval-ticket-001/approve",
+        headers=approver_headers(),
         json=decision_body(decision_id="approval-decision-approve-001"),
     )
     rejected = client.post(
         "/api/approval-tickets/approval-ticket-001/reject",
+        headers=approver_headers(),
         json=decision_body(decision_id="approval-decision-reject-001"),
     )
 
@@ -98,6 +110,7 @@ def test_simulation_approval_endpoint_rejects_unknown_ticket(
 
     response = client.post(
         "/api/approval-tickets/unknown-ticket/approve",
+        headers=approver_headers(),
         json=decision_body(decision_id="approval-decision-unknown-001"),
     )
 
@@ -105,7 +118,35 @@ def test_simulation_approval_endpoint_rejects_unknown_ticket(
     assert "unknown ticket_id" in response.json()["detail"]
 
 
-def test_simulation_approval_endpoint_requires_approve_permission_and_journals_denial(
+def test_simulation_approval_endpoint_requires_approver_role_and_journals_admin_denial(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_operator_auth_service()
+    reset_simulation_approval_service()
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/approval-tickets/approval-ticket-001/approve",
+        json=decision_body(actor="human-operator-001"),
+    )
+
+    assert response.status_code == 403
+    assert "approve_simulation" in response.json()["detail"]
+
+    records = operator_auth_journal_records()
+    assert len(records) == 1
+    assert records[0].event_type == "authz.decision.evaluated"
+    assert records[0].payload["operator_id"] == "human-operator-001"
+    assert records[0].payload["operator_roles"] == ["admin"]
+    assert records[0].payload["permission"] == "approve_simulation"
+    assert records[0].payload["required_role"] == "approver"
+    assert records[0].payload["role_separation"] == "admin_approver_separated"
+    assert records[0].payload["resource"] == "approval_ticket.approval-ticket-001"
+    assert records[0].payload["result"] == "denied"
+
+
+def test_simulation_approval_endpoint_requires_approve_permission_and_journals_viewer_denial(
     monkeypatch: MonkeyPatch,
 ) -> None:
     _set_safe_env(monkeypatch)
@@ -129,7 +170,10 @@ def test_simulation_approval_endpoint_requires_approve_permission_and_journals_d
     assert len(records) == 1
     assert records[0].event_type == "authz.decision.evaluated"
     assert records[0].payload["operator_id"] == "viewer-operator-001"
+    assert records[0].payload["operator_roles"] == ["viewer"]
     assert records[0].payload["permission"] == "approve_simulation"
+    assert records[0].payload["required_role"] == "approver"
+    assert records[0].payload["resource"] == "approval_ticket.approval-ticket-001"
     assert records[0].payload["result"] == "denied"
 
 
@@ -163,6 +207,7 @@ def test_simulation_approval_endpoint_response_excludes_broker_and_secret_afford
 
     response = client.post(
         "/api/approval-tickets/approval-ticket-001/approve",
+        headers=approver_headers(),
         json=decision_body(decision_id="approval-decision-safety-001"),
     )
 
@@ -201,6 +246,13 @@ def decision_body(**overrides: Any) -> dict[str, str]:
     }
     values.update(overrides)
     return values
+
+
+def approver_headers() -> dict[str, str]:
+    return {
+        "x-operator-id": "human-operator-001",
+        "x-operator-roles": "approver",
+    }
 
 
 def _set_safe_env(monkeypatch: MonkeyPatch) -> None:
