@@ -20,6 +20,7 @@ describe("App", () => {
     const text = renderedText();
 
     expect(text).toContain("Trading OMS");
+    expect(text).toContain("Operator access");
     expect(text).toContain("Visual builder");
     expect(text).toContain("Simulation run detail");
     expect(text).toContain("Approval inbox");
@@ -92,6 +93,11 @@ describe("App", () => {
     expect(text).toContain("Manual approval required");
     expect(text).toContain("Append-only journal");
     expect(text).toContain("Alert delivery local noop");
+    expect(text).toContain("Local development operator");
+    expect(text).toContain("human operator 001");
+    expect(text).toContain("view operations");
+    expect(text).toContain("approve simulation");
+    expect(text).toContain("administer system");
   });
 
   it("renders backend-derived workflow records when read data is loaded", () => {
@@ -230,6 +236,22 @@ describe("App", () => {
     expect(text).not.toContain("Credential");
   });
 
+  it("renders operator access state without credential controls", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Operator access");
+    expect(text).toContain("Local development operator");
+    expect(text).toContain("human operator 001");
+    expect(text).toContain("admin");
+    expect(text).toContain("view operations");
+    expect(text).toContain("approve simulation");
+    expect(text).toContain("administer system");
+    expect(text).not.toContain("Password");
+    expect(text).not.toContain("Token");
+    expect(text).not.toContain("Sign in");
+  });
+
   it("renders a safe fallback when backend read APIs are unavailable", () => {
     const fallbackState: ReadApiLoadState = {
       status: "error",
@@ -290,6 +312,17 @@ const backendSnapshot: OperationsApiSnapshot = {
     alert_delivery: "local_noop",
     approval_mode: "manual_required",
     data_source: "local_read_model",
+  },
+  operatorSession: {
+    schema_version: 1,
+    operator_id: "human-operator-001",
+    auth_state: "local_development",
+    auth_method: "local_header",
+    roles: ["admin"],
+    permissions: ["view_operations", "approve_simulation", "administer_system"],
+    can_view_operations: true,
+    can_approve_simulation: true,
+    can_administer_system: true,
   },
   auditEvents: [
     {

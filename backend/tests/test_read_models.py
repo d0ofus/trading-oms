@@ -13,6 +13,7 @@ from trading_oms_backend.read_models import (
     ApprovalTicketReadModel,
     AuditEventReadModel,
     OperationsReadModel,
+    OperatorSessionReadModel,
     OrderReadModel,
     PaperTradingOperatorReadModel,
     PositionReadModel,
@@ -155,6 +156,17 @@ def test_read_model_json_shapes_are_stable() -> None:
         failed_checks=("emergency_stop_implemented",),
         required_human_action="collect_missing_evidence",
     )
+    operator_session = OperatorSessionReadModel(
+        operator_id="human-operator-001",
+        auth_state="local_development",
+        auth_method="local_header",
+        roles=("admin",),
+        permissions=(
+            "view_operations",
+            "approve_simulation",
+            "administer_system",
+        ),
+    )
     paper_trading = PaperTradingOperatorReadModel(
         adapter_name="ibkr_paper",
         paper_mode="paper",
@@ -198,6 +210,21 @@ def test_read_model_json_shapes_are_stable() -> None:
         "required_human_action": "collect_missing_evidence",
         "live_trading_enabled": False,
         "live_trading_authorized": False,
+    }
+    assert operator_session.to_json_dict() == {
+        "schema_version": 1,
+        "operator_id": "human-operator-001",
+        "auth_state": "local_development",
+        "auth_method": "local_header",
+        "roles": ["admin"],
+        "permissions": [
+            "view_operations",
+            "approve_simulation",
+            "administer_system",
+        ],
+        "can_view_operations": True,
+        "can_approve_simulation": True,
+        "can_administer_system": True,
     }
     assert paper_trading.to_json_dict() == {
         "schema_version": 1,
@@ -253,6 +280,17 @@ def test_paper_trading_operator_read_model_blocks_live_or_non_paper_modes() -> N
         )
 
 
+def test_operator_session_read_model_blocks_missing_permissions() -> None:
+    with pytest.raises(ReadModelError, match="view_operations"):
+        OperatorSessionReadModel(
+            operator_id="viewer-operator-001",
+            auth_state="local_development",
+            auth_method="local_header",
+            roles=("viewer",),
+            permissions=(),
+        )
+
+
 def test_demo_operations_read_model_contains_every_expected_read_section() -> None:
     model = build_demo_operations_read_model(
         settings=Settings(app_env="development", app_mode="simulation"),
@@ -268,6 +306,7 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
         "alerts",
         "approval_tickets",
         "audit_events",
+        "operator_session",
         "orders",
         "paper_trading",
         "positions",
@@ -285,6 +324,10 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
     assert len(payload["positions"]) >= 1
     assert len(payload["alerts"]) >= 1
     assert payload["paper_trading"]["paper_mode"] == "paper"
+    assert payload["operator_session"]["operator_id"] == "human-operator-001"
+    assert payload["operator_session"]["can_view_operations"] is True
+    assert payload["operator_session"]["can_approve_simulation"] is True
+    assert payload["operator_session"]["can_administer_system"] is True
     assert payload["paper_trading"]["live_trading_enabled"] is False
     assert payload["paper_trading"]["requires_reconciliation"] is True
     assert payload["readiness"]["live_trading_authorized"] is False

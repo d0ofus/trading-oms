@@ -56,3 +56,6 @@ consideration.
 Slice 053 adds `docs/DEPLOYMENT_AND_SECRETS_MANAGEMENT_PLAN.md` as planning input for future
 secrets-management and network-exposure review. It is not a completed review, production rollout
 approval, or live-trading approval.
+
+Slice 054 adds local operator authentication and authorization models. This is not production
+authentication, not a completed external review, and not live-trading approval.

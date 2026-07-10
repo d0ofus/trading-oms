@@ -7,6 +7,13 @@ from math import isfinite
 from typing import Any
 
 from trading_oms_backend.config import Settings, get_settings
+from trading_oms_backend.operator_auth import (
+    ADMINISTER_SYSTEM_PERMISSION,
+    APPROVE_SIMULATION_PERMISSION,
+    VIEW_OPERATIONS_PERMISSION,
+    OperatorIdentity,
+    local_development_operator,
+)
 
 
 class ReadModelError(ValueError):
@@ -57,6 +64,73 @@ class SafetyPostureReadModel:
             "alert_delivery": self.alert_delivery,
             "approval_mode": self.approval_mode,
             "data_source": self.data_source,
+        }
+
+
+@dataclass(frozen=True)
+class OperatorSessionReadModel:
+    operator_id: str
+    auth_state: str
+    auth_method: str
+    roles: tuple[str, ...]
+    permissions: tuple[str, ...]
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _validated_identifier(self.operator_id, "operator_id")
+        if self.auth_state != "local_development":
+            raise ReadModelError("auth_state must be local_development")
+        if self.auth_method != "local_header":
+            raise ReadModelError("auth_method must be local_header")
+        _validated_identifier_tuple(self.roles, "roles")
+        _validated_identifier_tuple(self.permissions, "permissions")
+        if VIEW_OPERATIONS_PERMISSION not in self.permissions:
+            raise ReadModelError("permissions must include view_operations")
+        for permission in self.permissions:
+            if permission not in {
+                VIEW_OPERATIONS_PERMISSION,
+                APPROVE_SIMULATION_PERMISSION,
+                ADMINISTER_SYSTEM_PERMISSION,
+            }:
+                raise ReadModelError("permissions must be known operator permissions")
+        _assert_json_serializable(self.to_json_dict(), "operator session read model")
+
+    @classmethod
+    def from_identity(cls, identity: OperatorIdentity) -> OperatorSessionReadModel:
+        if not isinstance(identity, OperatorIdentity):
+            raise ReadModelError("identity must be OperatorIdentity")
+        return cls(
+            operator_id=identity.operator_id,
+            auth_state=identity.auth_state,
+            auth_method=identity.auth_method,
+            roles=identity.roles,
+            permissions=identity.permissions,
+        )
+
+    @property
+    def can_view_operations(self) -> bool:
+        return VIEW_OPERATIONS_PERMISSION in self.permissions
+
+    @property
+    def can_approve_simulation(self) -> bool:
+        return APPROVE_SIMULATION_PERMISSION in self.permissions
+
+    @property
+    def can_administer_system(self) -> bool:
+        return ADMINISTER_SYSTEM_PERMISSION in self.permissions
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "operator_id": self.operator_id,
+            "auth_state": self.auth_state,
+            "auth_method": self.auth_method,
+            "roles": list(self.roles),
+            "permissions": list(self.permissions),
+            "can_view_operations": self.can_view_operations,
+            "can_approve_simulation": self.can_approve_simulation,
+            "can_administer_system": self.can_administer_system,
         }
 
 
@@ -456,6 +530,7 @@ class PaperTradingOperatorReadModel:
 @dataclass(frozen=True)
 class OperationsReadModel:
     safety: SafetyPostureReadModel
+    operator_session: OperatorSessionReadModel
     audit_events: tuple[AuditEventReadModel, ...]
     signals: tuple[SignalReadModel, ...]
     risk_decisions: tuple[RiskDecisionReadModel, ...]
@@ -470,6 +545,7 @@ class OperationsReadModel:
     def __post_init__(self) -> None:
         _validate_schema_version(self.schema_version)
         _validated_model(self.safety, SafetyPostureReadModel, "safety")
+        _validated_model(self.operator_session, OperatorSessionReadModel, "operator_session")
         _validated_model_tuple(self.audit_events, AuditEventReadModel, "audit_events")
         _validated_model_tuple(self.signals, SignalReadModel, "signals")
         _validated_model_tuple(self.risk_decisions, RiskDecisionReadModel, "risk_decisions")
@@ -489,6 +565,7 @@ class OperationsReadModel:
         return {
             "schema_version": self.schema_version,
             "safety": self.safety.to_json_dict(),
+            "operator_session": self.operator_session.to_json_dict(),
             "audit_events": [event.to_json_dict() for event in self.audit_events],
             "signals": [signal.to_json_dict() for signal in self.signals],
             "risk_decisions": [decision.to_json_dict() for decision in self.risk_decisions],
@@ -505,6 +582,7 @@ def build_demo_operations_read_model(settings: Settings | None = None) -> Operat
     safety = SafetyPostureReadModel.from_settings(settings or get_settings())
     return OperationsReadModel(
         safety=safety,
+        operator_session=OperatorSessionReadModel.from_identity(local_development_operator()),
         audit_events=(
             AuditEventReadModel(
                 sequence=1,

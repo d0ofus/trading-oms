@@ -5,13 +5,26 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from trading_oms_backend.audit_export import AuditExportError, build_audit_export_bundle
 from trading_oms_backend.config import get_settings
-from trading_oms_backend.event_journal import JsonlEventJournal
-from trading_oms_backend.read_models import OperationsReadModel, build_demo_operations_read_model
+from trading_oms_backend.event_journal import JournalRecord, JsonlEventJournal
+from trading_oms_backend.operator_auth import (
+    ADMINISTER_SYSTEM_PERMISSION,
+    APPROVE_SIMULATION_PERMISSION,
+    VIEW_OPERATIONS_PERMISSION,
+    OperatorAuthError,
+    OperatorIdentity,
+    authorize_operator,
+    operator_identity_from_headers,
+)
+from trading_oms_backend.read_models import (
+    OperationsReadModel,
+    OperatorSessionReadModel,
+    build_demo_operations_read_model,
+)
 from trading_oms_backend.simulation_approval_service import (
     SimulationApprovalDecisionInput,
     get_simulation_approval_service,
@@ -72,58 +85,135 @@ def healthz() -> dict[str, str | bool]:
     }
 
 
+@app.get("/api/operator-session")
+def get_operator_session(request: Request) -> dict[str, Any]:
+    identity = _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="operator_session",
+        action="view",
+    )
+    return OperatorSessionReadModel.from_identity(identity).to_json_dict()
+
+
 @app.get("/api/safety")
-def get_safety() -> dict[str, Any]:
+def get_safety(request: Request) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="safety_posture",
+        action="view",
+    )
     return _operations_read_model().safety.to_json_dict()
 
 
 @app.get("/api/audit-events")
-def get_audit_events() -> list[dict[str, Any]]:
+def get_audit_events(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="audit_events",
+        action="view",
+    )
     return [event.to_json_dict() for event in _operations_read_model().audit_events]
 
 
 @app.get("/api/signals")
-def get_signals() -> list[dict[str, Any]]:
+def get_signals(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="signals",
+        action="view",
+    )
     return [signal.to_json_dict() for signal in _operations_read_model().signals]
 
 
 @app.get("/api/risk-decisions")
-def get_risk_decisions() -> list[dict[str, Any]]:
+def get_risk_decisions(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="risk_decisions",
+        action="view",
+    )
     return [decision.to_json_dict() for decision in _operations_read_model().risk_decisions]
 
 
 @app.get("/api/approval-tickets")
-def get_approval_tickets() -> list[dict[str, Any]]:
+def get_approval_tickets(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="approval_tickets",
+        action="view",
+    )
     return [ticket.to_json_dict() for ticket in _operations_read_model().approval_tickets]
 
 
 @app.get("/api/orders")
-def get_orders() -> list[dict[str, Any]]:
+def get_orders(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="orders",
+        action="view",
+    )
     return [order.to_json_dict() for order in _operations_read_model().orders]
 
 
 @app.get("/api/positions")
-def get_positions() -> list[dict[str, Any]]:
+def get_positions(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="positions",
+        action="view",
+    )
     return [position.to_json_dict() for position in _operations_read_model().positions]
 
 
 @app.get("/api/alerts")
-def get_alerts() -> list[dict[str, Any]]:
+def get_alerts(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="alerts",
+        action="view",
+    )
     return [alert.to_json_dict() for alert in _operations_read_model().alerts]
 
 
 @app.get("/api/readiness")
-def get_readiness() -> dict[str, Any]:
+def get_readiness(request: Request) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="readiness",
+        action="view",
+    )
     return _operations_read_model().readiness.to_json_dict()
 
 
 @app.get("/api/paper-trading")
-def get_paper_trading() -> dict[str, Any]:
+def get_paper_trading(request: Request) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="paper_trading",
+        action="view",
+    )
     return _operations_read_model().paper_trading.to_json_dict()
 
 
 @app.get("/api/audit-export-bundle")
-def get_audit_export_bundle() -> dict[str, Any]:
+def get_audit_export_bundle(request: Request) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="audit_export_bundle",
+        action="view",
+    )
     try:
         workflows = get_workflow_definition_store().list_workflows()
         runner = get_workflow_simulation_runner()
@@ -145,12 +235,24 @@ def get_audit_export_bundle() -> dict[str, Any]:
 
 
 @app.get("/api/workflows")
-def list_workflows() -> list[dict[str, Any]]:
+def list_workflows(request: Request) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="workflow_definitions",
+        action="view",
+    )
     return [record.to_json_dict() for record in get_workflow_definition_store().list_workflows()]
 
 
 @app.post("/api/workflows")
-def create_workflow(definition: WorkflowDefinitionBody) -> dict[str, Any]:
+def create_workflow(request: Request, definition: WorkflowDefinitionBody) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=ADMINISTER_SYSTEM_PERMISSION,
+        resource="workflow_definition",
+        action="create",
+    )
     try:
         request = _workflow_definition_request(definition)
         record = get_workflow_definition_store().create_workflow(request)
@@ -160,7 +262,13 @@ def create_workflow(definition: WorkflowDefinitionBody) -> dict[str, Any]:
 
 
 @app.get("/api/workflows/{workflow_id}")
-def get_workflow(workflow_id: str) -> dict[str, Any]:
+def get_workflow(request: Request, workflow_id: str) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="workflow_definition",
+        action="view",
+    )
     try:
         record = get_workflow_definition_store().get_workflow(workflow_id)
     except WorkflowDefinitionError as exc:
@@ -170,9 +278,16 @@ def get_workflow(workflow_id: str) -> dict[str, Any]:
 
 @app.post("/api/workflows/{workflow_id}/simulation-runs")
 def start_workflow_simulation_run(
+    request: Request,
     workflow_id: str,
     run: WorkflowSimulationRunBody,
 ) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=ADMINISTER_SYSTEM_PERMISSION,
+        resource="workflow_simulation_run",
+        action="start",
+    )
     try:
         request = _workflow_simulation_run_request(run)
         record = get_workflow_simulation_runner().start_run(workflow_id, request)
@@ -183,14 +298,26 @@ def start_workflow_simulation_run(
 
 
 @app.get("/api/workflows/{workflow_id}/simulation-runs")
-def list_workflow_simulation_runs(workflow_id: str) -> list[dict[str, Any]]:
+def list_workflow_simulation_runs(request: Request, workflow_id: str) -> list[dict[str, Any]]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="workflow_simulation_runs",
+        action="view",
+    )
     return [
         record.to_json_dict() for record in get_workflow_simulation_runner().list_runs(workflow_id)
     ]
 
 
 @app.get("/api/workflows/{workflow_id}/simulation-runs/{run_id}")
-def get_workflow_simulation_run(workflow_id: str, run_id: str) -> dict[str, Any]:
+def get_workflow_simulation_run(request: Request, workflow_id: str, run_id: str) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="workflow_simulation_run",
+        action="view",
+    )
     try:
         record = get_workflow_simulation_runner().get_run(workflow_id, run_id)
     except WorkflowSimulationRunError as exc:
@@ -199,7 +326,17 @@ def get_workflow_simulation_run(workflow_id: str, run_id: str) -> dict[str, Any]
 
 
 @app.put("/api/workflows/{workflow_id}")
-def update_workflow(workflow_id: str, definition: WorkflowDefinitionBody) -> dict[str, Any]:
+def update_workflow(
+    request: Request,
+    workflow_id: str,
+    definition: WorkflowDefinitionBody,
+) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=ADMINISTER_SYSTEM_PERMISSION,
+        resource="workflow_definition",
+        action="update",
+    )
     try:
         request = _workflow_definition_request(definition)
         record = get_workflow_definition_store().update_workflow(workflow_id, request)
@@ -210,18 +347,32 @@ def update_workflow(workflow_id: str, definition: WorkflowDefinitionBody) -> dic
 
 @app.post("/api/approval-tickets/{ticket_id}/approve")
 def approve_simulation_ticket(
+    request: Request,
     ticket_id: str,
     decision: ApprovalDecisionBody,
 ) -> dict[str, Any]:
-    return _apply_simulation_approval_decision(ticket_id, "approved", decision)
+    identity = _authorize_request(
+        request,
+        permission=APPROVE_SIMULATION_PERMISSION,
+        resource="approval_ticket",
+        action="approve",
+    )
+    return _apply_simulation_approval_decision(ticket_id, "approved", decision, identity)
 
 
 @app.post("/api/approval-tickets/{ticket_id}/reject")
 def reject_simulation_ticket(
+    request: Request,
     ticket_id: str,
     decision: ApprovalDecisionBody,
 ) -> dict[str, Any]:
-    return _apply_simulation_approval_decision(ticket_id, "rejected", decision)
+    identity = _authorize_request(
+        request,
+        permission=APPROVE_SIMULATION_PERMISSION,
+        resource="approval_ticket",
+        action="reject",
+    )
+    return _apply_simulation_approval_decision(ticket_id, "rejected", decision, identity)
 
 
 def _operations_read_model() -> OperationsReadModel:
@@ -232,6 +383,8 @@ def reset_simulation_approval_service() -> None:
     _reset_simulation_approval_service()
 
 
+_operator_auth_temp_dir: TemporaryDirectory[str] | None = None
+_operator_auth_journal: JsonlEventJournal | None = None
 _workflow_temp_dir: TemporaryDirectory[str] | None = None
 _workflow_store: WorkflowDefinitionStore | None = None
 _workflow_simulation_temp_dir: TemporaryDirectory[str] | None = None
@@ -259,6 +412,23 @@ def get_workflow_simulation_runner() -> WorkflowSimulationRunner:
     return _workflow_simulation_runner
 
 
+def get_operator_auth_journal() -> JsonlEventJournal:
+    global _operator_auth_journal
+    if _operator_auth_journal is None:
+        _operator_auth_journal = _build_operator_auth_journal()
+    return _operator_auth_journal
+
+
+def reset_operator_auth_service() -> JsonlEventJournal:
+    global _operator_auth_journal
+    _operator_auth_journal = _build_operator_auth_journal()
+    return _operator_auth_journal
+
+
+def operator_auth_journal_records() -> tuple[JournalRecord, ...]:
+    return tuple(get_operator_auth_journal().read_all())
+
+
 def reset_workflow_simulation_runner_service() -> WorkflowSimulationRunner:
     global _workflow_simulation_runner
     _workflow_simulation_runner = _build_workflow_simulation_runner()
@@ -269,7 +439,13 @@ def _apply_simulation_approval_decision(
     ticket_id: str,
     action: str,
     decision: ApprovalDecisionBody,
+    identity: OperatorIdentity,
 ) -> dict[str, Any]:
+    if decision.actor != identity.operator_id:
+        raise HTTPException(
+            status_code=400,
+            detail="actor must match authenticated operator",
+        )
     service = get_simulation_approval_service()
     decision_input = SimulationApprovalDecisionInput(
         decision_id=decision.decision_id,
@@ -286,6 +462,33 @@ def _apply_simulation_approval_decision(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return record.to_json_dict()
+
+
+def _authorize_request(
+    request: Request,
+    *,
+    permission: str,
+    resource: str,
+    action: str,
+) -> OperatorIdentity:
+    try:
+        identity = operator_identity_from_headers(request.headers, settings=get_settings())
+        decision = authorize_operator(
+            identity,
+            permission=permission,
+            resource=resource,
+            action=action,
+            journal=get_operator_auth_journal(),
+        )
+    except OperatorAuthError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+    if decision.result != "allowed":
+        raise HTTPException(
+            status_code=403,
+            detail=f"operator lacks required permission: {permission}",
+        )
+    return identity
 
 
 def _workflow_definition_request(
@@ -322,6 +525,16 @@ def _build_workflow_definition_store() -> WorkflowDefinitionStore:
     if store_path.exists():
         store_path.unlink()
     return WorkflowDefinitionStore(store_path)
+
+
+def _build_operator_auth_journal() -> JsonlEventJournal:
+    global _operator_auth_temp_dir
+    if _operator_auth_temp_dir is None:
+        _operator_auth_temp_dir = tempfile.TemporaryDirectory(prefix="trading-oms-authz-")
+    journal_path = Path(_operator_auth_temp_dir.name) / "operator-authz-journal.jsonl"
+    if journal_path.exists():
+        journal_path.unlink()
+    return JsonlEventJournal(journal_path)
 
 
 def _build_workflow_simulation_runner() -> WorkflowSimulationRunner:
