@@ -59,3 +59,8 @@ approval, or live-trading approval.
 
 Slice 054 adds local operator authentication and authorization models. This is not production
 authentication, not a completed external review, and not live-trading approval.
+
+Slice 058 adds `GET /api/live-readiness-evidence` and the frontend live-readiness evidence
+dashboard. The dashboard is read-only evidence visibility. It reports `not_ready` while evidence is
+missing, keeps `live_trading_enabled: false`, keeps `live_trading_authorized: false`, and cannot
+approve live trading or controlled paper rollout.

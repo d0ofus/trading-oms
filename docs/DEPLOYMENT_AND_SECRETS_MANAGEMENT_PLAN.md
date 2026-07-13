@@ -172,7 +172,8 @@ metadata, backup/restore posture, and incident response. It does not add externa
 backup execution, restore execution, audit deletion, external storage, production rollout, or live
 trading.
 
-Live-readiness evidence dashboards remain future Slice 058 work.
+Slice 058 adds read-only live-readiness evidence visibility. It does not complete external review,
+approve controlled rollout, authorize live trading, or change disabled live-trading configuration.
 
 Controlled paper-production rollout checklist work remains future Slice 059 work.
 

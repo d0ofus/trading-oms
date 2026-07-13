@@ -242,6 +242,17 @@ def get_operational_controls(request: Request) -> dict[str, Any]:
     return _operations_read_model().operational_controls.to_json_dict()
 
 
+@app.get("/api/live-readiness-evidence")
+def get_live_readiness_evidence(request: Request) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="live_readiness_evidence",
+        action="view",
+    )
+    return _operations_read_model().live_readiness_evidence.to_json_dict()
+
+
 @app.get("/api/audit-export-bundle")
 def get_audit_export_bundle(request: Request) -> dict[str, Any]:
     _authorize_request(

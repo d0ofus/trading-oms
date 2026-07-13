@@ -126,10 +126,10 @@ identifiers, broker hosts, or broker ports.
 
 ## Production Boundary
 
-Production-like paper operation still requires later approved work:
+Production-like paper operation still requires later approved work and review:
 
-- Slice 057 observability, retention, backup, and incident response;
-- Slice 058 live-readiness evidence dashboard;
+- Slice 057 observability, retention, backup, and incident response evidence;
+- Slice 058 read-only live-readiness evidence visibility;
 - Slice 059 controlled paper-production rollout checklist;
 - external review and explicit human approval.
 

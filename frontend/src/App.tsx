@@ -21,6 +21,7 @@ import {
   type ApprovalTicketApiView,
   type AuditEventApiView,
   type EmergencyStopApiView,
+  type LiveReadinessEvidenceApiView,
   type OperationsApiSnapshot,
   type OperationalControlsApiView,
   type OperatorSessionApiView,
@@ -96,6 +97,7 @@ const positionDetailSection = "Position detail" as const;
 const protectionMonitoringSection = "Protection monitor" as const;
 const emergencyStopSection = "Emergency stop" as const;
 const paperTradingSection = "Paper trading" as const;
+const liveReadinessEvidenceSection = "Live-readiness evidence" as const;
 const operationalControlsSection = "Operational controls" as const;
 const operatorAccessSection = "Operator access" as const;
 
@@ -120,6 +122,7 @@ const shellSections = [
   protectionMonitoringSection,
   emergencyStopSection,
   paperTradingSection,
+  liveReadinessEvidenceSection,
   operationalControlsSection,
   operatorAccessSection,
   ...workflowSections,
@@ -883,6 +886,46 @@ export function App({
           </section>
 
           <section
+            className="live-readiness-evidence-section"
+            id={sectionId(liveReadinessEvidenceSection)}
+          >
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Live-readiness evidence</p>
+                <h2>Evidence dashboard</h2>
+              </div>
+              <div className="status-strip" aria-label="Live-readiness evidence posture">
+                <StatusPill tone="good" label="Live trading disabled" />
+                <StatusPill
+                  tone={
+                    snapshot.liveReadinessEvidence.external_review_required
+                      ? "warning"
+                      : "good"
+                  }
+                  label={
+                    snapshot.liveReadinessEvidence.external_review_required
+                      ? "External review required"
+                      : "External review recorded"
+                  }
+                />
+                <StatusPill
+                  tone={
+                    snapshot.liveReadinessEvidence.explicit_human_approval_required
+                      ? "warning"
+                      : "good"
+                  }
+                  label={
+                    snapshot.liveReadinessEvidence.explicit_human_approval_required
+                      ? "Explicit human approval required"
+                      : "Explicit human approval recorded"
+                  }
+                />
+              </div>
+            </div>
+            <LiveReadinessEvidencePanel view={snapshot.liveReadinessEvidence} />
+          </section>
+
+          <section
             className="operational-controls-section"
             id={sectionId(operationalControlsSection)}
           >
@@ -1473,6 +1516,89 @@ function PaperTradingOperatorPanel({ view }: { view: PaperTradingApiView }) {
   );
 }
 
+function LiveReadinessEvidencePanel({ view }: { view: LiveReadinessEvidenceApiView }) {
+  const unresolvedEvidence = view.evidence_items.filter((item) => item.status !== "satisfied");
+
+  return (
+    <div className="detail-layout" aria-label="Live-readiness evidence records">
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Readiness result</p>
+            <h3>{formatIdentifier(view.result)}</h3>
+          </div>
+          <StatusPill
+            tone={view.result === "not_ready" ? "warning" : "info"}
+            label={formatIdentifier(view.result)}
+          />
+        </div>
+        <dl className="detail-facts compact">
+          <PostureItem label="Dashboard" value={formatIdentifier(view.dashboard_id)} />
+          <PostureItem label="Evaluated" value={view.evaluated_at} />
+          <PostureItem
+            label="Missing evidence"
+            value={`${view.missing_evidence_count}`}
+          />
+          <PostureItem
+            label="Blocked evidence"
+            value={`${view.blocking_evidence_count}`}
+          />
+          <PostureItem label="Blocking reason" value={formatIdentifier(view.blocking_reason)} />
+          <PostureItem
+            label="Live trading"
+            value={view.live_trading_enabled ? "Review required" : "Live trading disabled"}
+          />
+        </dl>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Missing evidence</p>
+            <h3>{formatCount(unresolvedEvidence.length, "item", "items")}</h3>
+          </div>
+          <StatusPill
+            tone={unresolvedEvidence.length > 0 ? "warning" : "good"}
+            label={unresolvedEvidence.length > 0 ? "Review required" : "Evidence complete"}
+          />
+        </div>
+        <div className="record-list compact-list">
+          {unresolvedEvidence.map((item) => (
+            <article className="record-row" key={item.evidence_id}>
+              <div>
+                <h3>{item.label}</h3>
+                <p>{item.summary}</p>
+              </div>
+              <StatusPill tone={evidenceStatusTone(item.status)} label={formatIdentifier(item.status)} />
+            </article>
+          ))}
+        </div>
+      </article>
+
+      <article className="detail-card">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Evidence checklist</p>
+            <h3>{formatCount(view.evidence_items.length, "record", "records")}</h3>
+          </div>
+          <StatusPill tone="neutral" label="Read only" />
+        </div>
+        <div className="record-list compact-list">
+          {view.evidence_items.map((item) => (
+            <article className="record-row" key={item.evidence_id}>
+              <div>
+                <h3>{item.label}</h3>
+                <p>{item.summary}</p>
+              </div>
+              <StatusPill tone={evidenceStatusTone(item.status)} label={formatIdentifier(item.status)} />
+            </article>
+          ))}
+        </div>
+      </article>
+    </div>
+  );
+}
+
 function OperationalControlsPanel({ view }: { view: OperationalControlsApiView }) {
   return (
     <div className="detail-layout" aria-label="Operational control records">
@@ -1855,6 +1981,16 @@ function operationalStatusTone(status: string): Tone {
     return "critical";
   }
   if (status === "warning") {
+    return "warning";
+  }
+  return "good";
+}
+
+function evidenceStatusTone(status: string): Tone {
+  if (status === "blocked") {
+    return "critical";
+  }
+  if (status === "missing" || status === "requires_external_review") {
     return "warning";
   }
   return "good";

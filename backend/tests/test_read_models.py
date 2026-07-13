@@ -13,6 +13,8 @@ from trading_oms_backend.read_models import (
     ApprovalTicketReadModel,
     AuditEventReadModel,
     EmergencyStopReadModel,
+    LiveReadinessEvidenceDashboardReadModel,
+    LiveReadinessEvidenceItemReadModel,
     OperationsReadModel,
     OperatorSessionReadModel,
     OrderReadModel,
@@ -182,6 +184,29 @@ def test_read_model_json_shapes_are_stable() -> None:
         leaves_quantity=6,
         updated_at="2026-07-08T00:06:00Z",
     )
+    live_readiness_evidence = LiveReadinessEvidenceDashboardReadModel(
+        dashboard_id="live-readiness-evidence-001",
+        evaluated_at="2026-07-08T00:08:00Z",
+        result="not_ready",
+        live_trading_enabled=False,
+        live_trading_authorized=False,
+        external_review_required=True,
+        explicit_human_approval_required=True,
+        missing_evidence_count=1,
+        blocking_evidence_count=0,
+        blocking_reason="missing_external_review",
+        evidence_items=(
+            LiveReadinessEvidenceItemReadModel(
+                evidence_id="evidence-external-review",
+                category="external_review",
+                label="External review",
+                status="missing",
+                required_for_final_review=True,
+                summary="Independent review evidence is missing",
+                source_reference="docs/live-trading-readiness-checklist",
+            ),
+        ),
+    )
 
     assert audit_event.to_json_dict() == {
         "schema_version": 1,
@@ -242,6 +267,31 @@ def test_read_model_json_shapes_are_stable() -> None:
         "cumulative_filled_quantity": 4,
         "leaves_quantity": 6,
         "updated_at": "2026-07-08T00:06:00Z",
+    }
+    assert live_readiness_evidence.to_json_dict() == {
+        "schema_version": 1,
+        "dashboard_id": "live-readiness-evidence-001",
+        "evaluated_at": "2026-07-08T00:08:00Z",
+        "result": "not_ready",
+        "live_trading_enabled": False,
+        "live_trading_authorized": False,
+        "external_review_required": True,
+        "explicit_human_approval_required": True,
+        "missing_evidence_count": 1,
+        "blocking_evidence_count": 0,
+        "blocking_reason": "missing_external_review",
+        "evidence_items": [
+            {
+                "schema_version": 1,
+                "evidence_id": "evidence-external-review",
+                "category": "external_review",
+                "label": "External review",
+                "status": "missing",
+                "required_for_final_review": True,
+                "summary": "Independent review evidence is missing",
+                "source_reference": "docs/live-trading-readiness-checklist",
+            },
+        ],
     }
 
 
@@ -351,6 +401,7 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
         "approval_tickets",
         "audit_events",
         "emergency_stop",
+        "live_readiness_evidence",
         "operational_controls",
         "operator_session",
         "orders",
@@ -386,6 +437,12 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
     assert payload["operational_controls"]["backup_restore"]["external_storage_configured"] is False
     assert payload["operational_controls"]["retention"]["destructive_retention_enabled"] is False
     assert payload["readiness"]["live_trading_authorized"] is False
+    assert payload["live_readiness_evidence"]["result"] == "not_ready"
+    assert payload["live_readiness_evidence"]["live_trading_enabled"] is False
+    assert payload["live_readiness_evidence"]["live_trading_authorized"] is False
+    assert payload["live_readiness_evidence"]["external_review_required"] is True
+    assert payload["live_readiness_evidence"]["explicit_human_approval_required"] is True
+    assert payload["live_readiness_evidence"]["missing_evidence_count"] > 0
 
 
 def test_read_model_payloads_exclude_action_broker_network_and_secret_affordance_keys() -> None:

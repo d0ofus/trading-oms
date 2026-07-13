@@ -10,6 +10,7 @@ export const READ_API_ENDPOINTS = {
   positions: "/api/positions",
   alerts: "/api/alerts",
   readiness: "/api/readiness",
+  liveReadinessEvidence: "/api/live-readiness-evidence",
   paperTrading: "/api/paper-trading",
   operationalControls: "/api/operational-controls",
 } as const;
@@ -153,6 +154,41 @@ export type ReadinessApiView = {
   live_trading_authorized: false;
 };
 
+export type LiveReadinessEvidenceItemApiView = {
+  schema_version: 1;
+  evidence_id: string;
+  category:
+    | "paper_trading"
+    | "emergency_stop"
+    | "audit_retention"
+    | "backup_restore"
+    | "incident_response"
+    | "external_review"
+    | "redaction_review"
+    | "human_approval"
+    | "network_review";
+  label: string;
+  status: "satisfied" | "missing" | "requires_external_review" | "blocked";
+  required_for_final_review: boolean;
+  summary: string;
+  source_reference: string;
+};
+
+export type LiveReadinessEvidenceApiView = {
+  schema_version: 1;
+  dashboard_id: string;
+  evaluated_at: string;
+  result: "not_ready" | "ready_for_final_review";
+  live_trading_enabled: false;
+  live_trading_authorized: false;
+  external_review_required: boolean;
+  explicit_human_approval_required: boolean;
+  missing_evidence_count: number;
+  blocking_evidence_count: number;
+  blocking_reason: string;
+  evidence_items: LiveReadinessEvidenceItemApiView[];
+};
+
 export type PaperTradingApiView = {
   schema_version: 1;
   adapter_name: string;
@@ -247,6 +283,7 @@ export type OperationsApiSnapshot = {
   positions: PositionApiView[];
   alerts: AlertApiView[];
   readiness: ReadinessApiView;
+  liveReadinessEvidence: LiveReadinessEvidenceApiView;
   paperTrading: PaperTradingApiView;
   operationalControls: OperationalControlsApiView;
 };
@@ -282,6 +319,7 @@ export type ReadApiClient = {
   getPositions: () => Promise<PositionApiView[]>;
   getAlerts: () => Promise<AlertApiView[]>;
   getReadiness: () => Promise<ReadinessApiView>;
+  getLiveReadinessEvidence: () => Promise<LiveReadinessEvidenceApiView>;
   getPaperTrading: () => Promise<PaperTradingApiView>;
   getOperationalControls: () => Promise<OperationalControlsApiView>;
   getOperationsSnapshot: () => Promise<OperationsApiSnapshot>;
@@ -345,6 +383,81 @@ export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
     required_human_action: "inspect_backend_read_api",
     live_trading_enabled: false,
     live_trading_authorized: false,
+  },
+  liveReadinessEvidence: {
+    schema_version: 1,
+    dashboard_id: "frontend-safe-fallback",
+    evaluated_at: "2026-07-08T00:08:00Z",
+    result: "not_ready",
+    live_trading_enabled: false,
+    live_trading_authorized: false,
+    external_review_required: true,
+    explicit_human_approval_required: true,
+    missing_evidence_count: 4,
+    blocking_evidence_count: 1,
+    blocking_reason: "backend_read_api_unavailable",
+    evidence_items: [
+      {
+        schema_version: 1,
+        evidence_id: "fallback-paper-trading",
+        category: "paper_trading",
+        label: "Paper trading evidence",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Backend read API unavailable",
+        source_reference: "frontend-safe-fallback",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "fallback-external-review",
+        category: "external_review",
+        label: "External review evidence",
+        status: "requires_external_review",
+        required_for_final_review: true,
+        summary: "External review evidence required",
+        source_reference: "frontend-safe-fallback",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "fallback-human-approval",
+        category: "human_approval",
+        label: "Human approval evidence",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Explicit human approval evidence is missing",
+        source_reference: "frontend-safe-fallback",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "fallback-network-review",
+        category: "network_review",
+        label: "Network exposure evidence",
+        status: "blocked",
+        required_for_final_review: true,
+        summary: "Network exposure evidence is blocked pending review",
+        source_reference: "frontend-safe-fallback",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "fallback-redaction-review",
+        category: "redaction_review",
+        label: "Redaction review evidence",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Private-value redaction review evidence is missing",
+        source_reference: "frontend-safe-fallback",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "fallback-incident-response",
+        category: "incident_response",
+        label: "Incident response evidence",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Incident-response review evidence is missing",
+        source_reference: "frontend-safe-fallback",
+      },
+    ],
   },
   paperTrading: {
     schema_version: 1,
@@ -456,6 +569,8 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
     getPositions: () => request<PositionApiView[]>(READ_API_ENDPOINTS.positions),
     getAlerts: () => request<AlertApiView[]>(READ_API_ENDPOINTS.alerts),
     getReadiness: () => request<ReadinessApiView>(READ_API_ENDPOINTS.readiness),
+    getLiveReadinessEvidence: () =>
+      request<LiveReadinessEvidenceApiView>(READ_API_ENDPOINTS.liveReadinessEvidence),
     getPaperTrading: () => request<PaperTradingApiView>(READ_API_ENDPOINTS.paperTrading),
     getOperationalControls: () =>
       request<OperationalControlsApiView>(READ_API_ENDPOINTS.operationalControls),
@@ -472,6 +587,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         positions,
         alerts,
         readiness,
+        liveReadinessEvidence,
         paperTrading,
         operationalControls,
       ] = await Promise.all([
@@ -486,6 +602,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         client.getPositions(),
         client.getAlerts(),
         client.getReadiness(),
+        client.getLiveReadinessEvidence(),
         client.getPaperTrading(),
         client.getOperationalControls(),
       ]);
@@ -502,6 +619,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         positions,
         alerts,
         readiness,
+        liveReadinessEvidence,
         paperTrading,
         operationalControls,
       };

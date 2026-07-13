@@ -148,6 +148,31 @@ const sampleSnapshot: OperationsApiSnapshot = {
     live_trading_enabled: false,
     live_trading_authorized: false,
   },
+  liveReadinessEvidence: {
+    schema_version: 1,
+    dashboard_id: "live-readiness-evidence-001",
+    evaluated_at: "2026-07-08T00:08:00Z",
+    result: "not_ready",
+    live_trading_enabled: false,
+    live_trading_authorized: false,
+    external_review_required: true,
+    explicit_human_approval_required: true,
+    missing_evidence_count: 4,
+    blocking_evidence_count: 1,
+    blocking_reason: "missing_external_review_and_human_approval",
+    evidence_items: [
+      {
+        schema_version: 1,
+        evidence_id: "evidence-external-review",
+        category: "external_review",
+        label: "External review",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Independent review evidence is missing",
+        source_reference: "docs/live-trading-readiness-checklist",
+      },
+    ],
+  },
   paperTrading: {
     schema_version: 1,
     adapter_name: "ibkr_paper",
@@ -236,6 +261,7 @@ const responseByEndpoint: Record<string, unknown> = {
   [READ_API_ENDPOINTS.positions]: sampleSnapshot.positions,
   [READ_API_ENDPOINTS.alerts]: sampleSnapshot.alerts,
   [READ_API_ENDPOINTS.readiness]: sampleSnapshot.readiness,
+  [READ_API_ENDPOINTS.liveReadinessEvidence]: sampleSnapshot.liveReadinessEvidence,
   [READ_API_ENDPOINTS.paperTrading]: sampleSnapshot.paperTrading,
   [READ_API_ENDPOINTS.operationalControls]: sampleSnapshot.operationalControls,
 };
@@ -261,6 +287,7 @@ describe("read API client", () => {
     await client.getPositions();
     await client.getAlerts();
     await client.getReadiness();
+    await client.getLiveReadinessEvidence();
     await client.getPaperTrading();
     await client.getOperationalControls();
 
@@ -305,6 +332,10 @@ describe("read API client", () => {
     expect(state.snapshot.paperTrading.paper_mode).toBe("paper");
     expect(state.snapshot.paperTrading.live_trading_enabled).toBe(false);
     expect(state.snapshot.paperTrading.requires_reconciliation).toBe(true);
+    expect(state.snapshot.liveReadinessEvidence.result).toBe("not_ready");
+    expect(state.snapshot.liveReadinessEvidence.live_trading_enabled).toBe(false);
+    expect(state.snapshot.liveReadinessEvidence.live_trading_authorized).toBe(false);
+    expect(state.snapshot.liveReadinessEvidence.external_review_required).toBe(true);
     expect(state.snapshot.operationalControls.live_trading_enabled).toBe(false);
     expect(state.snapshot.operationalControls.production_rollout_authorized).toBe(false);
     expect(state.snapshot.operationalControls.backup_restore.external_storage_configured).toBe(
