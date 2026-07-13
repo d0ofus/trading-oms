@@ -6,7 +6,8 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a read-only protection monitoring dashboard, a read-only paper trading operator section, deterministic local audit export bundles, a typed replay-only Strategy DSL, a local visual workflow builder foundation, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
-No live broker integration, production strategy engine, real alert delivery, connected UI trading workflow, or live order submission exists yet.
+No concrete IBKR application-protocol connector, authenticated broker session, production strategy
+engine, real alert delivery, production deployment, or live order submission exists.
 
 ## Safety posture
 
@@ -46,11 +47,14 @@ No live broker integration, production strategy engine, real alert delivery, con
 - Visual workflow builder behavior is local replay-only DSL preview only.
 - Local SQLite persistence behavior is local storage and journal indexing only; it rejects secrets,
   live-enabled payloads, broker routing fields, and order-transmission-shaped payloads.
-- IBKR paper adapter behavior is local configuration, state, and order-plan journaling only.
+- IBKR paper adapter behavior is a paper-only validation boundary with a localhost TCP reachability
+  probe, injected connector contracts, callback validation, and journaling. Default contract lookup
+  and order submission remain unavailable without a separately implemented connector.
 - Resilience/chaos behavior is local event journaling and risk-gate verification only.
 - Live-readiness behavior is checklist evaluation and journaling only; it cannot enable live trading.
 - Default mode is paper/simulation.
-- IBKR transport will come later as paper-only first.
+- A concrete IBKR application-protocol connector remains future, separately approved, paper-only
+  work. Local TCP reachability and injected test doubles are not paper-session evidence.
 
 ## Local verification
 
@@ -149,6 +153,8 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
 - `docs/RESILIENCE_CHAOS.md`: local reconnect, reconciliation, and chaos-test behavior.
 - `docs/LIVE_TRADING_READINESS_CHECKLIST.md`: auditable live-readiness checklist gate.
 - `docs/POST_SLICE_018_REVIEW.md`: post-queue planning boundary before any rollout work.
+- `docs/POST_SLICE_059_REVIEW.md`: evidence-backed program closeout, product traceability, and
+  blocking follow-up review after Slice 059.
 - `docs/PRODUCT_GAP_ANALYSIS.md`: post-Slice-018 product gap map and approval gates.
 - `docs/READ_MODELS.md`: typed backend read-model behavior and limitations.
 - `docs/READ_API.md`: backend read-only API endpoints and safety boundary.
