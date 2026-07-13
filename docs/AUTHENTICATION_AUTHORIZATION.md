@@ -130,7 +130,8 @@ Production-like paper operation still requires later approved work and review:
 
 - Slice 057 observability, retention, backup, and incident response evidence;
 - Slice 058 read-only live-readiness evidence visibility;
-- Slice 059 controlled paper-production rollout checklist;
+- Slice 059 fail-closed controlled paper-production rollout checklist review;
 - external review and explicit human approval.
 
-Local auth must not be treated as sufficient for production rollout.
+Local auth must not be treated as sufficient for production rollout. Slice 059 remains
+`not_ready`, and its checklist cannot authorize deployment, production operation, or live trading.

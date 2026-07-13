@@ -79,4 +79,8 @@ audit deletion, external storage, external incident tooling, or production rollo
 Slice 058 live-readiness evidence is not live-trading approval, controlled rollout approval,
 external review completion, or authorization to change disabled live-trading configuration.
 
-Controlled rollout remains later approved work.
+Slice 059 adds a fail-closed controlled paper-production rollout checklist. It records current
+evidence as `not_ready`; it does not approve, automate, or start a rollout.
+
+Checklist completion cannot authorize production operation or live trading. Any future rollout
+work remains subject to a separate explicit human approval, independent review, and new ExecPlan.

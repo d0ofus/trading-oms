@@ -48,3 +48,5 @@ The first backend readiness verifier is an audit gate only and cannot enable liv
 Only after explicit human approval, external review, paper-trading history, and readiness checklist completion.
 Slice 053 documents deployment and secrets-management planning requirements only; it does not approve
 or start controlled production rollout.
+Slice 059 documents the fail-closed controlled paper-production rollout checklist only. It does not
+start this phase, and its current result remains `not_ready`.

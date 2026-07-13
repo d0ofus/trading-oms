@@ -2334,9 +2334,11 @@ Non-goals:
 
 ## Slice 059 - controlled paper-production rollout checklist
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: F - requires separate explicit approval
+
+branch: `slice-059-controlled-paper-production-rollout-checklist`
 
 Goal:
 Prepare a controlled paper-production rollout checklist.
@@ -2346,6 +2348,25 @@ Scope:
 - external review evidence;
 - rollback and incident response evidence.
 
+Completed:
+- [x] A durable controlled paper-production rollout checklist exists.
+- [x] Evidence states and fail-closed evaluation rules are explicit.
+- [x] Paper-only entry criteria and go/no-go rules are explicit.
+- [x] External review, paper-trading history, live-readiness, secret-management, network-exposure,
+  authentication/authorization, emergency-stop, observability, audit-retention, backup/restore,
+  reconciliation, rollback, incident-response, and operator sign-off evidence are required.
+- [x] Missing and unverified current evidence remains blocking and the result is `not_ready`.
+- [x] Checklist completion cannot authorize rollout or live trading.
+- [x] No runtime, API, UI, deployment, transport, or external integration behavior is added.
+
 Non-goals:
 - live trading rollout;
 - enabling live order submission.
+
+Acceptance criteria:
+- [x] Slice 059 ExecPlan exists.
+- [x] Documentation tests enforce the checklist hard stops and required evidence categories.
+- [x] Verification passes.
+- [x] No actual rollout, production operation, live trading, live account mode, broker transport
+  change, deployment automation, public service, secret, account identifier, or safety-gate bypass
+  is added.
