@@ -64,3 +64,8 @@ Slice 058 adds `GET /api/live-readiness-evidence` and the frontend live-readines
 dashboard. The dashboard is read-only evidence visibility. It reports `not_ready` while evidence is
 missing, keeps `live_trading_enabled: false`, keeps `live_trading_authorized: false`, and cannot
 approve live trading or controlled paper rollout.
+
+Slice 059 adds a separate fail-closed checklist for production-like paper rollout evidence. Its
+current result is `not_ready`. Checklist completion cannot authorize rollout or live trading, and
+missing external review, paper-trading history, environment review, rollback, incident-response,
+and operator sign-off evidence remains blocking.

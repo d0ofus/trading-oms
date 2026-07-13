@@ -59,4 +59,6 @@ The current blockers are missing paper-trading history evidence, missing indepen
 evidence, missing redaction review evidence, missing explicit human approval evidence, and blocked
 network-exposure evidence.
 
-Slice 059 remains separate controlled paper-rollout checklist work and requires a separate approval.
+Slice 059 adds a separate controlled paper-production rollout checklist. The checklist remains
+`not_ready`, cannot mutate this dashboard, cannot authorize rollout or live trading, and requires a
+separate future approval before any rollout work.

@@ -47,6 +47,10 @@ No controlled rollout slice may start unless all of the following are true:
 - a new ExecPlan is created under `PLANS.md`;
 - the proposed scope preserves the non-negotiable safety rules in `AGENTS.md`.
 
+Slice 059 prepares the checklist used to assess those prerequisites. Checklist preparation is
+planning work, not the start of a controlled rollout. Missing prerequisite evidence must remain
+blocking, and a separate future approval is required before any rollout implementation begins.
+
 ## Recommended Next Work
 
 The next safe work is planning and review, not execution.

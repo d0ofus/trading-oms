@@ -175,7 +175,9 @@ trading.
 Slice 058 adds read-only live-readiness evidence visibility. It does not complete external review,
 approve controlled rollout, authorize live trading, or change disabled live-trading configuration.
 
-Controlled paper-production rollout checklist work remains future Slice 059 work.
+Slice 059 adds `docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md` as a fail-closed planning and
+evidence artifact. Its current result is `not_ready`. It adds no deployment automation, rollout
+executor, infrastructure, external integration, broker behavior, or operational approval.
 
 No future slice may enable live trading unless a separate live-readiness review, external review,
 and explicit human approval process later approves it. The current repository must continue to treat

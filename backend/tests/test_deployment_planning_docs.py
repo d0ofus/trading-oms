@@ -9,6 +9,12 @@ EXECPLAN_DOC = ROOT / "docs" / "execplans" / "slice-053-deployment-secrets-manag
 EMERGENCY_STOP_DOC = ROOT / "docs" / "EMERGENCY_STOP.md"
 OPERATIONS_CONTROLS_DOC = ROOT / "docs" / "OPERATIONS_CONTROLS.md"
 LIVE_READINESS_EVIDENCE_DOC = ROOT / "docs" / "LIVE_READINESS_EVIDENCE_DASHBOARD.md"
+CONTROLLED_PAPER_ROLLOUT_CHECKLIST_DOC = (
+    ROOT / "docs" / "CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+)
+SLICE_059_EXECPLAN_DOC = (
+    ROOT / "docs" / "execplans" / "slice-059-controlled-paper-production-rollout-checklist.md"
+)
 
 
 def test_slice_053_deployment_and_secrets_plan_preserves_hard_stops() -> None:
@@ -81,7 +87,56 @@ def test_slice_053_plan_does_not_document_secret_values_or_live_enablement() -> 
         assert re.search(pattern, combined, flags=re.IGNORECASE) is None
 
 
-def test_slice_058_is_ready_and_later_slices_remain_not_started() -> None:
+def test_slice_059_controlled_paper_rollout_checklist_is_fail_closed() -> None:
+    for path in (CONTROLLED_PAPER_ROLLOUT_CHECKLIST_DOC, SLICE_059_EXECPLAN_DOC):
+        assert path.exists(), f"{path.relative_to(ROOT)} is missing"
+
+    checklist_text = CONTROLLED_PAPER_ROLLOUT_CHECKLIST_DOC.read_text(encoding="utf-8")
+    required_phrases = [
+        "Planning and evidence checklist only.",
+        "Current result: `not_ready`.",
+        "Checklist completion does not authorize rollout.",
+        "Live trading remains disabled and unauthorized.",
+        "Missing, unverified, expired, or contradictory evidence is blocking.",
+        "Paper-only entry criteria",
+        "External review evidence",
+        "Paper-trading history evidence",
+        "Live-readiness evidence",
+        "Secret-management review",
+        "Network-exposure review",
+        "Authentication and authorization evidence",
+        "Emergency-stop evidence",
+        "Observability evidence",
+        "Audit-retention evidence",
+        "Backup and restore evidence",
+        "Reconciliation evidence",
+        "Rollback evidence",
+        "Incident-response evidence",
+        "Operator sign-off evidence",
+        "Explicit go/no-go rules",
+        "Separate future approval",
+        "IBKR TWS or Gateway API ports must never be exposed to the public internet.",
+    ]
+    for phrase in required_phrases:
+        assert phrase.casefold() in checklist_text.casefold()
+
+    forbidden_patterns = [
+        r"current result:\s*`ready_for_final_review`",
+        r"current result:\s*`ready_for_rollout`",
+        r"live[_ ]trading[_ ]enabled\s*[:=]\s*true",
+        r"live[_ ]trading[_ ]authorized\s*[:=]\s*true",
+        r"production rollout approved",
+        r"rollout is approved",
+        r"external review (?:is )?complete",
+        r"paper-trading history (?:is )?approved",
+        r"public ibkr ports are allowed",
+        r"-----BEGIN [A-Z ]+PRIVATE KEY-----",
+    ]
+    for pattern in forbidden_patterns:
+        assert re.search(pattern, checklist_text, flags=re.IGNORECASE) is None
+
+
+def test_slice_059_is_ready_for_review() -> None:
     slices_text = SLICES_DOC.read_text(encoding="utf-8")
 
     assert _slice_status(slices_text, "053") == "ready_for_human_review"
@@ -90,7 +145,7 @@ def test_slice_058_is_ready_and_later_slices_remain_not_started() -> None:
     assert _slice_status(slices_text, "056") == "ready_for_human_review"
     assert _slice_status(slices_text, "057") == "ready_for_human_review"
     assert _slice_status(slices_text, "058") == "ready_for_human_review"
-    assert _slice_status(slices_text, "059") == "not_started"
+    assert _slice_status(slices_text, "059") == "ready_for_human_review"
 
 
 def _slice_status(text: str, slice_id: str) -> str:
