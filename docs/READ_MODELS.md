@@ -31,6 +31,7 @@ The module provides frozen dataclasses for:
 - positions;
 - alerts;
 - live-readiness status;
+- live-readiness evidence dashboard;
 - paper trading operator visibility;
 - operations controls for observability, retention, backup/restore, and incident response;
 - aggregate operations view.
@@ -57,6 +58,10 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
 - Live trading remains disabled in the safety and readiness views.
 - Readiness views always report `live_trading_enabled: false` and
   `live_trading_authorized: false`.
+- Live-readiness evidence dashboard views always report `live_trading_enabled: false` and
+  `live_trading_authorized: false`, and may report only `not_ready` or
+  `ready_for_final_review`.
+- `ready_for_final_review` is evidence posture only and does not authorize live trading.
 - Paper trading operator views always require `paper_mode: paper` and
   `live_trading_enabled: false`.
 - Operational controls always report `live_trading_enabled: false`,
@@ -75,6 +80,8 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
 - Frontend screens consume these models for read-only inspection.
 - The paper trading operator read model is representative read-only visibility, not a live IBKR
   session.
+- The live-readiness evidence dashboard is representative read-only visibility, not approval for
+  live trading or controlled paper rollout.
 - The operations controls read model is representative read-only visibility, not external
   observability, backup execution, restore execution, audit deletion, or production rollout.
 - SQLite persistence exists as a local foundation, but these read models are not yet backed by it at

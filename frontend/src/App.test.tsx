@@ -30,6 +30,7 @@ describe("App", () => {
     expect(text).toContain("Protection monitor");
     expect(text).toContain("Emergency stop");
     expect(text).toContain("Paper trading");
+    expect(text).toContain("Live-readiness evidence");
     expect(text).toContain("Operational controls");
     expect(text).toContain("Signals");
     expect(text).toContain("Approval tickets");
@@ -280,6 +281,30 @@ describe("App", () => {
     expect(text).not.toContain("Credential");
   });
 
+  it("renders live-readiness evidence without live controls", () => {
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Live-readiness evidence");
+    expect(text).toContain("Evidence dashboard");
+    expect(text).toContain("not ready");
+    expect(text).toContain("Live trading disabled");
+    expect(text).toContain("External review required");
+    expect(text).toContain("Explicit human approval required");
+    expect(text).toContain("Paper trading evidence");
+    expect(text).toContain("Emergency stop evidence");
+    expect(text).toContain("Audit retention evidence");
+    expect(text).toContain("Backup restore evidence");
+    expect(text).toContain("Incident response evidence");
+    expect(text).toContain("Independent review evidence is missing");
+    expect(text).toContain("Explicit human approval evidence is missing");
+    expect(text).toContain("Missing evidence");
+    expect(text).not.toContain("Enable live trading");
+    expect(text).not.toContain("Connect broker");
+    expect(text).not.toContain("Transmit");
+    expect(text).not.toContain("Credential");
+  });
+
   it("renders operator access state without credential controls", () => {
     const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -486,6 +511,91 @@ const backendSnapshot: OperationsApiSnapshot = {
     required_human_action: "collect_missing_evidence",
     live_trading_enabled: false,
     live_trading_authorized: false,
+  },
+  liveReadinessEvidence: {
+    schema_version: 1,
+    dashboard_id: "live-readiness-evidence-backend",
+    evaluated_at: "2026-07-08T00:08:00Z",
+    result: "not_ready",
+    live_trading_enabled: false,
+    live_trading_authorized: false,
+    external_review_required: true,
+    explicit_human_approval_required: true,
+    missing_evidence_count: 4,
+    blocking_evidence_count: 1,
+    blocking_reason: "missing_external_review_and_human_approval",
+    evidence_items: [
+      {
+        schema_version: 1,
+        evidence_id: "evidence-paper-trading",
+        category: "paper_trading",
+        label: "Paper trading evidence",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Paper trading evidence is missing",
+        source_reference: "docs/live-trading-readiness-checklist",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "evidence-emergency-stop",
+        category: "emergency_stop",
+        label: "Emergency stop evidence",
+        status: "satisfied",
+        required_for_final_review: true,
+        summary: "Local emergency stop evidence is recorded",
+        source_reference: "docs/emergency-stop",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "evidence-audit-retention",
+        category: "audit_retention",
+        label: "Audit retention evidence",
+        status: "satisfied",
+        required_for_final_review: true,
+        summary: "Append-only retention evidence is recorded",
+        source_reference: "docs/operations-controls",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "evidence-backup-restore",
+        category: "backup_restore",
+        label: "Backup restore evidence",
+        status: "satisfied",
+        required_for_final_review: true,
+        summary: "Local backup and restore evidence is recorded",
+        source_reference: "docs/operations-controls",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "evidence-incident-response",
+        category: "incident_response",
+        label: "Incident response evidence",
+        status: "satisfied",
+        required_for_final_review: true,
+        summary: "Incident response evidence is recorded",
+        source_reference: "docs/operations-controls",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "evidence-external-review",
+        category: "external_review",
+        label: "External review evidence",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Independent review evidence is missing",
+        source_reference: "docs/live-trading-readiness-checklist",
+      },
+      {
+        schema_version: 1,
+        evidence_id: "evidence-human-approval",
+        category: "human_approval",
+        label: "Human approval evidence",
+        status: "missing",
+        required_for_final_review: true,
+        summary: "Explicit human approval evidence is missing",
+        source_reference: "docs/live-trading-readiness-checklist",
+      },
+    ],
   },
   paperTrading: {
     schema_version: 1,

@@ -51,7 +51,9 @@ IBKR TWS or Gateway API ports must never be exposed to the public internet.
 Slice 054 adds a local operator authentication and authorization foundation. Slice 055 hardens
 local operator roles and approval permissions only. Slice 056 adds a local emergency stop for
 simulation and paper-mode risk-increasing work. Slice 057 adds read-only local operating-control
-visibility for observability, retention, backup/restore posture, and incident response.
+visibility for observability, retention, backup/restore posture, and incident response. Slice 058
+adds read-only live-readiness evidence visibility for missing evidence, external review, explicit
+human approval, and final-review blockers.
 
 It is not production authentication and does not add passwords, bearer tokens, cookies, OAuth,
 API keys, certificates, private keys, identity-provider secrets, broker credentials, account
@@ -74,4 +76,7 @@ identifiers, or secrets.
 Slice 057 operating controls are not production observability, backup execution, restore execution,
 audit deletion, external storage, external incident tooling, or production rollout.
 
-Live-readiness evidence and controlled rollout remain later approved work.
+Slice 058 live-readiness evidence is not live-trading approval, controlled rollout approval,
+external review completion, or authorization to change disabled live-trading configuration.
+
+Controlled rollout remains later approved work.

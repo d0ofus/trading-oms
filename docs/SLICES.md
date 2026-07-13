@@ -2303,7 +2303,7 @@ Acceptance criteria:
 
 ## Slice 058 - live-readiness evidence dashboard
 
-status: `not_started`
+status: `ready_for_human_review`
 
 Gate: F - requires separate explicit approval
 
@@ -2314,6 +2314,17 @@ Scope:
 - evidence checklist UI;
 - readiness decision display;
 - missing evidence visibility.
+
+Completed:
+- [x] `LiveReadinessEvidenceDashboardReadModel` exposes evidence posture only.
+- [x] `GET /api/live-readiness-evidence` is read-only and requires `view_operations`.
+- [x] Frontend live-readiness evidence dashboard shows missing evidence, external review, explicit
+  human approval, paper evidence, emergency-stop evidence, audit-retention evidence,
+  backup/restore evidence, incident-response evidence, and blockers.
+- [x] Readiness results remain limited to `not_ready` or `ready_for_final_review`.
+- [x] `live_trading_enabled` and `live_trading_authorized` remain false.
+- [x] No broker transport, order path, private values, controlled rollout, or live-trading
+  enablement is added.
 
 Non-goals:
 - enabling live trading;

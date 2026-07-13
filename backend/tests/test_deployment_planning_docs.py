@@ -8,17 +8,29 @@ SECURITY_DOC = ROOT / "docs" / "SECURITY_BASELINE.md"
 EXECPLAN_DOC = ROOT / "docs" / "execplans" / "slice-053-deployment-secrets-management-plan.md"
 EMERGENCY_STOP_DOC = ROOT / "docs" / "EMERGENCY_STOP.md"
 OPERATIONS_CONTROLS_DOC = ROOT / "docs" / "OPERATIONS_CONTROLS.md"
+LIVE_READINESS_EVIDENCE_DOC = ROOT / "docs" / "LIVE_READINESS_EVIDENCE_DASHBOARD.md"
 
 
 def test_slice_053_deployment_and_secrets_plan_preserves_hard_stops() -> None:
-    for path in (PLAN_DOC, SECURITY_DOC, EXECPLAN_DOC, EMERGENCY_STOP_DOC, OPERATIONS_CONTROLS_DOC):
+    for path in (
+        PLAN_DOC,
+        SECURITY_DOC,
+        EXECPLAN_DOC,
+        EMERGENCY_STOP_DOC,
+        OPERATIONS_CONTROLS_DOC,
+        LIVE_READINESS_EVIDENCE_DOC,
+    ):
         assert path.exists(), f"{path.relative_to(ROOT)} is missing"
 
     plan_text = PLAN_DOC.read_text(encoding="utf-8")
     security_text = SECURITY_DOC.read_text(encoding="utf-8")
     emergency_stop_text = EMERGENCY_STOP_DOC.read_text(encoding="utf-8")
     operations_text = OPERATIONS_CONTROLS_DOC.read_text(encoding="utf-8")
-    combined = f"{plan_text}\n{security_text}\n{emergency_stop_text}\n{operations_text}"
+    live_readiness_evidence_text = LIVE_READINESS_EVIDENCE_DOC.read_text(encoding="utf-8")
+    combined = (
+        f"{plan_text}\n{security_text}\n{emergency_stop_text}\n"
+        f"{operations_text}\n{live_readiness_evidence_text}"
+    )
 
     required_phrases = [
         "Planning only: this document does not approve production rollout.",
@@ -42,6 +54,9 @@ def test_slice_053_deployment_and_secrets_plan_preserves_hard_stops() -> None:
         "Destructive retention is disabled.",
         "external storage not configured",
         "Incident response does not add broker-side liquidation",
+        "Slice 058 live-readiness evidence is not live-trading approval",
+        "The demo evidence dashboard reports `not_ready`.",
+        "No broker adapter, network client, external delivery, rollout executor, or action URL",
     ]
     for phrase in required_phrases:
         assert phrase in combined
@@ -66,7 +81,7 @@ def test_slice_053_plan_does_not_document_secret_values_or_live_enablement() -> 
         assert re.search(pattern, combined, flags=re.IGNORECASE) is None
 
 
-def test_slice_057_is_ready_and_later_slices_remain_not_started() -> None:
+def test_slice_058_is_ready_and_later_slices_remain_not_started() -> None:
     slices_text = SLICES_DOC.read_text(encoding="utf-8")
 
     assert _slice_status(slices_text, "053") == "ready_for_human_review"
@@ -74,8 +89,8 @@ def test_slice_057_is_ready_and_later_slices_remain_not_started() -> None:
     assert _slice_status(slices_text, "055") == "ready_for_human_review"
     assert _slice_status(slices_text, "056") == "ready_for_human_review"
     assert _slice_status(slices_text, "057") == "ready_for_human_review"
-    for slice_id in ("058", "059"):
-        assert _slice_status(slices_text, slice_id) == "not_started"
+    assert _slice_status(slices_text, "058") == "ready_for_human_review"
+    assert _slice_status(slices_text, "059") == "not_started"
 
 
 def _slice_status(text: str, slice_id: str) -> str:
