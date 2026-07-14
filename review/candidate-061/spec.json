@@ -1,0 +1,489 @@
+{
+  "baseline": {
+    "commit_sha": "2db249f7b7c239a7f09885d17f30cc8ba587afc0",
+    "subject": "Harden evidence provenance and readiness (#41)",
+    "tree_sha": "ae4caa823c99cf50a5a6f6cad744886d310b4c5e"
+  },
+  "baseline_verification": {
+    "backend_tests": {
+      "collected": 555,
+      "passed": 555
+    },
+    "checks": [
+      "Repository policy validation",
+      "Backend formatting, linting, compilation, and tests",
+      "Frontend linting, type checking, and tests",
+      "Resilience test suite"
+    ],
+    "commands": [
+      "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify.ps1"
+    ],
+    "evidence_level": "local_self_recorded",
+    "frontend_tests": {
+      "files": 15,
+      "passed": 60
+    },
+    "limitations": [
+      "Verification was executed locally by the packet preparer and has not been independently witnessed.",
+      "Integration, replay, and end-to-end verification stages remain script placeholders.",
+      "No controlled paper-production observation or live-readiness review is represented by these counts."
+    ],
+    "resilience_tests": {
+      "collected": 4,
+      "passed": 4
+    },
+    "result": "passed",
+    "tree_was_clean": true
+  },
+  "evidence_documents": [
+    {
+      "evidence_level": "documented",
+      "path": "AGENTS.md",
+      "purpose": "Repository-wide trading safety requirements and required verification workflow.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/PRODUCT_REQUIREMENTS.md",
+      "purpose": "Product intent, safety boundaries, and expected operating behavior.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/ROADMAP.md",
+      "purpose": "Delivery sequence and explicit controls on broker and rollout progression.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/SECURITY_BASELINE.md",
+      "purpose": "Current security boundary and prohibited capability inventory.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/EVIDENCE_PROVENANCE.md",
+      "purpose": "Evidence-level semantics, provenance validation, and readiness claim restrictions.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/POST_SLICE_059_REVIEW.md",
+      "purpose": "Post-milestone gap review and candidate-slice recommendations.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md",
+      "purpose": "Fourteen-category evidence gate for any future controlled paper-production decision.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/AUTHENTICATION_AUTHORIZATION.md",
+      "purpose": "Local identity and role-control implementation boundaries and limitations.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/OPERATIONS_CONTROLS.md",
+      "purpose": "Observability, retention, backup, restore, and incident-response controls.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/LIVE_TRADING_READINESS_CHECKLIST.md",
+      "purpose": "Explicit live-trading prohibition and future readiness evidence requirements.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "automated_test",
+      "path": "backend/tests/test_risk_engine.py",
+      "purpose": "Deterministic risk checks for stale data, duplicate intent, and unknown broker state.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "automated_test",
+      "path": "backend/tests/test_evidence_provenance.py",
+      "purpose": "Automated checks for evidence provenance and unsupported readiness claims.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "automated_test",
+      "path": "backend/tests/test_operational_controls.py",
+      "purpose": "Automated checks for local operational evidence and fail-closed controls.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "automated_test",
+      "path": "backend/tests/test_post_slice_059_review.py",
+      "purpose": "Automated checks for the post-Slice-059 no-go review boundary.",
+      "review_status": "pending_independent_review"
+    }
+  ],
+  "findings": [
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/POST_SLICE_059_REVIEW.md",
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "finding_id": "irp_001_independent_review_absent",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P1",
+      "summary": "No independent reviewer has accepted the architecture, controls, evidence, or readiness claims in this packet."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "finding_id": "irp_002_paper_history_absent",
+      "owner_status": "internal_owner_needed",
+      "resolution_state": "open",
+      "severity": "P1",
+      "summary": "No authenticated paper-trading observation history exists for the target operating environment."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/AUTHENTICATION_AUTHORIZATION.md",
+        "docs/SECURITY_BASELINE.md"
+      ],
+      "finding_id": "irp_003_identity_controls_local_only",
+      "owner_status": "internal_owner_needed",
+      "resolution_state": "open",
+      "severity": "P1",
+      "summary": "Identity and role controls are local foundations and are not verified for a target deployment environment."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/OPERATIONS_CONTROLS.md",
+        "docs/INCIDENT_RESPONSE.md"
+      ],
+      "finding_id": "irp_004_operational_rehearsals_absent",
+      "owner_status": "internal_owner_needed",
+      "resolution_state": "open",
+      "severity": "P1",
+      "summary": "Target-environment rollback, restore, emergency, and incident-response rehearsals have not been evidenced."
+    },
+    {
+      "blocking": false,
+      "evidence_references": [
+        "backend/pyproject.toml",
+        "backend/requirements-dev.txt"
+      ],
+      "finding_id": "irp_005_python_dependencies_unlocked",
+      "owner_status": "internal_owner_needed",
+      "resolution_state": "open",
+      "severity": "P2",
+      "summary": "Python dependencies are represented by constraints rather than a resolved lock artifact."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/EVIDENCE_PROVENANCE.md",
+        "docs/LIVE_TRADING_READINESS_CHECKLIST.md"
+      ],
+      "finding_id": "irp_006_external_evidence_absent",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P1",
+      "summary": "External operational, security, and live-readiness evidence remains missing or unverified."
+    }
+  ],
+  "packet_id": "candidate_061_independent_review_packet",
+  "reproducible_commands": [
+    "git rev-parse 2db249f7b7c239a7f09885d17f30cc8ba587afc0^{commit}",
+    "git show -s --format=%T 2db249f7b7c239a7f09885d17f30cc8ba587afc0",
+    "python -m trading_oms_backend.independent_review_packet verify --repository . --packet review/candidate-061/packet.json --digest review/candidate-061/packet.sha256",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify.ps1"
+  ],
+  "review_scope": [
+    {
+      "objective": "Assess architectural boundaries and fail-closed behavior under component and dependency failure.",
+      "scope_id": "architecture_failure_containment",
+      "title": "Architecture and failure containment"
+    },
+    {
+      "objective": "Assess declared dependencies, lock coverage, reproducibility, and supply-chain exposure.",
+      "scope_id": "dependency_supply_chain",
+      "title": "Dependency and supply-chain controls"
+    },
+    {
+      "objective": "Assess identity, role, secret-shape rejection, and network-exposure controls.",
+      "scope_id": "identity_secrets_network",
+      "title": "Identity, secrets, and network controls"
+    },
+    {
+      "objective": "Assess append-only journaling, event coverage, deterministic reconstruction, and audit exports.",
+      "scope_id": "journal_auditability",
+      "title": "Journal and auditability"
+    },
+    {
+      "objective": "Assess OMS transitions, approvals, protection, reconciliation, and emergency-stop invariants.",
+      "scope_id": "oms_approval_protection_reconciliation_emergency",
+      "title": "OMS and execution safety controls"
+    },
+    {
+      "objective": "Assess observability, retention, backup, restore, incident response, and rollout evidence.",
+      "scope_id": "operational_readiness",
+      "title": "Operational readiness"
+    },
+    {
+      "objective": "Assess provenance semantics and ensure product or readiness claims do not exceed evidence.",
+      "scope_id": "provenance_product_claims",
+      "title": "Evidence provenance and product claims"
+    },
+    {
+      "objective": "Assess risk gates, stale-data blocking, duplicate prevention, and live-trading prohibition.",
+      "scope_id": "trading_safety_risk",
+      "title": "Trading safety and risk"
+    }
+  ],
+  "schema_version": 1,
+  "traceability": [
+    {
+      "control_id": "ctrl_arch_fail_closed",
+      "evidence_level": "source_and_test",
+      "implementation_references": [
+        "docs/ARCHITECTURE.md",
+        "docs/RESILIENCE_CHAOS.md"
+      ],
+      "requirement": "Failures and unknown external state must block risk-increasing actions.",
+      "review_scope_id": "architecture_failure_containment",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_resilience.py",
+        "backend/tests/test_risk_engine.py"
+      ]
+    },
+    {
+      "control_id": "ctrl_dependency_inventory",
+      "evidence_level": "generated_manifest",
+      "implementation_references": [
+        "backend/pyproject.toml",
+        "backend/requirements-dev.txt",
+        "frontend/package-lock.json",
+        "frontend/package.json"
+      ],
+      "requirement": "Reviewers must receive deterministic dependency declarations and resolved-version evidence where available.",
+      "review_scope_id": "dependency_supply_chain",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_independent_review_packet.py"
+      ]
+    },
+    {
+      "control_id": "ctrl_identity_secret_network",
+      "evidence_level": "source_and_test",
+      "implementation_references": [
+        "docs/AUTHENTICATION_AUTHORIZATION.md",
+        "docs/SECURITY_BASELINE.md"
+      ],
+      "requirement": "Identity must be explicit, sensitive values must be rejected, and broker interfaces must remain non-public.",
+      "review_scope_id": "identity_secrets_network",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_operator_auth.py",
+        "backend/tests/test_config.py"
+      ]
+    },
+    {
+      "control_id": "ctrl_journal_coverage",
+      "evidence_level": "source_and_test",
+      "implementation_references": [
+        "docs/EVENT_JOURNAL.md",
+        "docs/AUDIT_EXPORT_BUNDLE.md"
+      ],
+      "requirement": "Critical trading and emergency transitions must be append-only, attributable, and reviewable.",
+      "review_scope_id": "journal_auditability",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_event_journal.py",
+        "backend/tests/test_audit_export.py"
+      ]
+    },
+    {
+      "control_id": "ctrl_oms_execution_gates",
+      "evidence_level": "source_and_test",
+      "implementation_references": [
+        "docs/OMS_STATE_MACHINE.md",
+        "docs/APPROVAL_TICKETS.md",
+        "docs/EMERGENCY_STOP.md"
+      ],
+      "requirement": "Order progression requires valid OMS state, passed risk, explicit approval, protection planning, reconciliation, and emergency controls.",
+      "review_scope_id": "oms_approval_protection_reconciliation_emergency",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_oms_state_machine.py",
+        "backend/tests/test_approval_tickets.py",
+        "backend/tests/test_emergency_stop.py"
+      ]
+    },
+    {
+      "control_id": "ctrl_operational_evidence",
+      "evidence_level": "documented_and_tested",
+      "implementation_references": [
+        "docs/OPERATIONS_CONTROLS.md",
+        "docs/INCIDENT_RESPONSE.md",
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "requirement": "Operational controls require attributable evidence, rehearsals, review, and an explicit no-go default.",
+      "review_scope_id": "operational_readiness",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_operational_controls.py",
+        "backend/tests/test_post_slice_059_review.py"
+      ]
+    },
+    {
+      "control_id": "ctrl_provenance_claims",
+      "evidence_level": "source_and_test",
+      "implementation_references": [
+        "docs/EVIDENCE_PROVENANCE.md",
+        "docs/LIVE_READINESS_EVIDENCE_DASHBOARD.md"
+      ],
+      "requirement": "Readiness and product claims must not exceed the provenance and recency of their supporting evidence.",
+      "review_scope_id": "provenance_product_claims",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_evidence_provenance.py",
+        "backend/tests/test_live_readiness_evidence.py"
+      ]
+    },
+    {
+      "control_id": "ctrl_trading_risk_gates",
+      "evidence_level": "source_and_test",
+      "implementation_references": [
+        "docs/RISK_ENGINE.md",
+        "docs/LIVE_TRADING_READINESS_CHECKLIST.md"
+      ],
+      "requirement": "Every risk-increasing intent must pass deterministic risk checks; stale data, duplicates, and unknown state must block progression.",
+      "review_scope_id": "trading_safety_risk",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_risk_engine.py",
+        "backend/tests/test_simulation_execution.py"
+      ]
+    }
+  ],
+  "unresolved_evidence": [
+    {
+      "blocking_reason": "Target-environment identity and permission controls have not been independently validated.",
+      "category": "authentication_authorization",
+      "evidence_references": [
+        "docs/AUTHENTICATION_AUTHORIZATION.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "Retention behavior and policy enforcement have not been demonstrated in a target environment.",
+      "category": "audit_retention",
+      "evidence_references": [
+        "docs/OPERATIONS_CONTROLS.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "Backup integrity and restore recovery have not been demonstrated in a target environment.",
+      "category": "backup_restore",
+      "evidence_references": [
+        "docs/OPERATIONS_CONTROLS.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "Emergency-stop behavior has automated local evidence but no independent or target-environment validation.",
+      "category": "emergency_stop",
+      "evidence_references": [
+        "docs/EMERGENCY_STOP.md",
+        "backend/tests/test_emergency_stop.py"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No independent reviewer has assessed or accepted this baseline or packet.",
+      "category": "external_review",
+      "evidence_references": [
+        "docs/POST_SLICE_059_REVIEW.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "No independently witnessed incident-response exercise is available.",
+      "category": "incident_response",
+      "evidence_references": [
+        "docs/INCIDENT_RESPONSE.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "The readiness model remains a local evidence summary and has not passed final review.",
+      "category": "live_readiness",
+      "evidence_references": [
+        "docs/LIVE_TRADING_READINESS_CHECKLIST.md",
+        "docs/LIVE_READINESS_EVIDENCE_DASHBOARD.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No target-environment network exposure assessment is available.",
+      "category": "network_exposure",
+      "evidence_references": [
+        "docs/SECURITY_BASELINE.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "Local observability controls have not been validated against a target environment or operational objectives.",
+      "category": "observability",
+      "evidence_references": [
+        "docs/OPERATIONS_CONTROLS.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No named operator has accepted the responsibilities or evidence for controlled operation.",
+      "category": "operator_signoff",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "No authenticated target-environment paper-trading observation history is available.",
+      "category": "paper_trading_history",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "Reconciliation has automated local evidence but no target-environment observation history.",
+      "category": "reconciliation",
+      "evidence_references": [
+        "docs/RESILIENCE_CHAOS.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No independently witnessed rollback rehearsal or rollback acceptance record is available.",
+      "category": "rollback",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "Secret-handling design is documented but not verified in a target deployment environment.",
+      "category": "secret_management",
+      "evidence_references": [
+        "docs/DEPLOYMENT_AND_SECRETS_MANAGEMENT_PLAN.md"
+      ],
+      "status": "unverified"
+    }
+  ]
+}

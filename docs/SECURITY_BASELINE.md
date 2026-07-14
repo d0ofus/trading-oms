@@ -84,3 +84,19 @@ evidence as `not_ready`; it does not approve, automate, or start a rollout.
 
 Checklist completion cannot authorize production operation or live trading. Any future rollout
 work remains subject to a separate explicit human approval, independent review, and new ExecPlan.
+
+## Independent Review Packet
+
+Candidate Slice 061 adds a local, deterministic review packet tied to the exact merged Candidate
+Slice 060 commit and tree. The packet contains only repository-derived manifests, internal
+pre-review findings, unresolved evidence, and reproducible local commands.
+
+Packet generation and verification do not use a network, API, external upload, broker transport,
+account identifier, private value, credential, deployment mechanism, or order path. Recursive
+safety validation rejects those affordances from machine-readable packet content.
+
+A valid packet digest establishes local artifact identity only. It is not independent review,
+security certification, evidence acceptance, production-readiness approval, paper-production
+rollout approval, or live-trading authorization. External-review evidence remains missing, all 14
+controlled-rollout evidence categories remain blocking, and the required decision remains
+`not_ready` / `no_go`.
