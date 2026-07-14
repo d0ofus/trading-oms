@@ -2416,3 +2416,59 @@ Acceptance criteria:
 - [x] Verification passes.
 - [x] No broker transport, external integration, rollout, production, live-order, credential,
   account-ID, or safety-gate bypass is added.
+
+---
+
+## Candidate Slice 061 - independent review packet
+
+status: `ready_for_human_review`
+
+Gate: post-Slice-059 corrective review
+
+branch: `candidate-slice-061-independent-review-packet`
+
+Goal:
+Prepare a deterministic, immutable packet through which an independent reviewer can assess the
+exact merged Candidate Slice 060 baseline without overstating local evidence or readiness.
+
+Scope:
+- exact commit and tree identity for the merged Slice 060 baseline;
+- SHA-256 source, dependency, test, verification, and evidence manifests;
+- eight-area review scope and safety-control traceability;
+- open internal findings and all 14 unresolved rollout evidence categories;
+- deterministic generation, canonical packet output, digest sidecar, and local verification;
+- a human review guide with explicit no-go and no-authorization boundaries.
+
+Completed:
+- [x] The packet is bound to commit `2db249f7b7c239a7f09885d17f30cc8ba587afc0` and tree
+  `ae4caa823c99cf50a5a6f6cad744886d310b4c5e`.
+- [x] The source manifest covers every tracked blob in the baseline Git tree.
+- [x] Dependency, test, local verification, evidence-document, traceability, finding, and
+  unresolved-evidence sections have deterministic content digests.
+- [x] Every evidence document and safety control remains pending independent review.
+- [x] External review remains missing; zero evidence categories are verified and all 14 remain
+  blocking.
+- [x] Packet status is `not_independently_reviewed`, readiness is `not_ready`, and the decision is
+  `no_go`.
+- [x] Recursive safety validation rejects secret-shaped fields, account identifiers, private
+  values, unsafe URLs, broker-routing fields, order affordances, and true authorization flags.
+- [x] Generation and verification are local-only and add no API, external delivery, or network
+  integration.
+
+Non-goals:
+- performing or claiming independent review;
+- collecting or verifying target-environment operational evidence;
+- IBKR connectivity, order submission, callbacks, credentials, or account identifiers;
+- external upload, deployment, rollout, production operation, or live trading;
+- Candidate Slice 062 behavior.
+
+Acceptance criteria:
+- [x] Candidate Slice 061 ExecPlan exists.
+- [x] Failing-first tests cover identity, completeness, determinism, tamper rejection, safety
+  scanning, and the no-integration boundary.
+- [x] The checked-in machine packet exactly matches deterministic regeneration and its digest
+  sidecar.
+- [x] The human guide provides reproducible commands and states that artifact verification is not
+  independent acceptance.
+- [x] No live trading, broker transport, order path, private value, external integration,
+  deployment, rollout, production operation, or safety-gate bypass is added.

@@ -56,6 +56,9 @@ engine, real alert delivery, production deployment, or live order submission exi
   and order submission remain unavailable without a separately implemented connector.
 - Resilience/chaos behavior is local event journaling and risk-gate verification only.
 - Live-readiness behavior is checklist evaluation and journaling only; it cannot enable live trading.
+- The Candidate Slice 061 independent-review packet is an internally prepared, deterministic
+  inventory of the exact merged Slice 060 baseline. It remains not independently reviewed,
+  reports `not_ready` and `no_go`, and leaves all 14 rollout evidence categories blocking.
 - Default mode is paper/simulation.
 - A concrete IBKR application-protocol connector remains future, separately approved, paper-only
   work. Local TCP reachability and injected test doubles are not paper-session evidence.
@@ -163,6 +166,10 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
 - `docs/READ_MODELS.md`: typed backend read-model behavior and limitations.
 - `docs/READ_API.md`: backend read-only API endpoints and safety boundary.
 - `docs/EVIDENCE_PROVENANCE.md`: read API provenance labels and fail-closed readiness evidence.
+- `review/candidate-061/REVIEW_GUIDE.md`: human entry point for the immutable Slice 060 review
+  packet, its reproduction procedure, and its no-authorization boundary.
+- `review/candidate-061/packet.json`: deterministic machine-readable source, dependency, test,
+  verification, evidence, traceability, finding, and unresolved-evidence inventory.
 - `docs/SIMULATION_APPROVAL_API.md`: simulation-only approval decision endpoints.
 - `docs/FRONTEND_READ_API_CLIENT.md`: frontend read API client and safe loading states.
 - `docs/ROADMAP.md`: staged roadmap.
