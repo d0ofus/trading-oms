@@ -22,6 +22,82 @@ class ReadModelError(ValueError):
     """Raised when an inspection read model is invalid."""
 
 
+OPERATIONS_READ_RESOURCES = (
+    "emergency_stop",
+    "operator_session",
+    "safety",
+    "audit_events",
+    "signals",
+    "risk_decisions",
+    "approval_tickets",
+    "orders",
+    "positions",
+    "alerts",
+    "readiness",
+    "paper_trading",
+    "operational_controls",
+    "live_readiness_evidence",
+)
+
+PROVENANCE_CLASSIFICATIONS = {
+    "representative",
+    "demo",
+    "simulated",
+    "local_only",
+    "test_double",
+    "adapter_only",
+    "externally_unverified",
+}
+
+
+@dataclass(frozen=True)
+class ReadModelProvenance:
+    resource: str
+    source: str
+    classifications: tuple[str, ...]
+    broker_derived: bool
+    externally_verified: bool
+    summary: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        if self.resource not in OPERATIONS_READ_RESOURCES:
+            raise ReadModelError("resource must be a known operations read resource")
+        _validated_identifier(self.source, "source")
+        _validated_identifier_tuple(self.classifications, "classifications")
+        if len(set(self.classifications)) != len(self.classifications):
+            raise ReadModelError("classifications must not contain duplicates")
+        if any(
+            classification not in PROVENANCE_CLASSIFICATIONS
+            for classification in self.classifications
+        ):
+            raise ReadModelError(
+                "classifications must contain only known provenance classification"
+            )
+        if "externally_unverified" not in self.classifications:
+            raise ReadModelError("classifications must include externally_unverified")
+        _validated_bool(self.broker_derived, "broker_derived")
+        if self.broker_derived is not False:
+            raise ReadModelError("broker_derived must remain false")
+        _validated_bool(self.externally_verified, "externally_verified")
+        if self.externally_verified is not False:
+            raise ReadModelError("externally_verified must remain false")
+        _validated_operational_text(self.summary, "summary")
+        _assert_json_serializable(self.to_json_dict(), "read model provenance")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "resource": self.resource,
+            "source": self.source,
+            "classifications": list(self.classifications),
+            "broker_derived": self.broker_derived,
+            "externally_verified": self.externally_verified,
+            "summary": self.summary,
+        }
+
+
 @dataclass(frozen=True)
 class SafetyPostureReadModel:
     app_env: str
@@ -855,23 +931,29 @@ class LiveReadinessEvidenceItemReadModel:
         _validate_schema_version(self.schema_version)
         _validated_operational_text(self.evidence_id, "evidence_id")
         if self.category not in {
-            "paper_trading",
+            "external_review",
+            "paper_trading_history",
+            "live_readiness",
+            "secret_management",
+            "network_exposure",
+            "authentication_authorization",
             "emergency_stop",
+            "observability",
             "audit_retention",
             "backup_restore",
+            "reconciliation",
+            "rollback",
             "incident_response",
-            "external_review",
-            "redaction_review",
-            "human_approval",
-            "network_review",
+            "operator_signoff",
         }:
             raise ReadModelError("category must be a known evidence category")
         _validated_operational_text(self.label, "label")
         if self.status not in {
-            "satisfied",
+            "verified",
             "missing",
-            "requires_external_review",
-            "blocked",
+            "unverified",
+            "expired",
+            "contradictory",
         }:
             raise ReadModelError("status must be a known evidence status")
         _validated_bool(self.required_for_final_review, "required_for_final_review")
@@ -901,7 +983,11 @@ class LiveReadinessEvidenceDashboardReadModel:
     live_trading_authorized: bool
     external_review_required: bool
     explicit_human_approval_required: bool
+    verified_evidence_count: int
     missing_evidence_count: int
+    unverified_evidence_count: int
+    expired_evidence_count: int
+    contradictory_evidence_count: int
     blocking_evidence_count: int
     blocking_reason: str
     evidence_items: tuple[LiveReadinessEvidenceItemReadModel, ...]
@@ -924,7 +1010,15 @@ class LiveReadinessEvidenceDashboardReadModel:
             self.explicit_human_approval_required,
             "explicit_human_approval_required",
         )
-        _nonnegative_integer(self.missing_evidence_count, "missing_evidence_count")
+        count_fields = {
+            "verified": self.verified_evidence_count,
+            "missing": self.missing_evidence_count,
+            "unverified": self.unverified_evidence_count,
+            "expired": self.expired_evidence_count,
+            "contradictory": self.contradictory_evidence_count,
+        }
+        for status, count in count_fields.items():
+            _nonnegative_integer(count, f"{status}_evidence_count")
         _nonnegative_integer(self.blocking_evidence_count, "blocking_evidence_count")
         _validated_operational_text(self.blocking_reason, "blocking_reason")
         _validated_model_tuple(
@@ -934,28 +1028,36 @@ class LiveReadinessEvidenceDashboardReadModel:
         )
         if not self.evidence_items:
             raise ReadModelError("live readiness evidence must include evidence items")
-        missing_count = sum(item.status == "missing" for item in self.evidence_items)
-        blocking_count = sum(item.status == "blocked" for item in self.evidence_items)
-        if self.missing_evidence_count != missing_count:
-            raise ReadModelError("missing_evidence_count must match evidence items")
+        actual_counts = {
+            status: sum(item.status == status for item in self.evidence_items)
+            for status in count_fields
+        }
+        for status, expected_count in count_fields.items():
+            if expected_count != actual_counts[status]:
+                raise ReadModelError(f"{status}_evidence_count must match evidence items")
+        blocking_count = sum(
+            item.required_for_final_review and item.status != "verified"
+            for item in self.evidence_items
+        )
         if self.blocking_evidence_count != blocking_count:
-            raise ReadModelError("blocking_evidence_count must match evidence items")
+            raise ReadModelError(
+                "blocking_evidence_count must include every nonverified mandatory item"
+            )
         if self.result == "not_ready" and not (
-            self.missing_evidence_count
-            or self.blocking_evidence_count
+            self.blocking_evidence_count
             or self.external_review_required
             or self.explicit_human_approval_required
         ):
             raise ReadModelError("not_ready evidence must include a review gap")
         if self.result == "ready_for_final_review":
             if (
-                self.missing_evidence_count
-                or self.blocking_evidence_count
+                self.blocking_evidence_count
                 or self.external_review_required
                 or self.explicit_human_approval_required
-                or any(item.status != "satisfied" for item in self.evidence_items)
+                or self.verified_evidence_count != len(self.evidence_items)
+                or any(item.status != "verified" for item in self.evidence_items)
             ):
-                raise ReadModelError("ready_for_final_review evidence must be satisfied")
+                raise ReadModelError("ready_for_final_review evidence must be verified")
         _assert_json_serializable(
             self.to_json_dict(),
             "live readiness evidence dashboard read model",
@@ -971,7 +1073,11 @@ class LiveReadinessEvidenceDashboardReadModel:
             "live_trading_authorized": self.live_trading_authorized,
             "external_review_required": self.external_review_required,
             "explicit_human_approval_required": self.explicit_human_approval_required,
+            "verified_evidence_count": self.verified_evidence_count,
             "missing_evidence_count": self.missing_evidence_count,
+            "unverified_evidence_count": self.unverified_evidence_count,
+            "expired_evidence_count": self.expired_evidence_count,
+            "contradictory_evidence_count": self.contradictory_evidence_count,
             "blocking_evidence_count": self.blocking_evidence_count,
             "blocking_reason": self.blocking_reason,
             "evidence_items": [item.to_json_dict() for item in self.evidence_items],
@@ -994,6 +1100,7 @@ class OperationsReadModel:
     live_readiness_evidence: LiveReadinessEvidenceDashboardReadModel
     paper_trading: PaperTradingOperatorReadModel
     operational_controls: OperationalControlsReadModel
+    provenance: tuple[ReadModelProvenance, ...]
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -1024,11 +1131,45 @@ class OperationsReadModel:
             OperationalControlsReadModel,
             "operational_controls",
         )
+        _validated_model_tuple(self.provenance, ReadModelProvenance, "provenance")
+        resources = tuple(item.resource for item in self.provenance)
+        if len(set(resources)) != len(resources):
+            raise ReadModelError("provenance resources must not contain duplicates")
+        if set(resources) != set(OPERATIONS_READ_RESOURCES):
+            raise ReadModelError("provenance must cover every operations read resource")
         _assert_json_serializable(self.to_json_dict(), "operations read model")
+
+    def provenance_for(self, resource: str) -> ReadModelProvenance:
+        if resource not in OPERATIONS_READ_RESOURCES:
+            raise ReadModelError("resource must be a known operations read resource")
+        return next(item for item in self.provenance if item.resource == resource)
+
+    def resource_data(self, resource: str) -> dict[str, Any] | list[dict[str, Any]]:
+        if resource not in OPERATIONS_READ_RESOURCES:
+            raise ReadModelError("resource must be a known operations read resource")
+        value = getattr(self, resource)
+        if isinstance(value, tuple):
+            return [item.to_json_dict() for item in value]
+        return value.to_json_dict()
+
+    def to_api_envelope(
+        self,
+        resource: str,
+        *,
+        data_override: dict[str, Any] | list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        provenance = self.provenance_for(resource)
+        return {
+            "schema_version": self.schema_version,
+            "resource": resource,
+            "provenance": provenance.to_json_dict(),
+            "data": self.resource_data(resource) if data_override is None else data_override,
+        }
 
     def to_json_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
+            "provenance": {item.resource: item.to_json_dict() for item in self.provenance},
             "emergency_stop": self.emergency_stop.to_json_dict(),
             "safety": self.safety.to_json_dict(),
             "operator_session": self.operator_session.to_json_dict(),
@@ -1177,92 +1318,14 @@ def build_demo_operations_read_model(
             live_trading_authorized=False,
             external_review_required=True,
             explicit_human_approval_required=True,
-            missing_evidence_count=4,
-            blocking_evidence_count=1,
-            blocking_reason="missing_external_review_and_human_approval",
-            evidence_items=(
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-paper-trading",
-                    category="paper_trading",
-                    label="Paper trading evidence",
-                    status="missing",
-                    required_for_final_review=True,
-                    summary="Paper trading history evidence is missing",
-                    source_reference="docs/live-trading-readiness-checklist",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-emergency-stop",
-                    category="emergency_stop",
-                    label="Emergency stop evidence",
-                    status="satisfied",
-                    required_for_final_review=True,
-                    summary="Local emergency stop evidence is recorded",
-                    source_reference="docs/emergency-stop",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-audit-retention",
-                    category="audit_retention",
-                    label="Audit retention evidence",
-                    status="satisfied",
-                    required_for_final_review=True,
-                    summary="Append-only retention evidence is recorded",
-                    source_reference="docs/operations-controls",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-backup-restore",
-                    category="backup_restore",
-                    label="Backup restore evidence",
-                    status="satisfied",
-                    required_for_final_review=True,
-                    summary="Local backup and restore evidence is recorded",
-                    source_reference="docs/operations-controls",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-incident-response",
-                    category="incident_response",
-                    label="Incident response evidence",
-                    status="missing",
-                    required_for_final_review=True,
-                    summary="Incident-response review evidence is missing",
-                    source_reference="docs/operations-controls",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-external-review",
-                    category="external_review",
-                    label="External review evidence",
-                    status="requires_external_review",
-                    required_for_final_review=True,
-                    summary="Independent review evidence is required",
-                    source_reference="docs/live-trading-readiness-checklist",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-redaction-review",
-                    category="redaction_review",
-                    label="Redaction review evidence",
-                    status="missing",
-                    required_for_final_review=True,
-                    summary="Private-value redaction review evidence is missing",
-                    source_reference="docs/deployment-and-private-value-plan",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-human-approval",
-                    category="human_approval",
-                    label="Human approval evidence",
-                    status="missing",
-                    required_for_final_review=True,
-                    summary="Explicit human approval evidence is missing",
-                    source_reference="docs/live-trading-readiness-checklist",
-                ),
-                LiveReadinessEvidenceItemReadModel(
-                    evidence_id="evidence-network-review",
-                    category="network_review",
-                    label="Network exposure evidence",
-                    status="blocked",
-                    required_for_final_review=True,
-                    summary="Network exposure evidence is blocked pending independent review",
-                    source_reference="docs/security-baseline",
-                ),
-            ),
+            verified_evidence_count=0,
+            missing_evidence_count=6,
+            unverified_evidence_count=8,
+            expired_evidence_count=0,
+            contradictory_evidence_count=0,
+            blocking_evidence_count=14,
+            blocking_reason="missing_and_unverified_controlled_rollout_evidence",
+            evidence_items=_demo_live_readiness_evidence_items(),
         ),
         paper_trading=PaperTradingOperatorReadModel(
             adapter_name="ibkr_paper",
@@ -1371,6 +1434,178 @@ def build_demo_operations_read_model(
                 last_reviewed_at="2026-07-08T00:07:00Z",
             ),
         ),
+        provenance=_demo_operations_provenance(),
+    )
+
+
+def _demo_operations_provenance() -> tuple[ReadModelProvenance, ...]:
+    simulated_resources = {
+        "audit_events",
+        "signals",
+        "risk_decisions",
+        "approval_tickets",
+        "orders",
+        "positions",
+        "alerts",
+        "readiness",
+    }
+    records: list[ReadModelProvenance] = []
+    for resource in OPERATIONS_READ_RESOURCES:
+        if resource in simulated_resources:
+            classifications = (
+                "representative",
+                "demo",
+                "simulated",
+                "local_only",
+                "externally_unverified",
+            )
+            summary = "Representative local simulation data; not external evidence"
+        elif resource == "paper_trading":
+            classifications = (
+                "representative",
+                "demo",
+                "local_only",
+                "test_double",
+                "adapter_only",
+                "externally_unverified",
+            )
+            summary = "Representative adapter state; not an authenticated IBKR paper session"
+        elif resource in {"operational_controls", "live_readiness_evidence"}:
+            classifications = (
+                "representative",
+                "demo",
+                "local_only",
+                "externally_unverified",
+            )
+            summary = "Representative local planning posture; not external evidence"
+        else:
+            classifications = ("local_only", "externally_unverified")
+            summary = "Current in-process local state; not external evidence"
+        records.append(
+            ReadModelProvenance(
+                resource=resource,
+                source="local_demo_read_model",
+                classifications=classifications,
+                broker_derived=False,
+                externally_verified=False,
+                summary=summary,
+            )
+        )
+    return tuple(records)
+
+
+def _demo_live_readiness_evidence_items() -> tuple[LiveReadinessEvidenceItemReadModel, ...]:
+    items = (
+        (
+            "external-review",
+            "external_review",
+            "External review evidence",
+            "missing",
+            "No independent scoped review record is attached",
+        ),
+        (
+            "paper-trading-history",
+            "paper_trading_history",
+            "Paper-trading history evidence",
+            "missing",
+            "No reviewed real paper-session history is attached",
+        ),
+        (
+            "live-readiness",
+            "live_readiness",
+            "Live-readiness evidence",
+            "unverified",
+            "Local dashboard remains not ready and is not external evidence",
+        ),
+        (
+            "secret-management",
+            "secret_management",
+            "Secret-management review",
+            "unverified",
+            "Requirements exist without a target-environment review",
+        ),
+        (
+            "network-exposure",
+            "network_exposure",
+            "Network-exposure review",
+            "missing",
+            "No reviewed target-environment network evidence is attached",
+        ),
+        (
+            "authentication-authorization",
+            "authentication_authorization",
+            "Authentication and authorization evidence",
+            "unverified",
+            "Local development authentication is not production evidence",
+        ),
+        (
+            "emergency-stop",
+            "emergency_stop",
+            "Emergency-stop evidence",
+            "unverified",
+            "Local implementation exists without a target-environment rehearsal",
+        ),
+        (
+            "observability",
+            "observability",
+            "Observability evidence",
+            "unverified",
+            "Local read-only visibility is not operating-environment evidence",
+        ),
+        (
+            "audit-retention",
+            "audit_retention",
+            "Audit-retention evidence",
+            "unverified",
+            "Local append-only policy has no operational retention review",
+        ),
+        (
+            "backup-restore",
+            "backup_restore",
+            "Backup and restore evidence",
+            "unverified",
+            "Local planning exists without a target-environment restore rehearsal",
+        ),
+        (
+            "reconciliation",
+            "reconciliation",
+            "Reconciliation evidence",
+            "unverified",
+            "Deterministic local tests are not real paper-session evidence",
+        ),
+        (
+            "rollback",
+            "rollback",
+            "Rollback evidence",
+            "missing",
+            "No reviewed rollback rehearsal record is attached",
+        ),
+        (
+            "incident-response",
+            "incident_response",
+            "Incident-response evidence",
+            "missing",
+            "No reviewed incident exercise record is attached",
+        ),
+        (
+            "operator-signoff",
+            "operator_signoff",
+            "Operator sign-off evidence",
+            "missing",
+            "Required scoped human sign-offs are not attached",
+        ),
+    )
+    return tuple(
+        LiveReadinessEvidenceItemReadModel(
+            evidence_id=f"evidence-{identifier}",
+            category=category,
+            label=label,
+            status=status,
+            required_for_final_review=True,
+            summary=summary,
+            source_reference="docs/controlled-paper-production-rollout-checklist",
+        )
+        for identifier, category, label, status, summary in items
     )
 
 

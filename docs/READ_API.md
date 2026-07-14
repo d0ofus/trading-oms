@@ -25,8 +25,12 @@ The backend exposes:
 - `GET /api/operational-controls`
 - `GET /api/audit-export-bundle`
 
-The section routes from `/api/emergency-stop` through `/api/live-readiness-evidence` return the
-matching section from `build_demo_operations_read_model()` or current local in-process state.
+The operations section routes from `/api/emergency-stop` through
+`/api/live-readiness-evidence` return a versioned envelope containing `resource`, `provenance`, and
+`data`. The `data` field contains the matching section from `build_demo_operations_read_model()` or
+current local in-process state. The provenance field identifies representative, demo, simulated,
+local-only, test-double, adapter-only, and externally unverified data as applicable. See
+`docs/EVIDENCE_PROVENANCE.md`.
 
 `GET /api/audit-export-bundle` returns a deterministic local review bundle built from the current
 read-model snapshot, workflow definitions, workflow simulation run records, and journal records. It
@@ -46,14 +50,18 @@ present.
 - Only `GET` handlers are implemented for these API views.
 - `POST`, `PUT`, `PATCH`, and `DELETE` are not implemented for these routes.
 - Responses expose inspection data only.
+- Every operations response says whether its data is broker-derived and externally verified. Both
+  values are false for the current local/demo implementation.
 - `GET /api/emergency-stop` exposes local emergency stop state only; admin-only activation and
   deactivation endpoints are documented in `docs/EMERGENCY_STOP.md`.
-- `GET /api/paper-trading` exposes paper-only operator visibility only, with no broker controls.
+- `GET /api/paper-trading` exposes representative adapter/test-double visibility only, with no
+  broker controls; it is not evidence of an authenticated IBKR paper session.
 - `GET /api/operational-controls` exposes local observability, retention, backup/restore, and
   incident-response posture only, with no external sinks, deletion executors, backup executors,
   restore commands, rollout controls, or broker controls.
-- `GET /api/live-readiness-evidence` exposes evidence posture only, including missing evidence and
-  final-review blockers. It cannot authorize live trading or controlled paper rollout.
+- `GET /api/live-readiness-evidence` exposes evidence posture only. Missing, unverified, expired,
+  and contradictory mandatory evidence all block final review. It cannot authorize live trading or
+  controlled paper rollout.
 - Responses do not expose submit, approve, reject, cancel, connect, transmit, credential, token,
   password, account, host, port, route, socket, or secret affordance keys.
 - Readiness responses keep `live_trading_enabled: false` and
@@ -65,6 +73,8 @@ present.
 ## Current Limitations
 
 - The endpoints use safe static demo read-model data.
+- The provenance envelope is metadata only and cannot make representative or local-only data into
+  broker-derived or externally verified evidence.
 - SQLite persistence exists as a local foundation, but these endpoints still use safe static demo
   read-model data.
 - Frontend screens consume these endpoints for read-only inspection and safe fallback rendering.

@@ -67,13 +67,13 @@ def test_read_only_api_endpoints_return_expected_read_model_sections(
     _set_safe_env(monkeypatch)
     reset_emergency_stop_service()
     client = TestClient(app)
-    expected = build_demo_operations_read_model().to_json_dict()
+    expected = build_demo_operations_read_model()
 
     for path, section_name in READ_ENDPOINTS.items():
         response = client.get(path)
 
         assert response.status_code == 200
-        assert response.json() == expected[section_name]
+        assert response.json() == expected.to_api_envelope(section_name)
 
 
 def test_read_only_api_endpoints_do_not_implement_mutation_methods(

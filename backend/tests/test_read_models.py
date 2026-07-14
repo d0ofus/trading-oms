@@ -192,8 +192,12 @@ def test_read_model_json_shapes_are_stable() -> None:
         live_trading_authorized=False,
         external_review_required=True,
         explicit_human_approval_required=True,
+        verified_evidence_count=0,
         missing_evidence_count=1,
-        blocking_evidence_count=0,
+        unverified_evidence_count=0,
+        expired_evidence_count=0,
+        contradictory_evidence_count=0,
+        blocking_evidence_count=1,
         blocking_reason="missing_external_review",
         evidence_items=(
             LiveReadinessEvidenceItemReadModel(
@@ -277,8 +281,12 @@ def test_read_model_json_shapes_are_stable() -> None:
         "live_trading_authorized": False,
         "external_review_required": True,
         "explicit_human_approval_required": True,
+        "verified_evidence_count": 0,
         "missing_evidence_count": 1,
-        "blocking_evidence_count": 0,
+        "unverified_evidence_count": 0,
+        "expired_evidence_count": 0,
+        "contradictory_evidence_count": 0,
+        "blocking_evidence_count": 1,
         "blocking_reason": "missing_external_review",
         "evidence_items": [
             {
@@ -407,6 +415,7 @@ def test_demo_operations_read_model_contains_every_expected_read_section() -> No
         "orders",
         "paper_trading",
         "positions",
+        "provenance",
         "readiness",
         "risk_decisions",
         "safety",

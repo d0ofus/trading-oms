@@ -158,7 +158,7 @@ def test_operational_controls_api_is_read_only_and_safe(monkeypatch: MonkeyPatch
     payload = response.json()
 
     assert response.status_code == 200
-    assert payload == build_demo_operations_read_model().operational_controls.to_json_dict()
+    assert payload == build_demo_operations_read_model().to_api_envelope("operational_controls")
     assert client.post("/api/operational-controls").status_code == 405
     assert client.put("/api/operational-controls").status_code == 405
     assert client.patch("/api/operational-controls").status_code == 405

@@ -30,6 +30,8 @@ engine, real alert delivery, production deployment, or live order submission exi
 - Operations shell records are backend-derived read-only inspection data with a safe fallback.
 - Backend read models are local read-only inspection summaries only.
 - Backend read API endpoints are `GET`-only inspection views backed by local demo read data.
+- Operations read API responses carry explicit provenance; current data is not broker-derived and
+  remains externally unverified.
 - Frontend read API client calls are `GET`-only and fall back to a safe no-live-trading posture.
 - Audit explorer behavior is read-only filtering and detail inspection with secret-shaped text
   redaction.
@@ -41,6 +43,8 @@ engine, real alert delivery, production deployment, or live order submission exi
   missing-protection states, and local critical/emergency alerts.
 - Paper trading operator behavior is read-only paper-state visibility and cannot connect, submit,
   transmit, route, cancel, modify, or configure broker connectivity.
+- Paper trading operator data is representative adapter/test-double state, not an authenticated
+  IBKR paper session or paper-trading history evidence.
 - Audit export behavior is deterministic local JSON output with recursive safety scanning and no
   external delivery.
 - Strategy DSL behavior is local replay-only validation and signal generation only.
@@ -158,6 +162,7 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
 - `docs/PRODUCT_GAP_ANALYSIS.md`: post-Slice-018 product gap map and approval gates.
 - `docs/READ_MODELS.md`: typed backend read-model behavior and limitations.
 - `docs/READ_API.md`: backend read-only API endpoints and safety boundary.
+- `docs/EVIDENCE_PROVENANCE.md`: read API provenance labels and fail-closed readiness evidence.
 - `docs/SIMULATION_APPROVAL_API.md`: simulation-only approval decision endpoints.
 - `docs/FRONTEND_READ_API_CLIENT.md`: frontend read API client and safe loading states.
 - `docs/ROADMAP.md`: staged roadmap.
