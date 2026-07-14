@@ -45,6 +45,7 @@ a {
 .protection-monitor-section h2,
 .emergency-stop-section h2,
 .paper-trading-section h2,
+.provenance-section h2,
 .operational-controls-section h2,
 .approval-inbox-section h2,
 .builder-section h2,
@@ -221,12 +222,53 @@ dd {
 .protection-monitor-section,
 .emergency-stop-section,
 .paper-trading-section,
+.provenance-section,
 .operational-controls-section,
 .approval-inbox-section,
 .workflow-section {
   border: 1px solid #d9ded5;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.provenance-section {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.provenance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.provenance-notice {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(240px, 1.3fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid #e2c87d;
+  border-radius: 6px;
+  background: #fffaf0;
+  padding: 12px;
+}
+
+.provenance-notice p,
+.provenance-notice strong {
+  margin: 0;
+}
+
+.provenance-notice strong {
+  display: block;
+  color: #815400;
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.provenance-notice .status-strip {
+  justify-content: flex-start;
 }
 
 .summary-panel {
@@ -1126,6 +1168,8 @@ dd {
   .detail-facts,
   .detail-facts.compact,
   .audit-explorer-layout,
+  .provenance-grid,
+  .provenance-notice,
   .section-grid {
     grid-template-columns: 1fr;
   }

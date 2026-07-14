@@ -32,6 +32,10 @@ The response includes:
 All fields are inspection data only. The endpoint has no mutation methods and does not connect,
 upload, download, delete, restore, submit, transmit, route, or deliver anything.
 
+The API provenance envelope labels this view `local_only` and `externally_unverified`. An `ok`
+local metric or a documented local plan describes local state only; it is not independently
+reviewed controlled-rollout evidence.
+
 ## Observability
 
 Slice 057 observability is local status visibility only.
@@ -92,6 +96,8 @@ transmit, live account mode, or production rollout behavior.
 ## Current Limitations
 
 - Operating controls use safe local read-model data.
+- Emergency-stop, observability, retention, backup/restore, and reconciliation artifacts remain
+  `unverified` in the live-readiness dashboard until separate external evidence is reviewed.
 - There is no external observability integration.
 - There is no backup executor or restore executor.
 - There is no audit-retention deletion executor.

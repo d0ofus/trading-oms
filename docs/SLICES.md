@@ -2370,3 +2370,49 @@ Acceptance criteria:
 - [x] No actual rollout, production operation, live trading, live account mode, broker transport
   change, deployment automation, public service, secret, account identifier, or safety-gate bypass
   is added.
+
+---
+
+## Candidate Slice 060 - evidence provenance and readiness contradiction hardening
+
+status: `ready_for_human_review`
+
+Gate: post-Slice-059 corrective review
+
+branch: `candidate-slice-060-evidence-provenance-hardening`
+
+Goal:
+Make representative data and unresolved rollout evidence impossible to mistake for broker-derived
+or externally verified evidence.
+
+Scope:
+- versioned provenance envelopes for operations read APIs;
+- visible provenance labels in API-backed frontend views;
+- checklist-aligned readiness categories and evidence states;
+- fail-closed handling of missing, unverified, expired, and contradictory mandatory evidence.
+
+Completed:
+- [x] All 14 operations read resources expose typed provenance metadata.
+- [x] Current data is explicitly not broker-derived and externally unverified.
+- [x] Simulation data is labeled representative, demo, simulated, and local-only.
+- [x] Paper operator data is labeled representative, demo, local-only, test-double, and
+  adapter-only, and states that it is not an authenticated IBKR paper session.
+- [x] Frontend envelope validation falls back safely on unknown or unsafe provenance.
+- [x] Readiness evidence uses the Slice 059 categories and the `verified`, `missing`, `unverified`,
+  `expired`, and `contradictory` states.
+- [x] Every non-verified mandatory item blocks readiness.
+- [x] Local emergency-stop, observability, retention, backup/restore, and reconciliation artifacts
+  remain unverified instead of being reported as satisfied external evidence.
+
+Non-goals:
+- IBKR connectivity, session authentication, contract lookup, orders, or callbacks;
+- credentials, account identifiers, external integrations, deployment, or rollout;
+- production operation or live trading.
+
+Acceptance criteria:
+- [x] Candidate Slice 060 ExecPlan exists.
+- [x] Backend and frontend tests cover provenance and contradiction hardening.
+- [x] Local runtime inspection confirms visible provenance and a fail-closed readiness result.
+- [x] Verification passes.
+- [x] No broker transport, external integration, rollout, production, live-order, credential,
+  account-ID, or safety-gate bypass is added.

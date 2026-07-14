@@ -15,6 +15,57 @@ export const READ_API_ENDPOINTS = {
   operationalControls: "/api/operational-controls",
 } as const;
 
+export const OPERATIONS_PROVENANCE_RESOURCES = [
+  "emergency_stop",
+  "operator_session",
+  "safety",
+  "audit_events",
+  "signals",
+  "risk_decisions",
+  "approval_tickets",
+  "orders",
+  "positions",
+  "alerts",
+  "readiness",
+  "paper_trading",
+  "operational_controls",
+  "live_readiness_evidence",
+] as const;
+
+export type OperationsProvenanceResource =
+  (typeof OPERATIONS_PROVENANCE_RESOURCES)[number];
+
+export type ProvenanceClassification =
+  | "representative"
+  | "demo"
+  | "simulated"
+  | "local_only"
+  | "test_double"
+  | "adapter_only"
+  | "externally_unverified";
+
+export type ReadModelProvenanceApiView = {
+  schema_version: 1;
+  resource: OperationsProvenanceResource;
+  source: string;
+  classifications: ProvenanceClassification[];
+  broker_derived: false;
+  externally_verified: false;
+  summary: string;
+};
+
+export type ReadApiEnvelope<Payload> = {
+  schema_version: 1;
+  resource: OperationsProvenanceResource;
+  provenance: ReadModelProvenanceApiView;
+  data: Payload;
+};
+
+export type OperationsProvenanceCatalog = Record<
+  OperationsProvenanceResource,
+  ReadModelProvenanceApiView
+>;
+
 export type SafetyApiView = {
   schema_version: 1;
   app_env: string;
@@ -158,17 +209,22 @@ export type LiveReadinessEvidenceItemApiView = {
   schema_version: 1;
   evidence_id: string;
   category:
-    | "paper_trading"
+    | "external_review"
+    | "paper_trading_history"
+    | "live_readiness"
+    | "secret_management"
+    | "network_exposure"
+    | "authentication_authorization"
     | "emergency_stop"
+    | "observability"
     | "audit_retention"
     | "backup_restore"
+    | "reconciliation"
+    | "rollback"
     | "incident_response"
-    | "external_review"
-    | "redaction_review"
-    | "human_approval"
-    | "network_review";
+    | "operator_signoff";
   label: string;
-  status: "satisfied" | "missing" | "requires_external_review" | "blocked";
+  status: "verified" | "missing" | "unverified" | "expired" | "contradictory";
   required_for_final_review: boolean;
   summary: string;
   source_reference: string;
@@ -183,7 +239,11 @@ export type LiveReadinessEvidenceApiView = {
   live_trading_authorized: false;
   external_review_required: boolean;
   explicit_human_approval_required: boolean;
+  verified_evidence_count: number;
   missing_evidence_count: number;
+  unverified_evidence_count: number;
+  expired_evidence_count: number;
+  contradictory_evidence_count: number;
   blocking_evidence_count: number;
   blocking_reason: string;
   evidence_items: LiveReadinessEvidenceItemApiView[];
@@ -272,6 +332,7 @@ export type OperationalControlsApiView = {
 };
 
 export type OperationsApiSnapshot = {
+  provenance: OperationsProvenanceCatalog;
   emergencyStop: EmergencyStopApiView;
   safety: SafetyApiView;
   operatorSession: OperatorSessionApiView;
@@ -308,20 +369,20 @@ export type ReadApiLoadState =
 export type ReadApiFetch = (input: string, init: RequestInit) => Promise<Response>;
 
 export type ReadApiClient = {
-  getEmergencyStop: () => Promise<EmergencyStopApiView>;
-  getOperatorSession: () => Promise<OperatorSessionApiView>;
-  getSafety: () => Promise<SafetyApiView>;
-  getAuditEvents: () => Promise<AuditEventApiView[]>;
-  getSignals: () => Promise<SignalApiView[]>;
-  getRiskDecisions: () => Promise<RiskDecisionApiView[]>;
-  getApprovalTickets: () => Promise<ApprovalTicketApiView[]>;
-  getOrders: () => Promise<OrderApiView[]>;
-  getPositions: () => Promise<PositionApiView[]>;
-  getAlerts: () => Promise<AlertApiView[]>;
-  getReadiness: () => Promise<ReadinessApiView>;
-  getLiveReadinessEvidence: () => Promise<LiveReadinessEvidenceApiView>;
-  getPaperTrading: () => Promise<PaperTradingApiView>;
-  getOperationalControls: () => Promise<OperationalControlsApiView>;
+  getEmergencyStop: () => Promise<ReadApiEnvelope<EmergencyStopApiView>>;
+  getOperatorSession: () => Promise<ReadApiEnvelope<OperatorSessionApiView>>;
+  getSafety: () => Promise<ReadApiEnvelope<SafetyApiView>>;
+  getAuditEvents: () => Promise<ReadApiEnvelope<AuditEventApiView[]>>;
+  getSignals: () => Promise<ReadApiEnvelope<SignalApiView[]>>;
+  getRiskDecisions: () => Promise<ReadApiEnvelope<RiskDecisionApiView[]>>;
+  getApprovalTickets: () => Promise<ReadApiEnvelope<ApprovalTicketApiView[]>>;
+  getOrders: () => Promise<ReadApiEnvelope<OrderApiView[]>>;
+  getPositions: () => Promise<ReadApiEnvelope<PositionApiView[]>>;
+  getAlerts: () => Promise<ReadApiEnvelope<AlertApiView[]>>;
+  getReadiness: () => Promise<ReadApiEnvelope<ReadinessApiView>>;
+  getLiveReadinessEvidence: () => Promise<ReadApiEnvelope<LiveReadinessEvidenceApiView>>;
+  getPaperTrading: () => Promise<ReadApiEnvelope<PaperTradingApiView>>;
+  getOperationalControls: () => Promise<ReadApiEnvelope<OperationalControlsApiView>>;
   getOperationsSnapshot: () => Promise<OperationsApiSnapshot>;
 };
 
@@ -331,6 +392,7 @@ type ReadApiClientOptions = {
 };
 
 export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
+  provenance: buildSafeFallbackProvenance(),
   emergencyStop: {
     schema_version: 1,
     active: false,
@@ -393,71 +455,14 @@ export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
     live_trading_authorized: false,
     external_review_required: true,
     explicit_human_approval_required: true,
-    missing_evidence_count: 4,
-    blocking_evidence_count: 1,
+    verified_evidence_count: 0,
+    missing_evidence_count: 6,
+    unverified_evidence_count: 8,
+    expired_evidence_count: 0,
+    contradictory_evidence_count: 0,
+    blocking_evidence_count: 14,
     blocking_reason: "backend_read_api_unavailable",
-    evidence_items: [
-      {
-        schema_version: 1,
-        evidence_id: "fallback-paper-trading",
-        category: "paper_trading",
-        label: "Paper trading evidence",
-        status: "missing",
-        required_for_final_review: true,
-        summary: "Backend read API unavailable",
-        source_reference: "frontend-safe-fallback",
-      },
-      {
-        schema_version: 1,
-        evidence_id: "fallback-external-review",
-        category: "external_review",
-        label: "External review evidence",
-        status: "requires_external_review",
-        required_for_final_review: true,
-        summary: "External review evidence required",
-        source_reference: "frontend-safe-fallback",
-      },
-      {
-        schema_version: 1,
-        evidence_id: "fallback-human-approval",
-        category: "human_approval",
-        label: "Human approval evidence",
-        status: "missing",
-        required_for_final_review: true,
-        summary: "Explicit human approval evidence is missing",
-        source_reference: "frontend-safe-fallback",
-      },
-      {
-        schema_version: 1,
-        evidence_id: "fallback-network-review",
-        category: "network_review",
-        label: "Network exposure evidence",
-        status: "blocked",
-        required_for_final_review: true,
-        summary: "Network exposure evidence is blocked pending review",
-        source_reference: "frontend-safe-fallback",
-      },
-      {
-        schema_version: 1,
-        evidence_id: "fallback-redaction-review",
-        category: "redaction_review",
-        label: "Redaction review evidence",
-        status: "missing",
-        required_for_final_review: true,
-        summary: "Private-value redaction review evidence is missing",
-        source_reference: "frontend-safe-fallback",
-      },
-      {
-        schema_version: 1,
-        evidence_id: "fallback-incident-response",
-        category: "incident_response",
-        label: "Incident response evidence",
-        status: "missing",
-        required_for_final_review: true,
-        summary: "Incident-response review evidence is missing",
-        source_reference: "frontend-safe-fallback",
-      },
-    ],
+    evidence_items: buildSafeFallbackEvidenceItems(),
   },
   paperTrading: {
     schema_version: 1,
@@ -544,6 +549,114 @@ export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
   },
 };
 
+function buildSafeFallbackProvenance(): OperationsProvenanceCatalog {
+  const simulatedResources = new Set<OperationsProvenanceResource>([
+    "audit_events",
+    "signals",
+    "risk_decisions",
+    "approval_tickets",
+    "orders",
+    "positions",
+    "alerts",
+    "readiness",
+  ]);
+  return Object.fromEntries(
+    OPERATIONS_PROVENANCE_RESOURCES.map((resource) => {
+      let classifications: ProvenanceClassification[];
+      let summary: string;
+      if (simulatedResources.has(resource)) {
+        classifications = [
+          "representative",
+          "demo",
+          "simulated",
+          "local_only",
+          "externally_unverified",
+        ];
+        summary = "Safe frontend simulation fallback; not external evidence";
+      } else if (resource === "paper_trading") {
+        classifications = [
+          "representative",
+          "demo",
+          "local_only",
+          "test_double",
+          "adapter_only",
+          "externally_unverified",
+        ];
+        summary =
+          "Representative adapter fallback; not an authenticated IBKR paper session";
+      } else if (
+        resource === "operational_controls" ||
+        resource === "live_readiness_evidence"
+      ) {
+        classifications = [
+          "representative",
+          "demo",
+          "local_only",
+          "externally_unverified",
+        ];
+        summary = "Safe frontend planning fallback; not external evidence";
+      } else {
+        classifications = ["local_only", "externally_unverified"];
+        summary = "Safe frontend local fallback; not external evidence";
+      }
+      return [
+        resource,
+        {
+          schema_version: 1,
+          resource,
+          source: "frontend_safe_fallback",
+          classifications,
+          broker_derived: false,
+          externally_verified: false,
+          summary,
+        } satisfies ReadModelProvenanceApiView,
+      ];
+    }),
+  ) as OperationsProvenanceCatalog;
+}
+
+function buildSafeFallbackEvidenceItems(): LiveReadinessEvidenceItemApiView[] {
+  const items: Array<
+    [
+      LiveReadinessEvidenceItemApiView["category"],
+      string,
+      LiveReadinessEvidenceItemApiView["status"],
+    ]
+  > = [
+    ["external_review", "External review evidence", "missing"],
+    ["paper_trading_history", "Paper-trading history evidence", "missing"],
+    ["live_readiness", "Live-readiness evidence", "unverified"],
+    ["secret_management", "Secret-management review", "unverified"],
+    ["network_exposure", "Network-exposure review", "missing"],
+    [
+      "authentication_authorization",
+      "Authentication and authorization evidence",
+      "unverified",
+    ],
+    ["emergency_stop", "Emergency-stop evidence", "unverified"],
+    ["observability", "Observability evidence", "unverified"],
+    ["audit_retention", "Audit-retention evidence", "unverified"],
+    ["backup_restore", "Backup and restore evidence", "unverified"],
+    ["reconciliation", "Reconciliation evidence", "unverified"],
+    ["rollback", "Rollback evidence", "missing"],
+    ["incident_response", "Incident-response evidence", "missing"],
+    ["operator_signoff", "Operator sign-off evidence", "missing"],
+  ];
+  return items.map(([category, label, status]) => ({
+    schema_version: 1,
+    evidence_id: `fallback-${category.replaceAll("_", "-")}`,
+    category,
+    label,
+    status,
+    required_for_final_review: true,
+    summary:
+      status === "missing"
+        ? `${label} is missing`
+        : `${label} is local-only and externally unverified`,
+    source_reference: "frontend-safe-fallback",
+  }));
+}
+
 export const initialReadApiState: ReadApiLoadState = {
   status: "loading",
   snapshot: safeFallbackOperationsSnapshot,
@@ -552,44 +665,74 @@ export const initialReadApiState: ReadApiLoadState = {
 
 export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApiClient {
   const fetchImpl = options.fetchImpl ?? defaultFetch;
-  const request = <Payload>(path: string) =>
-    requestJson<Payload>(fetchImpl, buildUrl(options.baseUrl ?? "", path), path);
+  const request = <Payload>(
+    path: string,
+    resource: OperationsProvenanceResource,
+  ) =>
+    requestEnvelope<Payload>(
+      fetchImpl,
+      buildUrl(options.baseUrl ?? "", path),
+      path,
+      resource,
+    );
 
   const client: ReadApiClient = {
-    getEmergencyStop: () => request<EmergencyStopApiView>(READ_API_ENDPOINTS.emergencyStop),
+    getEmergencyStop: () =>
+      request<EmergencyStopApiView>(READ_API_ENDPOINTS.emergencyStop, "emergency_stop"),
     getOperatorSession: () =>
-      request<OperatorSessionApiView>(READ_API_ENDPOINTS.operatorSession),
-    getSafety: () => request<SafetyApiView>(READ_API_ENDPOINTS.safety),
-    getAuditEvents: () => request<AuditEventApiView[]>(READ_API_ENDPOINTS.auditEvents),
-    getSignals: () => request<SignalApiView[]>(READ_API_ENDPOINTS.signals),
-    getRiskDecisions: () => request<RiskDecisionApiView[]>(READ_API_ENDPOINTS.riskDecisions),
+      request<OperatorSessionApiView>(
+        READ_API_ENDPOINTS.operatorSession,
+        "operator_session",
+      ),
+    getSafety: () => request<SafetyApiView>(READ_API_ENDPOINTS.safety, "safety"),
+    getAuditEvents: () =>
+      request<AuditEventApiView[]>(READ_API_ENDPOINTS.auditEvents, "audit_events"),
+    getSignals: () =>
+      request<SignalApiView[]>(READ_API_ENDPOINTS.signals, "signals"),
+    getRiskDecisions: () =>
+      request<RiskDecisionApiView[]>(
+        READ_API_ENDPOINTS.riskDecisions,
+        "risk_decisions",
+      ),
     getApprovalTickets: () =>
-      request<ApprovalTicketApiView[]>(READ_API_ENDPOINTS.approvalTickets),
-    getOrders: () => request<OrderApiView[]>(READ_API_ENDPOINTS.orders),
-    getPositions: () => request<PositionApiView[]>(READ_API_ENDPOINTS.positions),
-    getAlerts: () => request<AlertApiView[]>(READ_API_ENDPOINTS.alerts),
-    getReadiness: () => request<ReadinessApiView>(READ_API_ENDPOINTS.readiness),
+      request<ApprovalTicketApiView[]>(
+        READ_API_ENDPOINTS.approvalTickets,
+        "approval_tickets",
+      ),
+    getOrders: () => request<OrderApiView[]>(READ_API_ENDPOINTS.orders, "orders"),
+    getPositions: () =>
+      request<PositionApiView[]>(READ_API_ENDPOINTS.positions, "positions"),
+    getAlerts: () => request<AlertApiView[]>(READ_API_ENDPOINTS.alerts, "alerts"),
+    getReadiness: () =>
+      request<ReadinessApiView>(READ_API_ENDPOINTS.readiness, "readiness"),
     getLiveReadinessEvidence: () =>
-      request<LiveReadinessEvidenceApiView>(READ_API_ENDPOINTS.liveReadinessEvidence),
-    getPaperTrading: () => request<PaperTradingApiView>(READ_API_ENDPOINTS.paperTrading),
+      request<LiveReadinessEvidenceApiView>(
+        READ_API_ENDPOINTS.liveReadinessEvidence,
+        "live_readiness_evidence",
+      ),
+    getPaperTrading: () =>
+      request<PaperTradingApiView>(READ_API_ENDPOINTS.paperTrading, "paper_trading"),
     getOperationalControls: () =>
-      request<OperationalControlsApiView>(READ_API_ENDPOINTS.operationalControls),
+      request<OperationalControlsApiView>(
+        READ_API_ENDPOINTS.operationalControls,
+        "operational_controls",
+      ),
     getOperationsSnapshot: async () => {
       const [
-        emergencyStop,
-        operatorSession,
-        safety,
-        auditEvents,
-        signals,
-        riskDecisions,
-        approvalTickets,
-        orders,
-        positions,
-        alerts,
-        readiness,
-        liveReadinessEvidence,
-        paperTrading,
-        operationalControls,
+        emergencyStopEnvelope,
+        operatorSessionEnvelope,
+        safetyEnvelope,
+        auditEventsEnvelope,
+        signalsEnvelope,
+        riskDecisionsEnvelope,
+        approvalTicketsEnvelope,
+        ordersEnvelope,
+        positionsEnvelope,
+        alertsEnvelope,
+        readinessEnvelope,
+        liveReadinessEvidenceEnvelope,
+        paperTradingEnvelope,
+        operationalControlsEnvelope,
       ] = await Promise.all([
         client.getEmergencyStop(),
         client.getOperatorSession(),
@@ -608,20 +751,36 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
       ]);
 
       return {
-        emergencyStop,
-        operatorSession,
-        safety,
-        auditEvents,
-        signals,
-        riskDecisions,
-        approvalTickets,
-        orders,
-        positions,
-        alerts,
-        readiness,
-        liveReadinessEvidence,
-        paperTrading,
-        operationalControls,
+        provenance: {
+          emergency_stop: emergencyStopEnvelope.provenance,
+          operator_session: operatorSessionEnvelope.provenance,
+          safety: safetyEnvelope.provenance,
+          audit_events: auditEventsEnvelope.provenance,
+          signals: signalsEnvelope.provenance,
+          risk_decisions: riskDecisionsEnvelope.provenance,
+          approval_tickets: approvalTicketsEnvelope.provenance,
+          orders: ordersEnvelope.provenance,
+          positions: positionsEnvelope.provenance,
+          alerts: alertsEnvelope.provenance,
+          readiness: readinessEnvelope.provenance,
+          paper_trading: paperTradingEnvelope.provenance,
+          operational_controls: operationalControlsEnvelope.provenance,
+          live_readiness_evidence: liveReadinessEvidenceEnvelope.provenance,
+        },
+        emergencyStop: emergencyStopEnvelope.data,
+        operatorSession: operatorSessionEnvelope.data,
+        safety: safetyEnvelope.data,
+        auditEvents: auditEventsEnvelope.data,
+        signals: signalsEnvelope.data,
+        riskDecisions: riskDecisionsEnvelope.data,
+        approvalTickets: approvalTicketsEnvelope.data,
+        orders: ordersEnvelope.data,
+        positions: positionsEnvelope.data,
+        alerts: alertsEnvelope.data,
+        readiness: readinessEnvelope.data,
+        liveReadinessEvidence: liveReadinessEvidenceEnvelope.data,
+        paperTrading: paperTradingEnvelope.data,
+        operationalControls: operationalControlsEnvelope.data,
       };
     },
   };
@@ -648,11 +807,12 @@ export async function loadOperationsSnapshot(
   }
 }
 
-async function requestJson<Payload>(
+async function requestEnvelope<Payload>(
   fetchImpl: ReadApiFetch,
   url: string,
   endpointPath: string,
-): Promise<Payload> {
+  expectedResource: OperationsProvenanceResource,
+): Promise<ReadApiEnvelope<Payload>> {
   const response = await fetchImpl(url, {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -662,7 +822,62 @@ async function requestJson<Payload>(
     throw new ReadApiError(endpointPath, response.status);
   }
 
-  return (await response.json()) as Payload;
+  return validateEnvelope<Payload>(await response.json(), expectedResource);
+}
+
+function validateEnvelope<Payload>(
+  value: unknown,
+  expectedResource: OperationsProvenanceResource,
+): ReadApiEnvelope<Payload> {
+  if (!isRecord(value) || value.schema_version !== 1) {
+    throw new ReadApiProvenanceError("Read API envelope is missing or invalid");
+  }
+  if (value.resource !== expectedResource || !("data" in value)) {
+    throw new ReadApiProvenanceError("Read API resource provenance does not match");
+  }
+  const provenance = value.provenance;
+  if (
+    !isRecord(provenance) ||
+    provenance.schema_version !== 1 ||
+    provenance.resource !== expectedResource ||
+    typeof provenance.source !== "string" ||
+    !provenance.source ||
+    typeof provenance.summary !== "string" ||
+    !provenance.summary ||
+    !Array.isArray(provenance.classifications)
+  ) {
+    throw new ReadApiProvenanceError("Read API provenance is missing or invalid");
+  }
+  const allowed = new Set<ProvenanceClassification>([
+    "representative",
+    "demo",
+    "simulated",
+    "local_only",
+    "test_double",
+    "adapter_only",
+    "externally_unverified",
+  ]);
+  const classifications = provenance.classifications;
+  if (
+    classifications.length === 0 ||
+    classifications.some(
+      (classification) =>
+        typeof classification !== "string" ||
+        !allowed.has(classification as ProvenanceClassification),
+    ) ||
+    new Set(classifications).size !== classifications.length ||
+    !classifications.includes("externally_unverified")
+  ) {
+    throw new ReadApiProvenanceError("Read API provenance classifications are unsafe");
+  }
+  if (provenance.broker_derived !== false || provenance.externally_verified !== false) {
+    throw new ReadApiProvenanceError("Read API provenance exceeds the current evidence boundary");
+  }
+  return value as ReadApiEnvelope<Payload>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function buildUrl(baseUrl: string, path: string) {
@@ -692,5 +907,12 @@ class ReadApiError extends Error {
   constructor(endpointPath: string, status: number) {
     super(`Read API ${endpointPath} failed with status ${status}`);
     this.name = "ReadApiError";
+  }
+}
+
+class ReadApiProvenanceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ReadApiProvenanceError";
   }
 }

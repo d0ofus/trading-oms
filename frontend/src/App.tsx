@@ -14,6 +14,7 @@ import {
   type AuditExplorerFilterState,
 } from "./auditExplorer";
 import {
+  OPERATIONS_PROVENANCE_RESOURCES,
   createReadApiClient,
   initialReadApiState,
   loadOperationsSnapshot,
@@ -29,6 +30,7 @@ import {
   type PositionApiView,
   type ReadApiClient,
   type ReadApiLoadState,
+  type ReadModelProvenanceApiView,
 } from "./readApiClient";
 import {
   createSimulationApprovalApiClient,
@@ -100,6 +102,7 @@ const paperTradingSection = "Paper trading" as const;
 const liveReadinessEvidenceSection = "Live-readiness evidence" as const;
 const operationalControlsSection = "Operational controls" as const;
 const operatorAccessSection = "Operator access" as const;
+const dataProvenanceSection = "Data provenance" as const;
 
 const workflowSections = [
   "Signals",
@@ -113,6 +116,7 @@ const workflowSections = [
 type WorkflowSection = (typeof workflowSections)[number];
 
 const shellSections = [
+  dataProvenanceSection,
   visualBuilderSection,
   simulationRunSection,
   approvalInboxSection,
@@ -428,6 +432,27 @@ export function App({
                 value={`Alert delivery ${formatIdentifier(snapshot.safety.alert_delivery)}`}
               />
             </dl>
+          </section>
+
+          <section className="provenance-section" id={sectionId(dataProvenanceSection)}>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Data provenance</p>
+                <h2>Evidence boundaries by read view</h2>
+              </div>
+              <div className="status-strip" aria-label="Data provenance posture">
+                <StatusPill tone="good" label="Not broker-derived" />
+                <StatusPill tone="warning" label="Externally unverified" />
+              </div>
+            </div>
+            <div className="provenance-grid">
+              {OPERATIONS_PROVENANCE_RESOURCES.map((resource) => (
+                <ProvenanceNotice
+                  key={resource}
+                  view={snapshot.provenance[resource]}
+                />
+              ))}
+            </div>
           </section>
 
           <section className="summary-grid" aria-label="Workflow summary">
@@ -882,6 +907,7 @@ export function App({
                 <StatusPill tone="neutral" label="Read only" />
               </div>
             </div>
+            <ProvenanceNotice view={snapshot.provenance.paper_trading} />
             <PaperTradingOperatorPanel view={snapshot.paperTrading} />
           </section>
 
@@ -922,6 +948,7 @@ export function App({
                 />
               </div>
             </div>
+            <ProvenanceNotice view={snapshot.provenance.live_readiness_evidence} />
             <LiveReadinessEvidencePanel view={snapshot.liveReadinessEvidence} />
           </section>
 
@@ -940,6 +967,7 @@ export function App({
                 <StatusPill tone="good" label="production rollout not authorized" />
               </div>
             </div>
+            <ProvenanceNotice view={snapshot.provenance.operational_controls} />
             <OperationalControlsPanel view={snapshot.operationalControls} />
           </section>
 
@@ -1517,7 +1545,7 @@ function PaperTradingOperatorPanel({ view }: { view: PaperTradingApiView }) {
 }
 
 function LiveReadinessEvidencePanel({ view }: { view: LiveReadinessEvidenceApiView }) {
-  const unresolvedEvidence = view.evidence_items.filter((item) => item.status !== "satisfied");
+  const unresolvedEvidence = view.evidence_items.filter((item) => item.status !== "verified");
 
   return (
     <div className="detail-layout" aria-label="Live-readiness evidence records">
@@ -1536,11 +1564,27 @@ function LiveReadinessEvidencePanel({ view }: { view: LiveReadinessEvidenceApiVi
           <PostureItem label="Dashboard" value={formatIdentifier(view.dashboard_id)} />
           <PostureItem label="Evaluated" value={view.evaluated_at} />
           <PostureItem
+            label="Verified evidence"
+            value={`${view.verified_evidence_count}`}
+          />
+          <PostureItem
             label="Missing evidence"
             value={`${view.missing_evidence_count}`}
           />
           <PostureItem
-            label="Blocked evidence"
+            label="Unverified evidence"
+            value={`${view.unverified_evidence_count}`}
+          />
+          <PostureItem
+            label="Expired evidence"
+            value={`${view.expired_evidence_count}`}
+          />
+          <PostureItem
+            label="Contradictory evidence"
+            value={`${view.contradictory_evidence_count}`}
+          />
+          <PostureItem
+            label="Blocking evidence"
             value={`${view.blocking_evidence_count}`}
           />
           <PostureItem label="Blocking reason" value={formatIdentifier(view.blocking_reason)} />
@@ -1554,12 +1598,12 @@ function LiveReadinessEvidencePanel({ view }: { view: LiveReadinessEvidenceApiVi
       <article className="detail-card">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Missing evidence</p>
+            <p className="eyebrow">Blocking evidence</p>
             <h3>{formatCount(unresolvedEvidence.length, "item", "items")}</h3>
           </div>
           <StatusPill
             tone={unresolvedEvidence.length > 0 ? "warning" : "good"}
-            label={unresolvedEvidence.length > 0 ? "Review required" : "Evidence complete"}
+            label={unresolvedEvidence.length > 0 ? "Review required" : "Verified for final review"}
           />
         </div>
         <div className="record-list compact-list">
@@ -1868,6 +1912,30 @@ function StatusPill({ label, tone }: { label: string; tone: Tone }) {
   return <span className={`status-pill status-${tone}`}>{label}</span>;
 }
 
+function ProvenanceNotice({ view }: { view: ReadModelProvenanceApiView }) {
+  return (
+    <article className="provenance-notice" aria-label={`${view.resource} data provenance`}>
+      <div>
+        <p className="eyebrow">{formatIdentifier(view.resource)}</p>
+        <p>{view.summary}</p>
+        {view.resource === "paper_trading" ? (
+          <strong>Not an authenticated IBKR paper session</strong>
+        ) : null}
+      </div>
+      <div className="status-strip" aria-label={`${view.resource} provenance classifications`}>
+        {view.classifications.map((classification) => (
+          <StatusPill
+            key={classification}
+            tone={classification === "externally_unverified" ? "warning" : "neutral"}
+            label={sentenceCaseIdentifier(classification)}
+          />
+        ))}
+        <StatusPill tone="good" label="Not broker-derived" />
+      </div>
+    </article>
+  );
+}
+
 function PostureItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -1887,6 +1955,11 @@ function titleCase(value: string) {
 
 function formatIdentifier(value: string) {
   return value.toLowerCase().replace(/[_-]+/g, " ");
+}
+
+function sentenceCaseIdentifier(value: string) {
+  const formatted = formatIdentifier(value);
+  return `${formatted.charAt(0).toUpperCase()}${formatted.slice(1)}`;
 }
 
 function formatOperationalLabel(value: string) {
@@ -1987,10 +2060,10 @@ function operationalStatusTone(status: string): Tone {
 }
 
 function evidenceStatusTone(status: string): Tone {
-  if (status === "blocked") {
+  if (status === "contradictory" || status === "expired") {
     return "critical";
   }
-  if (status === "missing" || status === "requires_external_review") {
+  if (status === "missing" || status === "unverified") {
     return "warning";
   }
   return "good";

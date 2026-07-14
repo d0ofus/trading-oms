@@ -107,7 +107,10 @@ def get_operator_session(request: Request) -> dict[str, Any]:
         resource="operator_session",
         action="view",
     )
-    return OperatorSessionReadModel.from_identity(identity).to_json_dict()
+    return _operations_read_model().to_api_envelope(
+        "operator_session",
+        data_override=OperatorSessionReadModel.from_identity(identity).to_json_dict(),
+    )
 
 
 @app.get("/api/emergency-stop")
@@ -118,7 +121,7 @@ def get_emergency_stop(request: Request) -> dict[str, Any]:
         resource="emergency_stop",
         action="view",
     )
-    return _emergency_stop_read_model().to_json_dict()
+    return _operations_read_model().to_api_envelope("emergency_stop")
 
 
 @app.get("/api/safety")
@@ -129,84 +132,84 @@ def get_safety(request: Request) -> dict[str, Any]:
         resource="safety_posture",
         action="view",
     )
-    return _operations_read_model().safety.to_json_dict()
+    return _operations_read_model().to_api_envelope("safety")
 
 
 @app.get("/api/audit-events")
-def get_audit_events(request: Request) -> list[dict[str, Any]]:
+def get_audit_events(request: Request) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="audit_events",
         action="view",
     )
-    return [event.to_json_dict() for event in _operations_read_model().audit_events]
+    return _operations_read_model().to_api_envelope("audit_events")
 
 
 @app.get("/api/signals")
-def get_signals(request: Request) -> list[dict[str, Any]]:
+def get_signals(request: Request) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="signals",
         action="view",
     )
-    return [signal.to_json_dict() for signal in _operations_read_model().signals]
+    return _operations_read_model().to_api_envelope("signals")
 
 
 @app.get("/api/risk-decisions")
-def get_risk_decisions(request: Request) -> list[dict[str, Any]]:
+def get_risk_decisions(request: Request) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="risk_decisions",
         action="view",
     )
-    return [decision.to_json_dict() for decision in _operations_read_model().risk_decisions]
+    return _operations_read_model().to_api_envelope("risk_decisions")
 
 
 @app.get("/api/approval-tickets")
-def get_approval_tickets(request: Request) -> list[dict[str, Any]]:
+def get_approval_tickets(request: Request) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="approval_tickets",
         action="view",
     )
-    return [ticket.to_json_dict() for ticket in _operations_read_model().approval_tickets]
+    return _operations_read_model().to_api_envelope("approval_tickets")
 
 
 @app.get("/api/orders")
-def get_orders(request: Request) -> list[dict[str, Any]]:
+def get_orders(request: Request) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="orders",
         action="view",
     )
-    return [order.to_json_dict() for order in _operations_read_model().orders]
+    return _operations_read_model().to_api_envelope("orders")
 
 
 @app.get("/api/positions")
-def get_positions(request: Request) -> list[dict[str, Any]]:
+def get_positions(request: Request) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="positions",
         action="view",
     )
-    return [position.to_json_dict() for position in _operations_read_model().positions]
+    return _operations_read_model().to_api_envelope("positions")
 
 
 @app.get("/api/alerts")
-def get_alerts(request: Request) -> list[dict[str, Any]]:
+def get_alerts(request: Request) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="alerts",
         action="view",
     )
-    return [alert.to_json_dict() for alert in _operations_read_model().alerts]
+    return _operations_read_model().to_api_envelope("alerts")
 
 
 @app.get("/api/readiness")
@@ -217,7 +220,7 @@ def get_readiness(request: Request) -> dict[str, Any]:
         resource="readiness",
         action="view",
     )
-    return _operations_read_model().readiness.to_json_dict()
+    return _operations_read_model().to_api_envelope("readiness")
 
 
 @app.get("/api/paper-trading")
@@ -228,7 +231,7 @@ def get_paper_trading(request: Request) -> dict[str, Any]:
         resource="paper_trading",
         action="view",
     )
-    return _operations_read_model().paper_trading.to_json_dict()
+    return _operations_read_model().to_api_envelope("paper_trading")
 
 
 @app.get("/api/operational-controls")
@@ -239,7 +242,7 @@ def get_operational_controls(request: Request) -> dict[str, Any]:
         resource="operational_controls",
         action="view",
     )
-    return _operations_read_model().operational_controls.to_json_dict()
+    return _operations_read_model().to_api_envelope("operational_controls")
 
 
 @app.get("/api/live-readiness-evidence")
@@ -250,7 +253,7 @@ def get_live_readiness_evidence(request: Request) -> dict[str, Any]:
         resource="live_readiness_evidence",
         action="view",
     )
-    return _operations_read_model().live_readiness_evidence.to_json_dict()
+    return _operations_read_model().to_api_envelope("live_readiness_evidence")
 
 
 @app.get("/api/audit-export-bundle")

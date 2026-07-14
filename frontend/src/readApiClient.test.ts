@@ -7,6 +7,7 @@ import {
   loadOperationsSnapshot,
   safeFallbackOperationsSnapshot,
   type OperationsApiSnapshot,
+  type OperationsProvenanceResource,
 } from "./readApiClient";
 
 const sampleSnapshot: OperationsApiSnapshot = {
@@ -157,7 +158,11 @@ const sampleSnapshot: OperationsApiSnapshot = {
     live_trading_authorized: false,
     external_review_required: true,
     explicit_human_approval_required: true,
+    verified_evidence_count: 0,
     missing_evidence_count: 4,
+    unverified_evidence_count: 0,
+    expired_evidence_count: 0,
+    contradictory_evidence_count: 0,
     blocking_evidence_count: 1,
     blocking_reason: "missing_external_review_and_human_approval",
     evidence_items: [
@@ -247,24 +252,58 @@ const sampleSnapshot: OperationsApiSnapshot = {
       last_reviewed_at: "2026-07-08T00:07:00Z",
     },
   },
+  provenance: safeFallbackOperationsSnapshot.provenance,
 };
 
 const responseByEndpoint: Record<string, unknown> = {
-  [READ_API_ENDPOINTS.emergencyStop]: sampleSnapshot.emergencyStop,
-  [READ_API_ENDPOINTS.safety]: sampleSnapshot.safety,
-  [READ_API_ENDPOINTS.operatorSession]: sampleSnapshot.operatorSession,
-  [READ_API_ENDPOINTS.auditEvents]: sampleSnapshot.auditEvents,
-  [READ_API_ENDPOINTS.signals]: sampleSnapshot.signals,
-  [READ_API_ENDPOINTS.riskDecisions]: sampleSnapshot.riskDecisions,
-  [READ_API_ENDPOINTS.approvalTickets]: sampleSnapshot.approvalTickets,
-  [READ_API_ENDPOINTS.orders]: sampleSnapshot.orders,
-  [READ_API_ENDPOINTS.positions]: sampleSnapshot.positions,
-  [READ_API_ENDPOINTS.alerts]: sampleSnapshot.alerts,
-  [READ_API_ENDPOINTS.readiness]: sampleSnapshot.readiness,
-  [READ_API_ENDPOINTS.liveReadinessEvidence]: sampleSnapshot.liveReadinessEvidence,
-  [READ_API_ENDPOINTS.paperTrading]: sampleSnapshot.paperTrading,
-  [READ_API_ENDPOINTS.operationalControls]: sampleSnapshot.operationalControls,
+  [READ_API_ENDPOINTS.emergencyStop]: readEnvelope(
+    "emergency_stop",
+    sampleSnapshot.emergencyStop,
+  ),
+  [READ_API_ENDPOINTS.safety]: readEnvelope("safety", sampleSnapshot.safety),
+  [READ_API_ENDPOINTS.operatorSession]: readEnvelope(
+    "operator_session",
+    sampleSnapshot.operatorSession,
+  ),
+  [READ_API_ENDPOINTS.auditEvents]: readEnvelope(
+    "audit_events",
+    sampleSnapshot.auditEvents,
+  ),
+  [READ_API_ENDPOINTS.signals]: readEnvelope("signals", sampleSnapshot.signals),
+  [READ_API_ENDPOINTS.riskDecisions]: readEnvelope(
+    "risk_decisions",
+    sampleSnapshot.riskDecisions,
+  ),
+  [READ_API_ENDPOINTS.approvalTickets]: readEnvelope(
+    "approval_tickets",
+    sampleSnapshot.approvalTickets,
+  ),
+  [READ_API_ENDPOINTS.orders]: readEnvelope("orders", sampleSnapshot.orders),
+  [READ_API_ENDPOINTS.positions]: readEnvelope("positions", sampleSnapshot.positions),
+  [READ_API_ENDPOINTS.alerts]: readEnvelope("alerts", sampleSnapshot.alerts),
+  [READ_API_ENDPOINTS.readiness]: readEnvelope("readiness", sampleSnapshot.readiness),
+  [READ_API_ENDPOINTS.liveReadinessEvidence]: readEnvelope(
+    "live_readiness_evidence",
+    sampleSnapshot.liveReadinessEvidence,
+  ),
+  [READ_API_ENDPOINTS.paperTrading]: readEnvelope(
+    "paper_trading",
+    sampleSnapshot.paperTrading,
+  ),
+  [READ_API_ENDPOINTS.operationalControls]: readEnvelope(
+    "operational_controls",
+    sampleSnapshot.operationalControls,
+  ),
 };
+
+function readEnvelope(resource: OperationsProvenanceResource, data: unknown) {
+  return {
+    schema_version: 1,
+    resource,
+    provenance: sampleSnapshot.provenance[resource],
+    data,
+  };
+}
 
 describe("read API client", () => {
   it("uses GET only for every read endpoint", async () => {

@@ -14,6 +14,7 @@ from trading_oms_backend.app import (
     reset_workflow_definition_service,
     reset_workflow_simulation_runner_service,
 )
+from trading_oms_backend.read_models import build_demo_operations_read_model
 
 
 def test_emergency_stop_read_endpoint_returns_local_state(monkeypatch: MonkeyPatch) -> None:
@@ -24,7 +25,11 @@ def test_emergency_stop_read_endpoint_returns_local_state(monkeypatch: MonkeyPat
     response = client.get("/api/emergency-stop")
 
     assert response.status_code == 200
-    assert response.json() == {
+    assert response.json()["resource"] == "emergency_stop"
+    assert response.json()["provenance"] == (
+        build_demo_operations_read_model().provenance_for("emergency_stop").to_json_dict()
+    )
+    assert response.json()["data"] == {
         "schema_version": 1,
         "active": False,
         "status": "inactive",
