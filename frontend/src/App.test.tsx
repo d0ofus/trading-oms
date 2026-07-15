@@ -7,6 +7,7 @@ import {
   type OperationsApiSnapshot,
   type ReadApiLoadState,
 } from "./readApiClient";
+import type { WorkflowRunInspectionState } from "./workflowRunInspector";
 
 function renderedText(element = <App />) {
   return renderToStaticMarkup(element)
@@ -135,25 +136,53 @@ describe("App", () => {
     expect(text).not.toContain("MSFT replay SMA");
   });
 
-  it("renders the simulation run detail timeline and safety records", () => {
-    const text = renderedText(<App initialReadState={loadedReadState} />);
+  it("renders API-backed simulation run history and selected node evidence", () => {
+    const html = renderToStaticMarkup(
+      <App
+        initialReadState={loadedReadState}
+        initialWorkflowRunInspectionState={loadedWorkflowRunInspectionState}
+      />,
+    );
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-    expect(text).toContain("Run sim-run-001");
-    expect(text).toContain("Replay loaded");
-    expect(text).toContain("Signal generated");
-    expect(text).toContain("Risk evaluated");
-    expect(text).toContain("Approval decided");
-    expect(text).toContain("Fake broker filled");
-    expect(text).toContain("Protection monitored");
-    expect(text).toContain("signal-001");
-    expect(text).toContain("risk-001");
-    expect(text).toContain("approval-ticket-001");
-    expect(text).toContain("order-001");
-    expect(text).toContain("fake-client-001");
-    expect(text).toContain("fill-001");
-    expect(text).toContain("position-AAPL");
-    expect(text).toContain("alert-position-update-001");
-    expect(text).toContain("append only");
+    expect(text).toContain("Saved workflow runs");
+    expect(text).toContain("Run workflow-run-backend-002");
+    expect(text).toContain("First five-minute breakout workflow");
+    expect(text).toContain("workflow-backend-001");
+    expect(text).toContain("version 4");
+    expect(text).toContain("fixture://breakout-session-002");
+    expect(text).toContain("ticket-workflow-run-002");
+    expect(text).toContain("Deterministic local replay was loaded");
+    expect(text).toContain("Manual approval is required");
+    expect(text).toContain("Downstream simulation node remains blocked until manual approval");
+    expect(text).toContain("journal_sequence:72");
+    expect(text).toContain("workflow-run-backend-001");
+    expect(html).toContain('name="workflowSimulationRun"');
+    expect(text).not.toContain("Fake broker filled");
+    expect(text).not.toContain("Protection monitored");
+    expect(text).not.toContain("Manual simulation approval recorded");
+  });
+
+  it("renders explicit loading, empty, and failed run-history states without a fabricated run", () => {
+    const loadingText = renderedText(<App initialReadState={loadedReadState} />);
+    const emptyText = renderedText(
+      <App
+        initialReadState={loadedReadState}
+        initialWorkflowRunInspectionState={emptyWorkflowRunInspectionState}
+      />,
+    );
+    const errorText = renderedText(
+      <App
+        initialReadState={loadedReadState}
+        initialWorkflowRunInspectionState={failedWorkflowRunInspectionState}
+      />,
+    );
+
+    expect(loadingText).toContain("Loading saved workflow simulation runs");
+    expect(emptyText).toContain("No saved workflow simulation runs");
+    expect(errorText).toContain("Workflow simulation run history is unavailable");
+    expect(`${loadingText} ${emptyText} ${errorText}`).not.toContain("Fake broker filled");
+    expect(`${loadingText} ${emptyText} ${errorText}`).not.toContain("Protection monitored");
   });
 
   it("renders read-only audit explorer filters and event detail", () => {
@@ -622,3 +651,84 @@ const loadedReadState: ReadApiLoadState = {
   snapshot: backendSnapshot,
   errorMessage: null,
 };
+
+const loadedWorkflowRunInspectionState: WorkflowRunInspectionState = {
+  status: "loaded",
+  items: [
+    workflowRunItem("workflow-run-backend-002", "2026-07-15T02:00:00Z", 70),
+    workflowRunItem("workflow-run-backend-001", "2026-07-15T01:00:00Z", 60),
+  ],
+  errorMessage: null,
+};
+
+const emptyWorkflowRunInspectionState: WorkflowRunInspectionState = {
+  status: "loaded",
+  items: [],
+  errorMessage: null,
+};
+
+const failedWorkflowRunInspectionState: WorkflowRunInspectionState = {
+  status: "error",
+  items: [],
+  errorMessage: "Workflow simulation run history is unavailable",
+};
+
+function workflowRunItem(runId: string, updatedAt: string, journalSequence: number) {
+  return {
+    key: `workflow-backend-001::${runId}`,
+    workflowId: "workflow-backend-001",
+    workflowName: "First five-minute breakout workflow",
+    workflowVersion: 4,
+    run: {
+      schema_version: 1 as const,
+      workflow_id: "workflow-backend-001",
+      run_id: runId,
+      status: "waiting_for_approval" as const,
+      created_at: updatedAt,
+      updated_at: updatedAt,
+      approval_ticket_id: runId.endsWith("002") ? "ticket-workflow-run-002" : "ticket-workflow-run-001",
+      simulation_run: {
+        schema_version: 1 as const,
+        run_id: runId,
+        status: "waiting_for_approval",
+        created_at: updatedAt,
+        updated_at: updatedAt,
+        replay_input_reference: runId.endsWith("002")
+          ? "fixture://breakout-session-002"
+          : "fixture://breakout-session-001",
+        journal_references: [`journal_sequence:${journalSequence}`],
+      },
+      node_statuses: [
+        {
+          schema_version: 1 as const,
+          node_id: "replay-source",
+          node_type: "replay_source",
+          status: "completed",
+          detail: "Deterministic local replay was loaded",
+          journal_reference: `journal_sequence:${journalSequence + 1}`,
+        },
+        {
+          schema_version: 1 as const,
+          node_id: "approval-ticket",
+          node_type: "approval_ticket",
+          status: "waiting_for_approval",
+          detail: "Manual approval is required",
+          journal_reference: `journal_sequence:${journalSequence + 2}`,
+        },
+        {
+          schema_version: 1 as const,
+          node_id: "fake-broker",
+          node_type: "fake_broker",
+          status: "blocked_waiting_for_approval",
+          detail: "Downstream simulation node remains blocked until manual approval",
+          journal_reference: `journal_sequence:${journalSequence + 3}`,
+        },
+      ],
+      journal_references: [
+        `journal_sequence:${journalSequence + 1}`,
+        `journal_sequence:${journalSequence + 2}`,
+        `journal_sequence:${journalSequence + 3}`,
+      ],
+    },
+  };
+}

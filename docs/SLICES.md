@@ -2590,3 +2590,49 @@ Acceptance criteria:
   reviews, and accepted resolution of every P0/P1 finding against unchanged source.
 - [x] No live trading, IBKR dependency, broker contact, order path, private value, deployment,
   rollout, production operation, or safety-gate bypass is added.
+
+---
+
+## Non-broker candidate - API-backed simulation run inspector
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; simulation-only operator UX
+
+branch: `candidate-slice-nonbroker-simulation-run-inspector`
+
+Goal:
+Replace the static representative completed-run panel with a read-only inspector of actual saved
+workflow simulation runs.
+
+Scope:
+- existing workflow and simulation-run `GET` endpoints only;
+- deterministic newest-first multi-workflow run history;
+- local run selection and selected-run metadata;
+- backend-recorded node statuses and append-only journal references;
+- explicit loading, empty, and unavailable states without fabricated fallback execution.
+
+Completed:
+- [x] The ExecPlan was the first file edit.
+- [x] Static approval, fill, position, and protection-alert claims were removed from the run panel.
+- [x] Workflow definitions and run histories load through the existing typed frontend API client.
+- [x] API exceptions fail closed with no partial data or exception-text rendering.
+- [x] The selected run shows workflow identity, version, replay reference, approval ticket, status,
+  timestamps, node timeline, and journal references.
+- [x] Multiple runs are sorted newest first and can be selected for local read-only inspection.
+- [x] Loading, empty, and failed reads never render a representative successful run.
+
+Non-goals:
+- workflow creation, editing, validation, or run-start controls;
+- approval, fake-broker, OMS, position, alert, or journal behavior changes;
+- Candidate 063, IBKR dependencies, broker contact, credentials, account identifiers, deployment,
+  rollout, production operation, or live trading.
+
+Acceptance criteria:
+- [x] Focused loader and rendering tests cover loaded, sorted, selected, empty, and failed states.
+- [x] Frontend lint and type checking pass.
+- [x] Full verification passes with 587 backend and 65 frontend tests.
+- [x] Local backend and Vite services answer through `http://localhost:5173`; the clean runtime shows
+  zero saved workflows, `app_mode=paper`, and `live_trading_enabled=false`.
+- [x] No mutation endpoint, broker transport, secret field, account field, rollout, production, or
+  live-trading capability is added.

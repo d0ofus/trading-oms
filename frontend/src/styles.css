@@ -1033,6 +1033,87 @@ dd {
   padding: 16px;
 }
 
+.run-inspector-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.run-inspector-toolbar label {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  color: #4d5852;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.run-inspector-toolbar select {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid #cbd6cb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2923;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+}
+
+.run-inspector-toolbar select:focus {
+  border-color: #6aa56f;
+  outline: 2px solid #d8efdb;
+  outline-offset: 1px;
+}
+
+.run-inspector-facts > div {
+  overflow-wrap: anywhere;
+}
+
+.run-history {
+  display: grid;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.run-history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 62px;
+  border-bottom: 1px solid #e5e9e3;
+  padding: 10px 12px;
+}
+
+.run-history-row:last-child {
+  border-bottom: 0;
+}
+
+.run-history-row-selected {
+  border-left: 3px solid #3f7f52;
+  background: #f4f8f2;
+  padding-left: 9px;
+}
+
+.run-history-row h3,
+.run-history-row p {
+  margin: 0;
+}
+
+.run-history-row h3 {
+  color: #20282d;
+  font-size: 0.9rem;
+}
+
+.run-history-row p {
+  margin-top: 3px;
+  color: #68736c;
+  overflow-wrap: anywhere;
+}
+
 .run-timeline {
   display: grid;
   gap: 10px;
@@ -1050,35 +1131,25 @@ dd {
   padding: 12px;
 }
 
-.timeline-step h3,
-.run-detail-card h3 {
+.timeline-step h3 {
   margin: 0;
   color: #20282d;
   font-size: 0.95rem;
   letter-spacing: 0;
 }
 
-.timeline-step p,
-.run-detail-card p {
+.timeline-step p {
   margin: 0;
   color: #5e6873;
 }
 
-.run-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.run-detail-card {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  min-height: 150px;
-  border: 1px solid #dfe5dc;
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 14px;
+.journal-reference {
+  display: block;
+  margin-top: 5px;
+  color: #65706a;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .section-heading {
@@ -1163,7 +1234,6 @@ dd {
   .protection-position-grid,
   .builder-layout,
   .flow-node-ledger,
-  .run-detail-grid,
   .approval-ticket-facts,
   .detail-facts,
   .detail-facts.compact,
@@ -1193,6 +1263,24 @@ dd {
 
   .timeline-step .status-pill {
     grid-column: 2;
+    justify-self: start;
+  }
+
+  .run-inspector-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .run-inspector-toolbar .status-pill {
+    align-self: flex-start;
+  }
+
+  .run-history-row {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .run-history-row .status-pill {
     justify-self: start;
   }
 }
