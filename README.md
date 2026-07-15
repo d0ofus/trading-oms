@@ -59,6 +59,8 @@ engine, real alert delivery, production deployment, or live order submission exi
 - The Candidate Slice 061 independent-review packet is an internally prepared, deterministic
   inventory of the exact merged Slice 060 baseline. It remains not independently reviewed,
   reports `not_ready` and `no_go`, and leaves all 14 rollout evidence categories blocking.
+- The Candidate Slice 062 concrete connector ExecPlan is planning-only; it selects the official
+  native Python TWS API 10.48 design but does not install an SDK or contact IBKR.
 - Default mode is paper/simulation.
 - A concrete IBKR application-protocol connector remains future, separately approved, paper-only
   work. Local TCP reachability and injected test doubles are not paper-session evidence.
@@ -170,6 +172,8 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
   packet, its reproduction procedure, and its no-authorization boundary.
 - `review/candidate-061/packet.json`: deterministic machine-readable source, dependency, test,
   verification, evidence, traceability, finding, and unresolved-evidence inventory.
+- `docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md`: official-source-backed,
+  planning-only design and entry gates for a future concrete IBKR paper connector.
 - `docs/SIMULATION_APPROVAL_API.md`: simulation-only approval decision endpoints.
 - `docs/FRONTEND_READ_API_CLIENT.md`: frontend read API client and safe loading states.
 - `docs/ROADMAP.md`: staged roadmap.

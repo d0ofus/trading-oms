@@ -2472,3 +2472,64 @@ Acceptance criteria:
   independent acceptance.
 - [x] No live trading, broker transport, order path, private value, external integration,
   deployment, rollout, production operation, or safety-gate bypass is added.
+
+---
+
+## Candidate Slice 062 - concrete IBKR paper connector ExecPlan
+
+status: `ready_for_human_review`
+
+Gate: explicit transport-planning approval only
+
+branch: `candidate-slice-062-ibkr-paper-connector-execplan`
+
+Goal:
+Create a current, official-source-backed ExecPlan for one future concrete IBKR paper connector
+behind the existing adapter without implementing or exercising transport.
+
+This slice is planning only.
+
+Scope:
+- official IBKR native Python SDK selection and supply-chain gate;
+- paper-only connector boundary and default-off localhost transport;
+- session lifecycle, paper-mode proof, private values, and account ambiguity;
+- contract resolution, pre-transport safety gates, durable idempotency, callbacks, cancellation,
+  reconnect, reconciliation, protection, and failure behavior;
+- deterministic implementation-test strategy and bounded future paper-lab criteria;
+- external architecture, trading-safety, and security review checklist;
+- rollback, fail-closed behavior, and explicit Candidate 063 entry criteria.
+
+Completed:
+- [x] Candidate Slice 062 ExecPlan was the first file edit.
+- [x] The proposed SDK is the official native Python client from TWS API Latest 10.48 using the
+  classic asynchronous client/wrapper architecture.
+- [x] Official IBKR facts, repository facts, design recommendations, and unresolved blockers are
+  distinguished explicitly.
+- [x] Public/LAN/remote connectivity and live ports remain prohibited; only localhost paper ports
+  `7497` and `4002` are planned.
+- [x] Paper-mode proof and exactly-one-account handling fail closed without storing account
+  identifiers or inferring mode from their shape.
+- [x] Risk, manual approval, OMS, fresh data, protection, journal, emergency-stop, durable outbox,
+  and reconciliation prerequisites bind the future exact request.
+- [x] Duplicate, stale, out-of-order, disconnect, ambiguous, reject, cancel, unknown-state, and
+  partial-fill behavior is specified.
+- [x] The external-review checklist and bounded paper-lab limits are explicit.
+- [x] Readiness remains `not_ready`; external-review evidence remains `missing`; zero evidence
+  categories are verified and all 14 remain blocking.
+
+Non-goals:
+- SDK installation or invocation, connector implementation, sockets, endpoints, config fields, or
+  callback listeners;
+- TWS/Gateway startup, authentication, account selection, contract/market-data/order requests, or
+  paper-session evidence;
+- deployment, rollout, production operation, Candidate 063, or live trading.
+
+Acceptance criteria:
+- [x] The ExecPlan follows all 13 required sections from `PLANS.md`.
+- [x] Documentation tests enforce the SDK decision, required safety design, plan-only boundary, and
+  fail-closed evidence posture.
+- [x] No IBKR dependency, connector source, transport flag, credential/account field, broker
+  interaction, or live capability is added.
+- [x] Focused and full verification pass.
+- [x] Candidate 063 remains blocked on separate approval, accepted external design review, exact
+  artifact/version/hash/license review, and every entry criterion in this ExecPlan.
