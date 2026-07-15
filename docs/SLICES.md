@@ -2533,3 +2533,60 @@ Acceptance criteria:
 - [x] Focused and full verification pass.
 - [x] Candidate 063 remains blocked on separate approval, accepted external design review, exact
   artifact/version/hash/license review, and every entry criterion in this ExecPlan.
+
+---
+
+## Candidate Slice 062 - external design-review handoff
+
+status: `ready_for_human_review`
+
+Gate: post-Candidate-062 review preparation only
+
+branch: `candidate-slice-062-external-design-review-handoff`
+
+Goal:
+Prepare a deterministic, secret-scanned handoff through which independent architecture,
+trading-safety, and security reviewers can assess the exact merged Candidate Slice 062 connector
+design without implementing Candidate 063 or overstating review status.
+
+Scope:
+- exact merged Candidate 062 commit, tree, plan Git blob, and plan SHA-256;
+- complete deterministic source, dependency, test, verification, and evidence manifests;
+- official API 10.48 artifact/version/license/hash questions;
+- paper proof, account ambiguity, client/order identity, durable outbox, idempotency, callbacks,
+  protection, disconnect/reconnect, reconciliation, private-data, network, alert, and emergency
+  questions;
+- open blocking internal P0/P1 findings and an attributable reviewer response template;
+- explicit Candidate 063 entry gate and reproducible local commands.
+
+Completed:
+- [x] The handoff ExecPlan was the first file edit.
+- [x] The packet is bound to merged commit `eafc3939f2c5cdc2a7fe09280381395e648bc28d`
+  and tree `d1074dd86dc6b03ce6683cf90d9f2bce7a2da723`.
+- [x] The exact Candidate 062 plan blob and SHA-256 are recorded and tested.
+- [x] Architecture, trading-safety, and security reviewer instructions and eight blocking question
+  areas are explicit.
+- [x] Reviewer identity, role, date, scope, evidence, disposition, and residual-risk fields remain
+  visibly pending.
+- [x] Every internal P0/P1 finding remains open and blocking.
+- [x] The complete handoff is recursively safety scanned and deterministically reproducible.
+- [x] The handoff is not independently reviewed; readiness remains `not_ready`; external-review
+  evidence remains `missing`; all 14 categories remain blocking and zero are verified.
+
+Non-goals:
+- performing or claiming external review;
+- Candidate 063 implementation, an SDK/dependency, connector, socket, session, or callback listener;
+- TWS/Gateway contact, authentication, account selection, contract/market-data/order requests, or
+  paper-session evidence;
+- deployment, paper lab, rollout, production operation, or live trading.
+
+Acceptance criteria:
+- [x] `review/candidate-062/REVIEW_GUIDE.md` provides the immutable source identities, reviewer
+  procedure, blocking questions, findings process, and Candidate 063 gate.
+- [x] `packet.json` exactly matches deterministic generation and `packet.sha256`.
+- [x] Focused tests cover provenance, deterministic identity, readiness posture, findings, response
+  fields, safety scanning, reproduction, docs, and the no-runtime-change boundary.
+- [x] Candidate 063 requires separate explicit human approval, all three attributable independent
+  reviews, and accepted resolution of every P0/P1 finding against unchanged source.
+- [x] No live trading, IBKR dependency, broker contact, order path, private value, deployment,
+  rollout, production operation, or safety-gate bypass is added.

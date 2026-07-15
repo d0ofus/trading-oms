@@ -61,6 +61,12 @@ engine, real alert delivery, production deployment, or live order submission exi
   reports `not_ready` and `no_go`, and leaves all 14 rollout evidence categories blocking.
 - The Candidate Slice 062 concrete connector ExecPlan is planning-only; it selects the official
   native Python TWS API 10.48 design but does not install an SDK or contact IBKR.
+- The Candidate Slice 062 external design-review handoff at
+  `review/candidate-062/REVIEW_GUIDE.md` is deterministic and bound to the exact merged design. It
+  is not independently reviewed: readiness remains `not_ready`, external-review evidence remains
+  `missing`, all 14 rollout categories remain blocking, and zero are verified. Candidate 063 still
+  requires separate explicit human approval and accepted architecture, trading-safety, and security
+  review of every P0/P1 finding.
 - Default mode is paper/simulation.
 - A concrete IBKR application-protocol connector remains future, separately approved, paper-only
   work. Local TCP reachability and injected test doubles are not paper-session evidence.
@@ -174,6 +180,11 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
   verification, evidence, traceability, finding, and unresolved-evidence inventory.
 - `docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md`: official-source-backed,
   planning-only design and entry gates for a future concrete IBKR paper connector.
+- `review/candidate-062/REVIEW_GUIDE.md`: immutable Candidate 062 source identities, independent
+  architecture/trading-safety/security questions, blocking findings, response procedure, and the
+  closed Candidate 063 gate.
+- `review/candidate-062/packet.json`: deterministic machine-readable Candidate 062 design-review
+  handoff with complete baseline manifests and unresolved evidence.
 - `docs/SIMULATION_APPROVAL_API.md`: simulation-only approval decision endpoints.
 - `docs/FRONTEND_READ_API_CLIENT.md`: frontend read API client and safe loading states.
 - `docs/ROADMAP.md`: staged roadmap.

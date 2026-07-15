@@ -1,0 +1,2 @@
+review/**/*.json text eol=lf
+review/**/*.sha256 text eol=lf

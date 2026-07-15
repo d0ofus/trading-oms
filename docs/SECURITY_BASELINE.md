@@ -123,3 +123,23 @@ External-review evidence remains missing. Candidate Slice 062 is not external re
 paper-session evidence. Readiness remains `not_ready`, the decision remains `no_go`, zero
 controlled-rollout evidence categories are verified, and all 14 remain blocking. Candidate 063
 requires separate explicit approval and accepted architecture, trading-safety, and security review.
+
+## Candidate Slice 062 External Design-Review Handoff
+
+The handoff at `review/candidate-062/REVIEW_GUIDE.md` binds a deterministic packet to the exact
+merged Candidate Slice 062 commit, tree, plan Git blob, and plan SHA-256. It carries internal
+pre-review P0/P1 findings, discipline-specific questions, an attributable response template, and
+reproducible local verification commands. Recursive scanning covers machine-readable and human
+handoff artifacts for secret-shaped, account-shaped, private-data, external-URL, broker-routing,
+and live-affordance content.
+
+The handoff is internally prepared and is not independently reviewed. It is not a security
+certification, implementation approval, paper-session record, broker evidence, readiness decision,
+deployment approval, or rollout approval. Readiness remains `not_ready`; external-review evidence
+remains `missing`; all 14 controlled-rollout evidence categories remain blocking; zero are verified.
+
+Candidate 063 remains blocked until separate explicit human approval, completed attributable
+architecture/trading-safety/security review against unchanged source, independent acceptance of
+every P0/P1 resolution and residual risk, and every Candidate 062 entry criterion. The handoff adds
+no IBKR dependency, connector, socket, TWS/Gateway operation, credential/account field, broker
+request, callback listener, deployment, rollout, production operation, or live capability.

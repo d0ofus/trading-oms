@@ -1,0 +1,4813 @@
+{
+  "baseline": {
+    "commit_sha": "eafc3939f2c5cdc2a7fe09280381395e648bc28d",
+    "subject": "Plan Candidate Slice 062 IBKR paper connector (#43)",
+    "tree_sha": "d1074dd86dc6b03ce6683cf90d9f2bce7a2da723"
+  },
+  "findings": {
+    "content_sha256": "d4eff001de35fbc8d5e5eb4894804e595276cafeed5719c2b89b7c30d1564f00",
+    "finding_count": 8,
+    "items": [
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+        ],
+        "finding_id": "c062_001_sdk_provenance",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P1",
+        "summary": "The official TWS API 10.48 artifact filename, origin, version, SHA-256, license and redistribution terms, transitive dependencies, Python 3.12 compatibility, and compatible TWS/Gateway build are not independently accepted."
+      },
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+        ],
+        "finding_id": "c062_002_paper_proof_and_account_ambiguity",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P0",
+        "summary": "Authoritative paper-session proof, exactly-one-account handling, account ambiguity blocking, and transient private data containment are not independently accepted."
+      },
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/IBKR_PAPER_ADAPTER.md"
+        ],
+        "finding_id": "c062_003_client_order_identity_and_outbox",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P0",
+        "summary": "The dedicated client ID, persistent order-ID allocation, opaque order references, durable outbox, dispatch ambiguity, restart recovery, and idempotency design are not independently accepted."
+      },
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/IBKR_PAPER_ADAPTER.md"
+        ],
+        "finding_id": "c062_004_callbacks_and_protection",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P0",
+        "summary": "Callback ordering, duplicate and conflict handling, fill correlation, bracket sequencing, expected protection, and missing-protection blocking are not independently accepted."
+      },
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/RESILIENCE_CHAOS.md"
+        ],
+        "finding_id": "c062_005_reconnect_and_reconciliation",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P0",
+        "summary": "Disconnect, reconnect, reader failure, retrieval-window gaps, callback replay, position comparison, and reconciliation-before-new-risk behavior are not independently accepted."
+      },
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/SECURITY_BASELINE.md",
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+        ],
+        "finding_id": "c062_006_network_and_private_data",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P0",
+        "summary": "Local-only destination enforcement, no-public-exposure evidence, private data redaction, and fail-closed handling of account ambiguity are not independently accepted."
+      },
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "finding_id": "c062_007_alert_and_emergency_response",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P1",
+        "summary": "The local no-op alert limitation, missing-protection escalation, emergency-stop behavior, and operator response procedure are not independently accepted."
+      },
+      {
+        "blocking": true,
+        "evidence_references": [
+          "docs/POST_SLICE_059_REVIEW.md",
+          "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+        ],
+        "finding_id": "c062_008_independent_review_absent",
+        "owner_status": "unassigned",
+        "resolution_state": "open",
+        "severity": "P0",
+        "summary": "No independent architecture, trading-safety, or security reviewer has accepted the exact Candidate 062 design, its P0/P1 resolutions, or its residual risks."
+      }
+    ]
+  },
+  "independence_statement": "Prepared internally for review; no independent reviewer has accepted this packet",
+  "manifests": {
+    "dependencies": {
+      "content_sha256": "97401d724635d225619137c1a396b3c739f000957e072cb8a2548c96ea9edf89",
+      "file_count": 4,
+      "files": [
+        {
+          "bytes": 494,
+          "git_blob_sha": "7c45fccd4ca44d653d15e8e82008f1813339a9ca",
+          "mode": "100644",
+          "path": "backend/pyproject.toml",
+          "sha256": "6f288a67ac90461ff255ccf51b46961e9f77cf2386a2241fed7797622feee99b"
+        },
+        {
+          "bytes": 18,
+          "git_blob_sha": "086712921fa9fbfb95615e928ae643bc4636a7dd",
+          "mode": "100644",
+          "path": "backend/requirements-dev.txt",
+          "sha256": "c7d1bc758511964b1b406c09b882d2ae8d42d2bf989237d25121466d4b7a24d6"
+        },
+        {
+          "bytes": 160716,
+          "git_blob_sha": "2d65c50ac9ac9921a2a6c566ebb82b1976e7e25e",
+          "mode": "100644",
+          "path": "frontend/package-lock.json",
+          "sha256": "c31b590468021b4e5d69f0d24046deb9fba33513ae73fe2f2582ecf72538dc3e"
+        },
+        {
+          "bytes": 650,
+          "git_blob_sha": "1839df1ddb020b3b6ecd504e2a7545f658c6cb1c",
+          "mode": "100644",
+          "path": "frontend/package.json",
+          "sha256": "3eafd8dc40d3b2ac495aabc3764adc623c68fcf0aa4930958a3b5dd8170bbce6"
+        }
+      ],
+      "npm_lock_status": "lockfile_present",
+      "package_count": 299,
+      "packages": [
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/code-frame",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/compat-data",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/core",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/generator",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-compilation-targets",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-globals",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-module-imports",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-module-transforms",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-plugin-utils",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-string-parser",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-validator-identifier",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helper-validator-option",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/helpers",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/parser",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/plugin-transform-react-jsx-self",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/plugin-transform-react-jsx-source",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/template",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/traverse",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@babel/types",
+          "resolved_version": "7.29.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/aix-ppc64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/aix-ppc64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/android-arm",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/android-arm",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/android-arm64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/android-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/android-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/android-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/darwin-arm64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/darwin-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/darwin-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/darwin-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/freebsd-arm64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/freebsd-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/freebsd-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/freebsd-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-arm",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-arm",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-arm64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-ia32",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-ia32",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-loong64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-loong64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-mips64el",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-mips64el",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-ppc64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-ppc64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-riscv64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-riscv64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-s390x",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-s390x",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/linux-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/netbsd-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/netbsd-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/netbsd-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/openbsd-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/openbsd-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/openbsd-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/openharmony-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/sunos-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/sunos-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/win32-arm64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/win32-arm64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/win32-ia32",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/win32-ia32",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/win32-x64",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@esbuild/win32-x64",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint-community/eslint-utils",
+          "resolved_version": "4.9.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint-community/regexpp",
+          "resolved_version": "4.12.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint/config-array",
+          "resolved_version": "0.21.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint/config-helpers",
+          "resolved_version": "0.4.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint/core",
+          "resolved_version": "0.17.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint/eslintrc",
+          "resolved_version": "3.3.5"
+        },
+        {
+          "constraint": "^9.16.0",
+          "ecosystem": "npm",
+          "name": "@eslint/js",
+          "resolved_version": "9.39.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint/object-schema",
+          "resolved_version": "2.1.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@eslint/plugin-kit",
+          "resolved_version": "0.4.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@humanfs/core",
+          "resolved_version": "0.19.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@humanfs/node",
+          "resolved_version": "0.16.8"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@humanfs/types",
+          "resolved_version": "0.15.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@humanwhocodes/module-importer",
+          "resolved_version": "1.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@humanwhocodes/retry",
+          "resolved_version": "0.4.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@jridgewell/gen-mapping",
+          "resolved_version": "0.3.13"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@jridgewell/remapping",
+          "resolved_version": "2.3.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@jridgewell/resolve-uri",
+          "resolved_version": "3.1.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@jridgewell/sourcemap-codec",
+          "resolved_version": "1.5.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@jridgewell/trace-mapping",
+          "resolved_version": "0.3.31"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rolldown/pluginutils",
+          "resolved_version": "1.0.0-beta.27"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-android-arm-eabi",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-android-arm64",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-darwin-arm64",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-darwin-x64",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-freebsd-arm64",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-freebsd-x64",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-arm-gnueabihf",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-arm-musleabihf",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-arm64-gnu",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-arm64-musl",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-loong64-gnu",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-loong64-musl",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-ppc64-gnu",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-ppc64-musl",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-riscv64-gnu",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-riscv64-musl",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-s390x-gnu",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-x64-gnu",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-linux-x64-musl",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-openbsd-x64",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-openharmony-arm64",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-win32-arm64-msvc",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-win32-ia32-msvc",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-win32-x64-gnu",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@rollup/rollup-win32-x64-msvc",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/babel__core",
+          "resolved_version": "7.20.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/babel__generator",
+          "resolved_version": "7.27.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/babel__template",
+          "resolved_version": "7.4.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/babel__traverse",
+          "resolved_version": "7.28.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/d3-color",
+          "resolved_version": "3.1.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/d3-drag",
+          "resolved_version": "3.0.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/d3-interpolate",
+          "resolved_version": "3.0.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/d3-selection",
+          "resolved_version": "3.0.11"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/d3-transition",
+          "resolved_version": "3.0.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/d3-zoom",
+          "resolved_version": "3.0.8"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/estree",
+          "resolved_version": "1.0.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@types/json-schema",
+          "resolved_version": "7.0.15"
+        },
+        {
+          "constraint": "^19.0.1",
+          "ecosystem": "npm",
+          "name": "@types/react",
+          "resolved_version": "19.2.17"
+        },
+        {
+          "constraint": "^19.0.2",
+          "ecosystem": "npm",
+          "name": "@types/react-dom",
+          "resolved_version": "19.2.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/eslint-plugin",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/parser",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/project-service",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/scope-manager",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/tsconfig-utils",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/type-utils",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/types",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/typescript-estree",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/utils",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@typescript-eslint/visitor-keys",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "^4.3.4",
+          "ecosystem": "npm",
+          "name": "@vitejs/plugin-react",
+          "resolved_version": "4.7.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@vitest/expect",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@vitest/mocker",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@vitest/pretty-format",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@vitest/runner",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@vitest/snapshot",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@vitest/spy",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@vitest/utils",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "^12.11.2",
+          "ecosystem": "npm",
+          "name": "@xyflow/react",
+          "resolved_version": "12.11.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "@xyflow/system",
+          "resolved_version": "0.0.79"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "acorn",
+          "resolved_version": "8.17.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "acorn-jsx",
+          "resolved_version": "5.3.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "ajv",
+          "resolved_version": "6.15.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "ansi-styles",
+          "resolved_version": "4.3.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "argparse",
+          "resolved_version": "2.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "assertion-error",
+          "resolved_version": "2.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "balanced-match",
+          "resolved_version": "1.0.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "balanced-match",
+          "resolved_version": "4.0.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "baseline-browser-mapping",
+          "resolved_version": "2.10.42"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "brace-expansion",
+          "resolved_version": "1.1.15"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "brace-expansion",
+          "resolved_version": "5.0.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "browserslist",
+          "resolved_version": "4.28.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "cac",
+          "resolved_version": "6.7.14"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "callsites",
+          "resolved_version": "3.1.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "caniuse-lite",
+          "resolved_version": "1.0.30001800"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "chai",
+          "resolved_version": "5.3.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "chalk",
+          "resolved_version": "4.1.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "check-error",
+          "resolved_version": "2.1.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "classcat",
+          "resolved_version": "5.0.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "color-convert",
+          "resolved_version": "2.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "color-name",
+          "resolved_version": "1.1.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "concat-map",
+          "resolved_version": "0.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "convert-source-map",
+          "resolved_version": "2.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "cross-spawn",
+          "resolved_version": "7.0.6"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "csstype",
+          "resolved_version": "3.2.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-color",
+          "resolved_version": "3.1.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-dispatch",
+          "resolved_version": "3.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-drag",
+          "resolved_version": "3.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-ease",
+          "resolved_version": "3.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-interpolate",
+          "resolved_version": "3.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-selection",
+          "resolved_version": "3.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-timer",
+          "resolved_version": "3.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-transition",
+          "resolved_version": "3.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "d3-zoom",
+          "resolved_version": "3.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "debug",
+          "resolved_version": "4.4.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "deep-eql",
+          "resolved_version": "5.0.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "deep-is",
+          "resolved_version": "0.1.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "electron-to-chromium",
+          "resolved_version": "1.5.387"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "es-module-lexer",
+          "resolved_version": "1.7.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "esbuild",
+          "resolved_version": "0.21.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "esbuild",
+          "resolved_version": "0.25.12"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "escalade",
+          "resolved_version": "3.2.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "escape-string-regexp",
+          "resolved_version": "4.0.0"
+        },
+        {
+          "constraint": "^9.16.0",
+          "ecosystem": "npm",
+          "name": "eslint",
+          "resolved_version": "9.39.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "eslint-scope",
+          "resolved_version": "8.4.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "eslint-visitor-keys",
+          "resolved_version": "3.4.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "eslint-visitor-keys",
+          "resolved_version": "4.2.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "eslint-visitor-keys",
+          "resolved_version": "5.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "espree",
+          "resolved_version": "10.4.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "esquery",
+          "resolved_version": "1.7.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "esrecurse",
+          "resolved_version": "4.3.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "estraverse",
+          "resolved_version": "5.3.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "estree-walker",
+          "resolved_version": "3.0.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "esutils",
+          "resolved_version": "2.0.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "expect-type",
+          "resolved_version": "1.4.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "fast-deep-equal",
+          "resolved_version": "3.1.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "fast-json-stable-stringify",
+          "resolved_version": "2.1.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "fast-levenshtein",
+          "resolved_version": "2.0.6"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "fdir",
+          "resolved_version": "6.5.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "file-entry-cache",
+          "resolved_version": "8.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "find-up",
+          "resolved_version": "5.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "flat-cache",
+          "resolved_version": "4.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "flatted",
+          "resolved_version": "3.4.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "fsevents",
+          "resolved_version": "2.3.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "gensync",
+          "resolved_version": "1.0.0-beta.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "glob-parent",
+          "resolved_version": "6.0.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "globals",
+          "resolved_version": "14.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "has-flag",
+          "resolved_version": "4.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "ignore",
+          "resolved_version": "5.3.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "ignore",
+          "resolved_version": "7.0.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "import-fresh",
+          "resolved_version": "3.3.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "imurmurhash",
+          "resolved_version": "0.1.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "is-extglob",
+          "resolved_version": "2.1.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "is-glob",
+          "resolved_version": "4.0.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "isexe",
+          "resolved_version": "2.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "js-tokens",
+          "resolved_version": "4.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "js-yaml",
+          "resolved_version": "4.3.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "jsesc",
+          "resolved_version": "3.1.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "json-buffer",
+          "resolved_version": "3.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "json-schema-traverse",
+          "resolved_version": "0.4.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "json-stable-stringify-without-jsonify",
+          "resolved_version": "1.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "json5",
+          "resolved_version": "2.2.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "keyv",
+          "resolved_version": "4.5.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "levn",
+          "resolved_version": "0.4.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "locate-path",
+          "resolved_version": "6.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "lodash.merge",
+          "resolved_version": "4.6.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "loupe",
+          "resolved_version": "3.2.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "lru-cache",
+          "resolved_version": "5.1.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "magic-string",
+          "resolved_version": "0.30.21"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "minimatch",
+          "resolved_version": "10.2.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "minimatch",
+          "resolved_version": "3.1.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "ms",
+          "resolved_version": "2.1.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "nanoid",
+          "resolved_version": "3.3.15"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "natural-compare",
+          "resolved_version": "1.4.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "node-releases",
+          "resolved_version": "2.0.50"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "optionator",
+          "resolved_version": "0.9.4"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "p-limit",
+          "resolved_version": "3.1.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "p-locate",
+          "resolved_version": "5.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "parent-module",
+          "resolved_version": "1.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "path-exists",
+          "resolved_version": "4.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "path-key",
+          "resolved_version": "3.1.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "pathe",
+          "resolved_version": "1.1.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "pathval",
+          "resolved_version": "2.0.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "picocolors",
+          "resolved_version": "1.1.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "picomatch",
+          "resolved_version": "4.0.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "postcss",
+          "resolved_version": "8.5.16"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "prelude-ls",
+          "resolved_version": "1.2.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "punycode",
+          "resolved_version": "2.3.1"
+        },
+        {
+          "constraint": "^19.0.0",
+          "ecosystem": "npm",
+          "name": "react",
+          "resolved_version": "19.2.7"
+        },
+        {
+          "constraint": "^19.0.0",
+          "ecosystem": "npm",
+          "name": "react-dom",
+          "resolved_version": "19.2.7"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "react-refresh",
+          "resolved_version": "0.17.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "resolve-from",
+          "resolved_version": "4.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "rollup",
+          "resolved_version": "4.62.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "scheduler",
+          "resolved_version": "0.27.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "semver",
+          "resolved_version": "6.3.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "semver",
+          "resolved_version": "7.8.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "shebang-command",
+          "resolved_version": "2.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "shebang-regex",
+          "resolved_version": "3.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "siginfo",
+          "resolved_version": "2.0.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "source-map-js",
+          "resolved_version": "1.2.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "stackback",
+          "resolved_version": "0.0.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "std-env",
+          "resolved_version": "3.10.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "strip-json-comments",
+          "resolved_version": "3.1.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "supports-color",
+          "resolved_version": "7.2.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "tinybench",
+          "resolved_version": "2.9.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "tinyexec",
+          "resolved_version": "0.3.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "tinyglobby",
+          "resolved_version": "0.2.17"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "tinypool",
+          "resolved_version": "1.1.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "tinyrainbow",
+          "resolved_version": "1.2.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "tinyspy",
+          "resolved_version": "3.0.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "ts-api-utils",
+          "resolved_version": "2.5.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "type-check",
+          "resolved_version": "0.4.0"
+        },
+        {
+          "constraint": "^5.7.2",
+          "ecosystem": "npm",
+          "name": "typescript",
+          "resolved_version": "5.9.3"
+        },
+        {
+          "constraint": "^8.18.0",
+          "ecosystem": "npm",
+          "name": "typescript-eslint",
+          "resolved_version": "8.62.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "update-browserslist-db",
+          "resolved_version": "1.2.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "uri-js",
+          "resolved_version": "4.4.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "use-sync-external-store",
+          "resolved_version": "1.6.0"
+        },
+        {
+          "constraint": "^6.0.3",
+          "ecosystem": "npm",
+          "name": "vite",
+          "resolved_version": "5.4.21"
+        },
+        {
+          "constraint": "^6.0.3",
+          "ecosystem": "npm",
+          "name": "vite",
+          "resolved_version": "6.4.3"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "vite-node",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "^2.1.8",
+          "ecosystem": "npm",
+          "name": "vitest",
+          "resolved_version": "2.1.9"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "which",
+          "resolved_version": "2.0.2"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "why-is-node-running",
+          "resolved_version": "2.3.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "word-wrap",
+          "resolved_version": "1.2.5"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "yallist",
+          "resolved_version": "3.1.1"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "yocto-queue",
+          "resolved_version": "0.1.0"
+        },
+        {
+          "constraint": "transitive",
+          "ecosystem": "npm",
+          "name": "zustand",
+          "resolved_version": "4.5.7"
+        },
+        {
+          "constraint": ">=0.115,<1",
+          "ecosystem": "python",
+          "name": "fastapi",
+          "resolved_version": null
+        },
+        {
+          "constraint": ">=0.27,<1",
+          "ecosystem": "python",
+          "name": "httpx",
+          "resolved_version": null
+        },
+        {
+          "constraint": ">=8,<9",
+          "ecosystem": "python",
+          "name": "pytest",
+          "resolved_version": null
+        },
+        {
+          "constraint": ">=0.8,<1",
+          "ecosystem": "python",
+          "name": "ruff",
+          "resolved_version": null
+        },
+        {
+          "constraint": ">=0.34,<1",
+          "ecosystem": "python",
+          "name": "uvicorn",
+          "resolved_version": null
+        }
+      ],
+      "python_lock_status": "unlocked_constraints"
+    },
+    "evidence": {
+      "content_sha256": "ca72bb1cf56c11b6a87d9197d951af6ec96526a02c3588d9697032a63db298a0",
+      "document_count": 14,
+      "documents": [
+        {
+          "bytes": 4958,
+          "evidence_level": "documented",
+          "git_blob_sha": "ec3855c89387134a9a150e1bb9d156bde3cd7537",
+          "path": "AGENTS.md",
+          "purpose": "Repository-wide trading safety rules and required implementation workflow.",
+          "review_status": "pending_independent_review",
+          "sha256": "af2a95d3b18a4799f6dcea940f97773be4398edb44b3359b2e5392e7970796b1"
+        },
+        {
+          "bytes": 39608,
+          "evidence_level": "source_inspected",
+          "git_blob_sha": "0dc6580dce46d20521641b8f58d792f4a56017dc",
+          "path": "backend/src/trading_oms_backend/independent_review_packet.py",
+          "purpose": "Canonical packet generation, Git-tree binding, verification, and safety scanning.",
+          "review_status": "pending_independent_review",
+          "sha256": "04e277f97e3d1ba3fb26fea55cc90e3c01bc5d8cc59f38e89bde8766123b1d0e"
+        },
+        {
+          "bytes": 8440,
+          "evidence_level": "automated_test",
+          "git_blob_sha": "ee7bef8a4656c08d962b879de0ea69031431cd3f",
+          "path": "backend/tests/test_candidate_slice_062_execplan.py",
+          "purpose": "Candidate 062 plan structure, official-source distinction, and no-runtime-surface tests.",
+          "review_status": "pending_independent_review",
+          "sha256": "357d98e6b910caa82d6342d76e3d17275f2a7f2ba1c9d4765929f8aa6a923f99"
+        },
+        {
+          "bytes": 11341,
+          "evidence_level": "automated_test",
+          "git_blob_sha": "5b3d8462b1886578a658e50331bbeb8aa6e649ab",
+          "path": "backend/tests/test_independent_review_packet.py",
+          "purpose": "Deterministic packet identity, tamper rejection, and unsafe-content tests.",
+          "review_status": "pending_independent_review",
+          "sha256": "1583b41b8b803d05559cf7708ff9cf07ffdf4b33ed8d1b4f3e9af3b471e6ad1f"
+        },
+        {
+          "bytes": 12886,
+          "evidence_level": "documented",
+          "git_blob_sha": "1a9f7d095e9b2777d4d647975f21aef5d354b318",
+          "path": "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md",
+          "purpose": "Fourteen-category evidence gate and fail-closed readiness posture.",
+          "review_status": "pending_independent_review",
+          "sha256": "b33635b378f30305baf0027c13638a2d5290cf917db558110e506f8b223614d0"
+        },
+        {
+          "bytes": 2577,
+          "evidence_level": "documented",
+          "git_blob_sha": "697d916cdd500b088165e0331db9ca9b0fdaf3b0",
+          "path": "docs/IBKR_ADAPTER_DESIGN.md",
+          "purpose": "Existing broker-boundary responsibilities and future paper-only scope.",
+          "review_status": "pending_independent_review",
+          "sha256": "3e06646b4b9e31d12cc40b8a65cdc14b7c193b4fbbc8430e7554c4310dcce9b3"
+        },
+        {
+          "bytes": 11431,
+          "evidence_level": "documented",
+          "git_blob_sha": "fbee1f8c8f52f2b32adcb6838ae336a0b245766a",
+          "path": "docs/IBKR_PAPER_ADAPTER.md",
+          "purpose": "Current adapter-only behavior, safety guards, and runtime limitations.",
+          "review_status": "pending_independent_review",
+          "sha256": "39b0e13d86b4182bf678d73223dcaf3866b6e84a749ffb8f7ae2e7315e190fac"
+        },
+        {
+          "bytes": 4090,
+          "evidence_level": "documented",
+          "git_blob_sha": "871398259f5f7a592172564452ae98ffea02661e",
+          "path": "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md",
+          "purpose": "External-review topics, test expectations, and explicit non-approvals.",
+          "review_status": "pending_independent_review",
+          "sha256": "3f995ea2c4d380b7e08ebb2e4367ba6d6043c3122638bbba99c2e85faebf659e"
+        },
+        {
+          "bytes": 28964,
+          "evidence_level": "documented",
+          "git_blob_sha": "3f96417a3113ba116b26d1cb7da1cc9d58e35d5d",
+          "path": "docs/POST_SLICE_059_REVIEW.md",
+          "purpose": "No-go product gap review and independent-evidence program boundary.",
+          "review_status": "pending_independent_review",
+          "sha256": "8eba54d0b812cb82b8435ed2760956b14de3ad13db5cd8ddcb437400b3264cb8"
+        },
+        {
+          "bytes": 3100,
+          "evidence_level": "documented",
+          "git_blob_sha": "8453692e25fcef8531cdd9a48fe7f5dffd48b59f",
+          "path": "docs/RESILIENCE_CHAOS.md",
+          "purpose": "Current deterministic disconnect, reconnect, callback, and reconciliation evidence limits.",
+          "review_status": "pending_independent_review",
+          "sha256": "28e3d52b1df5a7e17e0ee0b3d78156e4fed5658f8609aa2a6b2a1764f8e88eb7"
+        },
+        {
+          "bytes": 6557,
+          "evidence_level": "documented",
+          "git_blob_sha": "dcc163c24ac7c60a6c828a9b6cabde3b61d7fb07",
+          "path": "docs/SECURITY_BASELINE.md",
+          "purpose": "Secret, network, configuration, review, and live-prohibition boundary.",
+          "review_status": "pending_independent_review",
+          "sha256": "fd8d17d767fdbc690f0c7d51dee20afe6e08f324ec3625769f6332917c36e1a1"
+        },
+        {
+          "bytes": 91324,
+          "evidence_level": "documented",
+          "git_blob_sha": "101620038c34e202d3d944fa368b4e7386e11a71",
+          "path": "docs/SLICES.md",
+          "purpose": "Candidate 062 completion record and Candidate 063 non-authorization boundary.",
+          "review_status": "pending_independent_review",
+          "sha256": "c18b5408acfcaf31d80885a3635258df2151f78534df0ebe2efd8257062ffa34"
+        },
+        {
+          "bytes": 49965,
+          "evidence_level": "documented",
+          "git_blob_sha": "e72d53b9ca85744809e91a3fdff97c42e41bfa7a",
+          "path": "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "purpose": "Exact proposed Candidate Slice 063 paper-connector design under review.",
+          "review_status": "pending_independent_review",
+          "sha256": "b76575eaf048c13b91bc18ecb778c767b11d66da428d42ec9710ddfc1fade145"
+        },
+        {
+          "bytes": 3297,
+          "evidence_level": "documented",
+          "git_blob_sha": "9f44e4c0758a1d21a45fcf0af649c6f4dfa9945f",
+          "path": "review/candidate-061/REVIEW_GUIDE.md",
+          "purpose": "Prior deterministic packet review procedure and non-independence boundary.",
+          "review_status": "pending_independent_review",
+          "sha256": "458f700a34973f60a4681c060f5442e83576d4fc7377485dbfd829d09807727f"
+        }
+      ]
+    },
+    "source": {
+      "content_sha256": "a8ce88a78ba5ac7396ef6d62b4f26f0b10c33011151aa3f8996ed8fe85b27ced",
+      "entries": [
+        {
+          "bytes": 1406,
+          "git_blob_sha": "ab40b843dc482b0d04be94d2b28daf2f299e5a3f",
+          "mode": "100644",
+          "path": ".codex/config.toml",
+          "sha256": "6045c7c0da237a4b1f66a1411f67e2b0c3891c145a7f256f7346d47f1a5fc9bc"
+        },
+        {
+          "bytes": 312,
+          "git_blob_sha": "1fe5a5f2b4a7eb95d822845a96fa49317e72ce1a",
+          "mode": "100644",
+          "path": ".codex/prompts/00-repo-inspection.md",
+          "sha256": "780808e7d13d12a3a52a03c57e44297f21beb524f3b2006ada230ef995e162e5"
+        },
+        {
+          "bytes": 352,
+          "git_blob_sha": "efd703fc26fc83d406d22142a77dde0f4d480061",
+          "mode": "100644",
+          "path": ".codex/prompts/01-plan-only.md",
+          "sha256": "6e369d5a64a1951c1dba31cf2e44b23386f180524965f796cae3cfa43c72dee4"
+        },
+        {
+          "bytes": 730,
+          "git_blob_sha": "1d174581ecc997760094375f3a587d1fa75d2247",
+          "mode": "100644",
+          "path": ".codex/prompts/02-implement-approved-plan.md",
+          "sha256": "cd890382d7b35bce46d74597a8137f011d985d73d1934877c92acce12d3fbc37"
+        },
+        {
+          "bytes": 488,
+          "git_blob_sha": "790a84f8bea644e407bae160c7853bc2c76374bc",
+          "mode": "100644",
+          "path": ".codex/prompts/03-self-review.md",
+          "sha256": "f4f7bfacdc9f8680ed36506ea411cc9de0af5a40e5e472265508168f94ef5fd3"
+        },
+        {
+          "bytes": 574,
+          "git_blob_sha": "154e8e65e6e5de2cd63e3e9cf6edbebbff4cc214",
+          "mode": "100644",
+          "path": ".codex/prompts/04-red-team-trading-safety.md",
+          "sha256": "f0def586d03f0b082c474fcaa1803c51933c9db7f8ffb7a3f61fecb8a83a52e8"
+        },
+        {
+          "bytes": 281,
+          "git_blob_sha": "fc9e657fd8a35ac29170c05c8a7cb64b7411a544",
+          "mode": "100644",
+          "path": ".codex/prompts/05-fix-review-findings.md",
+          "sha256": "ee1825a7b600ec2d33ed3e233c88126ddcfca361841d8b4c54d3c3dc6b9eecaa"
+        },
+        {
+          "bytes": 299,
+          "git_blob_sha": "65f5172f492fa741bee8a10a9e422dc17bcfb2d9",
+          "mode": "100644",
+          "path": ".codex/prompts/06-next-slice-plan.md",
+          "sha256": "3e64eea56f3469ebc23da8a860363b52eea80347cad0cf7e37e7ebbbceab8e95"
+        },
+        {
+          "bytes": 2022,
+          "git_blob_sha": "70b3f962cef02680033a3c5a6613d549cb9a5c40",
+          "mode": "100644",
+          "path": ".codex/prompts/07-run-one-approved-slice-autonomously.md",
+          "sha256": "2fd09cd51a24364fd10d097f2ae733951dc41b7cf920bf04c13c57da4748fd68"
+        },
+        {
+          "bytes": 645,
+          "git_blob_sha": "82b851ead2e56ceea81eb26a3547b3b6e51e2701",
+          "mode": "100644",
+          "path": ".codex/prompts/08-human-approved-commit.md",
+          "sha256": "1e6712a4ccf794915d98191fc4d693826f76a7d50833986466f11fbe108cd0e4"
+        },
+        {
+          "bytes": 774,
+          "git_blob_sha": "647866411ee81261515bccf12e2d5811ef784784",
+          "mode": "100644",
+          "path": ".codex/prompts/09-human-approved-next-slice.md",
+          "sha256": "152f1a3ad59dfa7ac3b11270204eefe72482f859af3bdc5154dbfc09d28a3c16"
+        },
+        {
+          "bytes": 503,
+          "git_blob_sha": "80399cdb5cb3b4144f2e0cb09d3598dd34bd5cc2",
+          "mode": "100644",
+          "path": ".codex/prompts/10-autonomous-slice-self-check.md",
+          "sha256": "836b1f950d07712601236048361ea1ac667eae32b5c5c04da43a05a856bf5f03"
+        },
+        {
+          "bytes": 4356,
+          "git_blob_sha": "afde6f785e120d0402e1ccc1be78b5f4e0012d3c",
+          "mode": "100644",
+          "path": ".codex/prompts/11-human-gated-slice-conveyor.md",
+          "sha256": "a2dcc55b7d88ae6e5de9d02be0bbc1eac2560e16b32429629c726ce6849c6d48"
+        },
+        {
+          "bytes": 6862,
+          "git_blob_sha": "6cdcc36ba47e04b361943faa2a21cabac9efef98",
+          "mode": "100644",
+          "path": ".codex/prompts/12-merge-current-pr-and-run-next-recommended-slice.md",
+          "sha256": "5260c67b2909c125a3424088e6d19189181fd174640aceb063205e6e02241522"
+        },
+        {
+          "bytes": 257,
+          "git_blob_sha": "994ccabe1845873b5f45d559172574830170ef39",
+          "mode": "100644",
+          "path": ".env.example",
+          "sha256": "9e78c7be3da514a2efaad5327d37fa4fe624033b8279f6b3e6f915ad063cce3e"
+        },
+        {
+          "bytes": 434,
+          "git_blob_sha": "aadb9c38f3e51c9a9018bfc4e06db65a0082a3da",
+          "mode": "100644",
+          "path": ".github/pull_request_template.md",
+          "sha256": "24800edbf70a56b857fef5a93b46e32d042681c33918adb97271570c1eda31b6"
+        },
+        {
+          "bytes": 863,
+          "git_blob_sha": "e065fbddb3ba1d89175f585b539bd77b949ec936",
+          "mode": "100644",
+          "path": ".github/workflows/ci.yml",
+          "sha256": "167869ad3590c80f9c59e36c59aeb1121c40b3bbb7eeba494d236737ddbd9abe"
+        },
+        {
+          "bytes": 410,
+          "git_blob_sha": "f9e2abdaa7c606784189b30e569ad164e3f809f8",
+          "mode": "100644",
+          "path": ".gitignore",
+          "sha256": "f80022a57c8702421cb1a8c8647d5b0ed022f347f04b40b45fae849a4ce9801c"
+        },
+        {
+          "bytes": 4958,
+          "git_blob_sha": "ec3855c89387134a9a150e1bb9d156bde3cd7537",
+          "mode": "100644",
+          "path": "AGENTS.md",
+          "sha256": "af2a95d3b18a4799f6dcea940f97773be4398edb44b3359b2e5392e7970796b1"
+        },
+        {
+          "bytes": 830,
+          "git_blob_sha": "250d84b570942db98e8aaa3e24025bad4d9e350b",
+          "mode": "100644",
+          "path": "FILE_MANIFEST.txt",
+          "sha256": "f77f9dddde2e69d84091410e9da7949259794c62a727722d1779b722fa0a3b37"
+        },
+        {
+          "bytes": 2255,
+          "git_blob_sha": "73daa8b674750a9f245c616e2492c28af9939c24",
+          "mode": "100644",
+          "path": "FIRST_AUTONOMOUS_CODEX_LOOP.md",
+          "sha256": "b7099582327e3acab0823f7fc527b8d0cae277b107a2660998f2eab33f21034c"
+        },
+        {
+          "bytes": 2878,
+          "git_blob_sha": "fc690130b912922787b8d345dc82d43b59bebb30",
+          "mode": "100644",
+          "path": "FIRST_CODEX_LOOP.md",
+          "sha256": "c0fb5b42c5fdce31747658563722df63d2dbf5aebced808282fa532a381c2dcf"
+        },
+        {
+          "bytes": 2192,
+          "git_blob_sha": "c84922382ef3fe1f966a52d248485aac0d5eac94",
+          "mode": "100644",
+          "path": "GETTING_STARTED_WINDOWS.md",
+          "sha256": "a79c434280cd44acf6dda87a14275623b2ba2b3dc6366f738c64ff9ab9cc569b"
+        },
+        {
+          "bytes": 1289,
+          "git_blob_sha": "fe8e09b336d8660cb238feaa9a20296d0d40dc67",
+          "mode": "100644",
+          "path": "Makefile",
+          "sha256": "30c017af2dca64ac406629dc3b87971d9dd161eb29ef2c984f96c3829eb523f8"
+        },
+        {
+          "bytes": 2328,
+          "git_blob_sha": "b625067839462c0ec20c70f3cbff74656ce53024",
+          "mode": "100644",
+          "path": "PLANS.md",
+          "sha256": "f41f5b78029675cd67da3b14cbd4eef48989f1dccd25b85bddebaa2ba212b961"
+        },
+        {
+          "bytes": 10627,
+          "git_blob_sha": "f30c390704e095b22e7c4e856213cf02f8eeeb14",
+          "mode": "100644",
+          "path": "README.md",
+          "sha256": "e4d815a9968ceed73f43dedbe978be6aba32ae67584098f682e14170d33c68e6"
+        },
+        {
+          "bytes": 408,
+          "git_blob_sha": "8c2b3ebac76bf1aec728dd550951149b12aeea2c",
+          "mode": "100644",
+          "path": "README_HUMAN_GATED_CONTINUATION.md",
+          "sha256": "8c46899f1c2e8318333dcb0b86f0ab2b966018a7dff66ada8877077662ac004f"
+        },
+        {
+          "bytes": 1124,
+          "git_blob_sha": "5a0d62f120388cc1e4b2992cd431bbda74fc8f4b",
+          "mode": "100644",
+          "path": "README_MERGE_AND_NEXT_SLICE.md",
+          "sha256": "365e20f8f3ce0cb216c630a55400bed8c555ac5bd6250358a2ab8fab930c91e8"
+        },
+        {
+          "bytes": 494,
+          "git_blob_sha": "7c45fccd4ca44d653d15e8e82008f1813339a9ca",
+          "mode": "100644",
+          "path": "backend/pyproject.toml",
+          "sha256": "6f288a67ac90461ff255ccf51b46961e9f77cf2386a2241fed7797622feee99b"
+        },
+        {
+          "bytes": 18,
+          "git_blob_sha": "086712921fa9fbfb95615e928ae643bc4636a7dd",
+          "mode": "100644",
+          "path": "backend/requirements-dev.txt",
+          "sha256": "c7d1bc758511964b1b406c09b882d2ae8d42d2bf989237d25121466d4b7a24d6"
+        },
+        {
+          "bytes": 35,
+          "git_blob_sha": "7733cfdc6468eb9aa94aef2cc81f484653f9926e",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/__init__.py",
+          "sha256": "c46483c52b96c6b6432b87318aa708101cb43db227769d0c8806d02d0d45f665"
+        },
+        {
+          "bytes": 18381,
+          "git_blob_sha": "cff2976d4af490b396a67479cdb4615e6825a06f",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/alerts.py",
+          "sha256": "0f7edf24c3ac177e0eacf67e0774061b4912b2c57231806eda5cbb73c9fb7a23"
+        },
+        {
+          "bytes": 23717,
+          "git_blob_sha": "afa4d58015ac6ac108fc8679f78329e4b5f4f951",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/app.py",
+          "sha256": "5e98981c2f8ec7ce91c5838c683f3b837bc878301c7ba30e44ee203bfc4935c5"
+        },
+        {
+          "bytes": 18765,
+          "git_blob_sha": "2445c5531f32ce67b5800856141539453d85e454",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/approval_tickets.py",
+          "sha256": "27b5ac9d4d4308a9d3b2caba7109ef80c49d51487c7dce2e3648d9a2b36b6890"
+        },
+        {
+          "bytes": 10978,
+          "git_blob_sha": "e4d9c0ed18493ef065749ce4c7bd4edda9e7f4ae",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/audit_export.py",
+          "sha256": "90dc4a5809d632a4fbe28337eac70444c04ddd900fda16d5923b693a68bd5ec0"
+        },
+        {
+          "bytes": 7714,
+          "git_blob_sha": "6352e253bcdc69894521b7ac710ca0dcea9a29fc",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/bar_builder.py",
+          "sha256": "f30ff919bbf0485eb0bf4a827ed632d035d09c4f79e8123c7a198d43aae20b00"
+        },
+        {
+          "bytes": 3491,
+          "git_blob_sha": "5cd6d918e6fbcbb55ad6a81a1e663bb6f4c7bd59",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/config.py",
+          "sha256": "db6683faa631daac21557e95c62727206075f800310f5b57daa6064101155c0f"
+        },
+        {
+          "bytes": 13819,
+          "git_blob_sha": "6ca489feb2d903c2850727691baed76eeb6c8704",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/emergency_stop.py",
+          "sha256": "7fef98266869f1196aa6827d446007dcd93467e4955e2f3b6523c16714231ceb"
+        },
+        {
+          "bytes": 5577,
+          "git_blob_sha": "46c4102c58c8af2d2cf41bd8d58e35e8d1102e7c",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/event_journal.py",
+          "sha256": "8b403697816e72c8d658a9843fa2182a5e69d7fce71fe99dbdb6764dc4c72ab2"
+        },
+        {
+          "bytes": 17763,
+          "git_blob_sha": "e09c2175c717bb583bd7b8f5853d6381c267e203",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/fake_broker.py",
+          "sha256": "5d13bfcabdf0eec143d01c9ed672301d504984a398d3a7ac3c90c2667bcc25e1"
+        },
+        {
+          "bytes": 100126,
+          "git_blob_sha": "c9305317bc8f85549bb5548ee082b81ab29bdb9f",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/ibkr_paper_adapter.py",
+          "sha256": "56e6b854a8e1797832396b9169b7e56fcbb457438896b290f68f6e5afff411bd"
+        },
+        {
+          "bytes": 39608,
+          "git_blob_sha": "0dc6580dce46d20521641b8f58d792f4a56017dc",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/independent_review_packet.py",
+          "sha256": "04e277f97e3d1ba3fb26fea55cc90e3c01bc5d8cc59f38e89bde8766123b1d0e"
+        },
+        {
+          "bytes": 12473,
+          "git_blob_sha": "4de77e85d81abb7b0b6317778ce7c900c224f878",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/live_readiness.py",
+          "sha256": "4ba09b83244f73d79928dd20a2d3fe7cef865a60984a2c4739bc19a42c5ddbaa"
+        },
+        {
+          "bytes": 19514,
+          "git_blob_sha": "10d9a27b87074775c208aee2079ad922239e5f34",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/local_persistence.py",
+          "sha256": "ce4dd47a16b52b45126b47306699d11f70620d6faaf38d75353996054a0beae2"
+        },
+        {
+          "bytes": 5882,
+          "git_blob_sha": "d946c3fa12796daa72c7a42e9ed3bafc197f248a",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/market_data_replay.py",
+          "sha256": "7909b474c411dfd2319dc9b220865648a109d85086d7e68d1b4fda5b999fce53"
+        },
+        {
+          "bytes": 20702,
+          "git_blob_sha": "a56648e294fb370c792159797ac4764e03255941",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/oms_state_machine.py",
+          "sha256": "4bbbe4a0facc099b5c996c57778da7e6f38d2eee566ee0e80d3a35aba8e40528"
+        },
+        {
+          "bytes": 12943,
+          "git_blob_sha": "57be93c2bfeedb33703af537cefb14cc10445900",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/operator_auth.py",
+          "sha256": "134c891a666f708793ac748e4586f25a2fcd48e0368ef23560471b3a8e443425"
+        },
+        {
+          "bytes": 14264,
+          "git_blob_sha": "685b47178403ad562491b712627c22e0aca9fbb5",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/order_intents.py",
+          "sha256": "4455b419393fe1ad7742c16e0b1db9ca124b9b4460ee609c95a6b6ee18f9b3fc"
+        },
+        {
+          "bytes": 13399,
+          "git_blob_sha": "638f60ff6786ef5529d2375feb26f19da400bd9c",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/product_strategy.py",
+          "sha256": "0b943849b4e84142345ff6102eaa1bfe09cff8579b9e9562963b31524d6889cd"
+        },
+        {
+          "bytes": 70421,
+          "git_blob_sha": "badfe6e7570a8ef485cce59e92928367a0c050ce",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/read_models.py",
+          "sha256": "717a7226943194704a1ddccba6e98799c11f33a52bb6d0ed4c9b547b72248d48"
+        },
+        {
+          "bytes": 7328,
+          "git_blob_sha": "9c0cce38c96e3687ba05c9f67b2c4425434e970a",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/replay_strategy.py",
+          "sha256": "a1d89bdbb1862898223acfc64224e8e6747303e0bcb874a9091def82dc76c2a0"
+        },
+        {
+          "bytes": 22570,
+          "git_blob_sha": "7c6608ce18cf4eb7f8750e0dd5d3bef5093b9610",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/resilience.py",
+          "sha256": "c33b136704a647bb8815c8bfbff6db666bdbc51884baa6fb6bc261309aed6d77"
+        },
+        {
+          "bytes": 15482,
+          "git_blob_sha": "9491759b177218d3de2958864a4375d6cd17c640",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/risk_engine.py",
+          "sha256": "3b9658c55d211c7e1f3684dec4d420434c92daece29ce270d8d56a82f2edd8d8"
+        },
+        {
+          "bytes": 11566,
+          "git_blob_sha": "06c108b7490c11568f761edefecf330b7aa5a89c",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/simulated_positions.py",
+          "sha256": "a9f801ec73ec6657412fa25e13ea82e777b4006921f98867b1919e79c9cc5ff9"
+        },
+        {
+          "bytes": 4130,
+          "git_blob_sha": "c0990ab1b8d3c13472c202447f1e9a0168f3cb5b",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/simulation_approval_service.py",
+          "sha256": "5d04eea3e9ea49291917e44c66bbbeb48415cf39d45d7cb17130cc40f7cfc48c"
+        },
+        {
+          "bytes": 32518,
+          "git_blob_sha": "1c256a477f2e9e348ae4633e4c91ecf6d33ca47a",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/simulation_orchestration.py",
+          "sha256": "fd15479ebde396de86628a782762a73d9c982b749f75f8e8b55473007ddea385"
+        },
+        {
+          "bytes": 11497,
+          "git_blob_sha": "6e4c2362f7be1f664a6612a51754870033c44309",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/simulation_runs.py",
+          "sha256": "5cc3151f13e03c552fd4981d5df070edb4251c33b55e01df3d7c78fec124462c"
+        },
+        {
+          "bytes": 10228,
+          "git_blob_sha": "45b19b3418b088f1af54250498a89fafc06bb3de",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/strategy_dsl.py",
+          "sha256": "020df20e96572f897f7e878ec97bd4a1a65124175644a9c6dea089565fa3343b"
+        },
+        {
+          "bytes": 12244,
+          "git_blob_sha": "ba37791378932158cfb5a895caa58fcc09173268",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/workflow_definitions.py",
+          "sha256": "2889b678408f798f98acae989e62050d0445de5e7fc940200b5d87593effb9d0"
+        },
+        {
+          "bytes": 6662,
+          "git_blob_sha": "47f9a523133cca833e4c153caa49a269ca2507f6",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/workflow_dsl.py",
+          "sha256": "c3f42b9f02382032b10faae4bfd3dbec9924a56924994d0c45100a34e05a4843"
+        },
+        {
+          "bytes": 18847,
+          "git_blob_sha": "f5d73f3781a5af56a5c0f87678c50e163da5f280",
+          "mode": "100644",
+          "path": "backend/src/trading_oms_backend/workflow_simulation_runs.py",
+          "sha256": "abe14cf6507c363ec2537cd615b0face5cc909a7464865413a1f46b2cf5479d7"
+        },
+        {
+          "bytes": 9924,
+          "git_blob_sha": "31d0428499ea6f128c4337a587317f3f96d611ca",
+          "mode": "100644",
+          "path": "backend/tests/test_alerts.py",
+          "sha256": "77cddecd5acdbeb6b14e8b2332be6e4006170d4640a5a2ed79308ecc31774d34"
+        },
+        {
+          "bytes": 12527,
+          "git_blob_sha": "a15a9aa6fe66f4265f864b693face45b9b954135",
+          "mode": "100644",
+          "path": "backend/tests/test_approval_tickets.py",
+          "sha256": "240cbefa0a0e71030f36c907302cb849443110041ff771167df44e05f4ba2e8a"
+        },
+        {
+          "bytes": 11210,
+          "git_blob_sha": "a429fa6981b64ff1bf36448dcc11b1e1252e432c",
+          "mode": "100644",
+          "path": "backend/tests/test_audit_export.py",
+          "sha256": "74cf897c155ebf67749898b60e5577fd0c91297aa9e20ef7443ee0abe4cc0f69"
+        },
+        {
+          "bytes": 5985,
+          "git_blob_sha": "d88fbf6cee2e489859120700e36f3804cb425cd5",
+          "mode": "100644",
+          "path": "backend/tests/test_bar_builder.py",
+          "sha256": "14a6e6dc7ce2341cafd030e6269ab5b856ae8f8dc50fd9244bed98912fd2963b"
+        },
+        {
+          "bytes": 8440,
+          "git_blob_sha": "ee7bef8a4656c08d962b879de0ea69031431cd3f",
+          "mode": "100644",
+          "path": "backend/tests/test_candidate_slice_062_execplan.py",
+          "sha256": "357d98e6b910caa82d6342d76e3d17275f2a7f2ba1c9d4765929f8aa6a923f99"
+        },
+        {
+          "bytes": 2678,
+          "git_blob_sha": "0e4060a0d5a9c048d71c122b6a85d5983da4ec7f",
+          "mode": "100644",
+          "path": "backend/tests/test_config.py",
+          "sha256": "d5178fd02841dafd3ebeeaf1a9ddccfbd783f952be89e5d6e713939a23cc7015"
+        },
+        {
+          "bytes": 7062,
+          "git_blob_sha": "0e74d233914e04af8d787c8d28c14ad9796ecbde",
+          "mode": "100644",
+          "path": "backend/tests/test_deployment_planning_docs.py",
+          "sha256": "9d2b0f295449ae3e9c108d81e1e94f7aadd53f67b5b51125065787825bca84f6"
+        },
+        {
+          "bytes": 5286,
+          "git_blob_sha": "7142d8c1a81ae079aab733e75a9986f53ccc0327",
+          "mode": "100644",
+          "path": "backend/tests/test_emergency_stop.py",
+          "sha256": "7da72469cd7afe47c49143411b77235518a291a6b27ca42e134de1d49674eec5"
+        },
+        {
+          "bytes": 12049,
+          "git_blob_sha": "575ba7fc846d9d37a096e6df7be775b2706ce9f4",
+          "mode": "100644",
+          "path": "backend/tests/test_emergency_stop_api.py",
+          "sha256": "7a58594cbae741da208d0994346c79d3ed08ea520d825ba63ec1d5732ba98dbf"
+        },
+        {
+          "bytes": 4413,
+          "git_blob_sha": "87ee4a4b9242aec27dd2f3b3711415d29ac14fd0",
+          "mode": "100644",
+          "path": "backend/tests/test_event_journal.py",
+          "sha256": "6d75ebe8eead5874afb02fbc4b205d879df679f3140b9fab4bfc6714f832d7c5"
+        },
+        {
+          "bytes": 9155,
+          "git_blob_sha": "8fffee752369e59a2c90286c448f43e8351a6aca",
+          "mode": "100644",
+          "path": "backend/tests/test_evidence_provenance.py",
+          "sha256": "ef171ec447d46a1e23e1c35f39bdd964e1701bae815dcd81011c4721f3083844"
+        },
+        {
+          "bytes": 11398,
+          "git_blob_sha": "405f3167b45ce166e01e53a9ece2cd6ccc2a6313",
+          "mode": "100644",
+          "path": "backend/tests/test_fake_broker.py",
+          "sha256": "e03ab177f3770cc7f2c1648506323a1bc192cd9042ea7727e26447366ee2fec8"
+        },
+        {
+          "bytes": 1119,
+          "git_blob_sha": "a7a3caa2745e9b987f58ac69493ccf47d0610c17",
+          "mode": "100644",
+          "path": "backend/tests/test_health.py",
+          "sha256": "6226d7ea5a671a42c6a853f05e6f5bf124529a2db10c14ccfe27b03b026b0b17"
+        },
+        {
+          "bytes": 55398,
+          "git_blob_sha": "f71fbb07cbeae0078e3e84570689aec77ff85612",
+          "mode": "100644",
+          "path": "backend/tests/test_ibkr_paper_adapter.py",
+          "sha256": "55d8386afeb6492d050e612de82aa09007b76a790cb9cef7d6ff7251add5ab48"
+        },
+        {
+          "bytes": 18920,
+          "git_blob_sha": "6a1243522f75704fa16810c1fa503c57c493073f",
+          "mode": "100644",
+          "path": "backend/tests/test_ibkr_paper_transport_chaos.py",
+          "sha256": "2cba56f52c3787e0491b62567a3ebb30a57683299bcf2044e8dc25b31fdcee2a"
+        },
+        {
+          "bytes": 11341,
+          "git_blob_sha": "5b3d8462b1886578a658e50331bbeb8aa6e649ab",
+          "mode": "100644",
+          "path": "backend/tests/test_independent_review_packet.py",
+          "sha256": "1583b41b8b803d05559cf7708ff9cf07ffdf4b33ed8d1b4f3e9af3b471e6ad1f"
+        },
+        {
+          "bytes": 6182,
+          "git_blob_sha": "5fc602573e87db2a227dedbce7518f0d6cec8de5",
+          "mode": "100644",
+          "path": "backend/tests/test_live_readiness.py",
+          "sha256": "465b4c82cea1a40113f161a3724f3eaedd2a4e56a6036896d8f23206a9eabbe1"
+        },
+        {
+          "bytes": 8548,
+          "git_blob_sha": "83633f827eab033f32d1c722a84795db16d986c0",
+          "mode": "100644",
+          "path": "backend/tests/test_live_readiness_evidence.py",
+          "sha256": "6692e8c276ca3c9bd6641e28c23767a6d356784a88e0c0ac50c2c7d82058400f"
+        },
+        {
+          "bytes": 9451,
+          "git_blob_sha": "17b00ea2c6c6cc1076d87aa0a875737414cf4387",
+          "mode": "100644",
+          "path": "backend/tests/test_local_persistence.py",
+          "sha256": "51eafa1d62b3fc7b0643184222d0c4b159e90805ecd09b91c6549db1b6c5e4ee"
+        },
+        {
+          "bytes": 4245,
+          "git_blob_sha": "c5ffc7ad5eff07652ecb4a657f0d245ed62379c1",
+          "mode": "100644",
+          "path": "backend/tests/test_market_data_replay.py",
+          "sha256": "5c5f802db181a98c5a6587fc07b11f72f38389d9d13553e9fde53e849b28dca1"
+        },
+        {
+          "bytes": 14448,
+          "git_blob_sha": "b230c6013066222f67aded20125d2291270a2644",
+          "mode": "100644",
+          "path": "backend/tests/test_oms_state_machine.py",
+          "sha256": "bb42180f5b222a9a3799c43d7e27c2234a5da16283b26ff3e98a4368996e8c2f"
+        },
+        {
+          "bytes": 9143,
+          "git_blob_sha": "e08f077370f066985232fdc6c3efa64c20946563",
+          "mode": "100644",
+          "path": "backend/tests/test_operational_controls.py",
+          "sha256": "d78f40a999a25decf79482a4c7fe28758cbf22676c343837b1a9f87e3fa036c2"
+        },
+        {
+          "bytes": 6802,
+          "git_blob_sha": "83cd4326ec90509eb984900f5cbecbc49d0d48d0",
+          "mode": "100644",
+          "path": "backend/tests/test_operator_auth.py",
+          "sha256": "6f1d6c765d6970b071f5680f6c8d06b792f6cfb0286f54373d9eeff58b29ae8c"
+        },
+        {
+          "bytes": 8282,
+          "git_blob_sha": "6586de43b66ee4976e005c727eb081c2f608f9c0",
+          "mode": "100644",
+          "path": "backend/tests/test_order_intents.py",
+          "sha256": "a22c2740b8f606b6df58e442e17625e0866c76419e1e5370b168728bf4604470"
+        },
+        {
+          "bytes": 4028,
+          "git_blob_sha": "08593d5ca9a17aeca11da9f408ea8cf1b7146786",
+          "mode": "100644",
+          "path": "backend/tests/test_post_slice_059_review.py",
+          "sha256": "98401c91d3bc7b9787864d03210c57c0ee419bba580331d50350395d6b22c8f4"
+        },
+        {
+          "bytes": 12068,
+          "git_blob_sha": "b772c1b8ceb90cc0a6f28cfc528442d3c5d1d28e",
+          "mode": "100644",
+          "path": "backend/tests/test_product_strategy.py",
+          "sha256": "aa41770a125f74903fb27db58499cf28f7705386ce7160cf0db652c2d4732d22"
+        },
+        {
+          "bytes": 5813,
+          "git_blob_sha": "babbef6bede02546d94e84df49464a25c62fb117",
+          "mode": "100644",
+          "path": "backend/tests/test_read_api.py",
+          "sha256": "b8d1989372b159f201eb72030231979193e7811dbf4e3d10973d36a8e11b6502"
+        },
+        {
+          "bytes": 17655,
+          "git_blob_sha": "d92b34ed36807a04805a7ccd8eecb441bd39ee33",
+          "mode": "100644",
+          "path": "backend/tests/test_read_models.py",
+          "sha256": "199954817c0077ff062df690a043be2dacb860d59cc0ebfe5c9e2b2b055e9ca3"
+        },
+        {
+          "bytes": 8553,
+          "git_blob_sha": "88bafc98a92b35b158e3d23c1ce59682f0aecf68",
+          "mode": "100644",
+          "path": "backend/tests/test_replay_strategy.py",
+          "sha256": "71846bf05065826bab9ded4b95c8d9a66ea416924acb3b0abaa823c1d5829ba5"
+        },
+        {
+          "bytes": 9151,
+          "git_blob_sha": "6bef122edb51c8f5dfaad48b8cec0fb06bcdc08b",
+          "mode": "100644",
+          "path": "backend/tests/test_resilience.py",
+          "sha256": "04c1733d314b530d9a143be90fbb33824161f0b0ed5acfe15ab22ffd2eb1740d"
+        },
+        {
+          "bytes": 7559,
+          "git_blob_sha": "d66a3fd2d5a191a1762b7fa8c232d1f91b54905c",
+          "mode": "100644",
+          "path": "backend/tests/test_risk_engine.py",
+          "sha256": "86b82631a6f9e76c5b30f9508f84f0530a6860e4dd766d6718e0b1d6e0c7bad9"
+        },
+        {
+          "bytes": 8344,
+          "git_blob_sha": "0b9280a1b443f6c65ab6fe082a8c88240f495f50",
+          "mode": "100644",
+          "path": "backend/tests/test_simulated_positions.py",
+          "sha256": "3d0572084cd3d21ee3318504a574b2b6a2bfe3c7f3a821741146b6d0a0e876d9"
+        },
+        {
+          "bytes": 8949,
+          "git_blob_sha": "bcbd7f9512fad9ff874de1c9d13548168e1a33bc",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_approval_api.py",
+          "sha256": "8dd199f057b414a0392d95d69610e7933427144725f6a54a6d024d2581541898"
+        },
+        {
+          "bytes": 9001,
+          "git_blob_sha": "8f4059523486821b5379e82481958fc734236341",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_execution.py",
+          "sha256": "5fdfc7b4d6161695d0f6f8653ace27ae4e3c4d5c8c17c75b16e581a6036ce823"
+        },
+        {
+          "bytes": 12133,
+          "git_blob_sha": "997b947d2d7efa3f94384e070b3e44ecdd6b745a",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_orchestration.py",
+          "sha256": "0decf02fce03b7c304dab4682456c5589b9280a51c26b4821c03d4205768b44d"
+        },
+        {
+          "bytes": 10235,
+          "git_blob_sha": "faacc5cb2b071abba85db0b54eff91405c6cf1b4",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_runs.py",
+          "sha256": "069650ca658610b7c129cfe10d96b5ba03715f57152a97f1d0c9631c3fab98e0"
+        },
+        {
+          "bytes": 8461,
+          "git_blob_sha": "6db978edb88e3d02fe405c83aa81a1ec276b4913",
+          "mode": "100644",
+          "path": "backend/tests/test_strategy_dsl.py",
+          "sha256": "8806ed829d3b390ba840176592d65af957ae5929b01bf51d0f278fbe6b0e790c"
+        },
+        {
+          "bytes": 824,
+          "git_blob_sha": "52eb01ac14bf2cd773430ebf25543fdc27750d7b",
+          "mode": "100644",
+          "path": "backend/tests/test_verify_repo.py",
+          "sha256": "c1eb7f785893ec96989ba8ff3ede6a76c86ceecb8cdbf209032b533b588bc6f9"
+        },
+        {
+          "bytes": 11120,
+          "git_blob_sha": "52f25bc70ab37b345a3abaeee952d3dd4775a143",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_api.py",
+          "sha256": "6eab980b053dbc4f77b5eb624a98563b38b7d46ed8e0566fcc61d33b0200ae14"
+        },
+        {
+          "bytes": 10292,
+          "git_blob_sha": "502e4e8697e84087c38f3b781ec4403f1b430a6b",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_definitions.py",
+          "sha256": "4710fec9344f904e7b4530fc2775953027fb9a5e9f64f065ac71798664ee2678"
+        },
+        {
+          "bytes": 5908,
+          "git_blob_sha": "12559536fead03d830abe4250055b23161e6a340",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_dsl.py",
+          "sha256": "17d55231a9b3f2d8c400de3a5e180ead31468cfe5b0efcc5bf323eff46bb5b91"
+        },
+        {
+          "bytes": 11333,
+          "git_blob_sha": "a406d91435a41f5e0426198cc1e342d3ee036ee9",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_simulation_api.py",
+          "sha256": "932f8f1a036de751f1c673c51d80d39ab65268bd232ed2b0ccfe5de3390de434"
+        },
+        {
+          "bytes": 11748,
+          "git_blob_sha": "77df721b1f9e3f805862051a02745b91c9372b83",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_simulation_runs.py",
+          "sha256": "52f5e5d6006e043e21d11f9ad837830feee10bde9b493ffb618c45a9728c5d16"
+        },
+        {
+          "bytes": 2910,
+          "git_blob_sha": "5469799da20019df5da5a95b2a063fccf8e59c83",
+          "mode": "100644",
+          "path": "docs/ALERTS.md",
+          "sha256": "fdd11befdfa467c4228848a2316edfb1a339f220185b7557eb47c9971ff9760e"
+        },
+        {
+          "bytes": 1184,
+          "git_blob_sha": "1b16f7e93889cf70df9a9163bacb4ed1c6a0d2b9",
+          "mode": "100644",
+          "path": "docs/APPROVAL_INBOX.md",
+          "sha256": "38efa78672104326832dc4ae31e5706ad96b1594e9bddf7eba96e80fe689cb3d"
+        },
+        {
+          "bytes": 3094,
+          "git_blob_sha": "24b27c6611784889379dab288bca2537fd6033df",
+          "mode": "100644",
+          "path": "docs/APPROVAL_TICKETS.md",
+          "sha256": "21a1499e90ad636d97abdbb3f2ae838023bfb78df074adcd2bca59e489157a35"
+        },
+        {
+          "bytes": 840,
+          "git_blob_sha": "f7ccd8c9f9b24f0556a4a1bcd425c07b02e08d9a",
+          "mode": "100644",
+          "path": "docs/ARCHITECTURE.md",
+          "sha256": "a142ee2d1debf310c0fceef6768f57b81d152e0d61961a7274339c600c194124"
+        },
+        {
+          "bytes": 1334,
+          "git_blob_sha": "aa7118dbd25704b4900d206b488e2750cbddfb4d",
+          "mode": "100644",
+          "path": "docs/AUDIT_EXPLORER.md",
+          "sha256": "15c9484a5c5c6ad0fe36b397d2901251a451784f0d2d6a3eb5b88b0f4a79a067"
+        },
+        {
+          "bytes": 1548,
+          "git_blob_sha": "be01afd0278e33ca1a87305e37a160274c198eab",
+          "mode": "100644",
+          "path": "docs/AUDIT_EXPORT_BUNDLE.md",
+          "sha256": "0293ca6ab894ae67faa6856bce23943dd9853d30d4f557dd23477260dc8068c7"
+        },
+        {
+          "bytes": 4757,
+          "git_blob_sha": "ebe5deffc947bd35093e354d3c755dbda02ae75e",
+          "mode": "100644",
+          "path": "docs/AUTHENTICATION_AUTHORIZATION.md",
+          "sha256": "de217729c36a2e1763fd8f36e1f48340e3fccecff7349897454ea398b00d61ae"
+        },
+        {
+          "bytes": 2283,
+          "git_blob_sha": "8363408ba05e2b56d1a924ec35d6aaaf6f853043",
+          "mode": "100644",
+          "path": "docs/BAR_BUILDER.md",
+          "sha256": "65b034e1ca1ebe26a9972541b2ea578de63c2dd4f04d40a79f55c7dd7bc5d20e"
+        },
+        {
+          "bytes": 1516,
+          "git_blob_sha": "99161a4fe596de8ef2d626105f19e555dee0c69e",
+          "mode": "100644",
+          "path": "docs/CODEX_HUMAN_GATED_CONTINUATION.md",
+          "sha256": "3ed6dc16f6e2acb23601bcafc92c93b0b61f8a43a4dbd0541c97d5693a5e3573"
+        },
+        {
+          "bytes": 2166,
+          "git_blob_sha": "6e393cede2a35ec74c4aacd93bea690953686978",
+          "mode": "100644",
+          "path": "docs/CODEX_MERGE_AND_NEXT_SLICE.md",
+          "sha256": "64eb92fea9f33ab149d80f1229568610f966013cde395a0e3bc6f75a17b5afd3"
+        },
+        {
+          "bytes": 2033,
+          "git_blob_sha": "853adf40a317ac98644790453440b7110b3ceae2",
+          "mode": "100644",
+          "path": "docs/CODEX_OPERATING_GUIDE.md",
+          "sha256": "98a87b9cfed07b6a3486f7fdd1a3fddcadd533aed534b325748ec4d8a31719ff"
+        },
+        {
+          "bytes": 3461,
+          "git_blob_sha": "f48bbb0294b5c34a13b6f4ed2389a8353a06d1ee",
+          "mode": "100644",
+          "path": "docs/CODEX_SLICE_AUTONOMY_PROTOCOL.md",
+          "sha256": "215f6f234d9147ea974edde2e656f793ad807a955681afb2a510152224a4d7ca"
+        },
+        {
+          "bytes": 1801,
+          "git_blob_sha": "3a9b2b68a9fa33bdb35ec3092eb77706543566db",
+          "mode": "100644",
+          "path": "docs/CONFIGURATION.md",
+          "sha256": "166eba936d1febe912ddec97dad65ade6577e6a00776b385367a859b8c0fddd0"
+        },
+        {
+          "bytes": 12886,
+          "git_blob_sha": "1a9f7d095e9b2777d4d647975f21aef5d354b318",
+          "mode": "100644",
+          "path": "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md",
+          "sha256": "b33635b378f30305baf0027c13638a2d5290cf917db558110e506f8b223614d0"
+        },
+        {
+          "bytes": 8927,
+          "git_blob_sha": "1dd20536d957fc3285790ab131c014d7a6e879f2",
+          "mode": "100644",
+          "path": "docs/DEPLOYMENT_AND_SECRETS_MANAGEMENT_PLAN.md",
+          "sha256": "c348fe866225fcfe87562e2fd8500ffc9c773a0418733c9d2f5bb18cb9bd8e3c"
+        },
+        {
+          "bytes": 1980,
+          "git_blob_sha": "f2e7291680547656bc8641ed1aff6de2c328150b",
+          "mode": "100644",
+          "path": "docs/EMERGENCY_STOP.md",
+          "sha256": "57599ee9950eb1320d5c82c4d118c1b1caf2a6b6ce63c9e141b811d2d0d9b79b"
+        },
+        {
+          "bytes": 1275,
+          "git_blob_sha": "a7470cd693659ed02671b0c99dcfe81d66620caa",
+          "mode": "100644",
+          "path": "docs/EVENT_JOURNAL.md",
+          "sha256": "9334c5271cf8ba3f8c91342ecf51d10f3acfddc67335752b7ad911a52d9841cf"
+        },
+        {
+          "bytes": 3341,
+          "git_blob_sha": "1ddde6a22b532cf4eb2dd29af356e14933d651f9",
+          "mode": "100644",
+          "path": "docs/EVIDENCE_PROVENANCE.md",
+          "sha256": "dbf6cd11fc6ab2a9cd92bd909c9861e25c65922bdb4b8b827874ce49d3c67ac5"
+        },
+        {
+          "bytes": 3378,
+          "git_blob_sha": "d17e87911d2f4549fb9d238f630c66fe50310cc1",
+          "mode": "100644",
+          "path": "docs/FAKE_BROKER.md",
+          "sha256": "633c0ee03b74b4a897bcf5851eb0563e289e810501fd0b1737c3fbad8e8b2ca2"
+        },
+        {
+          "bytes": 2095,
+          "git_blob_sha": "7fd74c010421fd13880eeba0df2e95aa780b8ee3",
+          "mode": "100644",
+          "path": "docs/FRONTEND_READ_API_CLIENT.md",
+          "sha256": "475b853e25fc0f3e581234e31d42e03ca7e6857a41cb12f0f154fe87f36b2d0d"
+        },
+        {
+          "bytes": 2577,
+          "git_blob_sha": "697d916cdd500b088165e0331db9ca9b0fdaf3b0",
+          "mode": "100644",
+          "path": "docs/IBKR_ADAPTER_DESIGN.md",
+          "sha256": "3e06646b4b9e31d12cc40b8a65cdc14b7c193b4fbbc8430e7554c4310dcce9b3"
+        },
+        {
+          "bytes": 11431,
+          "git_blob_sha": "fbee1f8c8f52f2b32adcb6838ae336a0b245766a",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_ADAPTER.md",
+          "sha256": "39b0e13d86b4182bf678d73223dcaf3866b6e84a749ffb8f7ae2e7315e190fac"
+        },
+        {
+          "bytes": 3274,
+          "git_blob_sha": "67ab928872297a74f0c905efe83c4cb440d6030a",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_CONNECTIVITY_PROBE.md",
+          "sha256": "ddd3e2209cee55fc55dc6c520ca85448638fddd62e8113f2644bd15fbc299222"
+        },
+        {
+          "bytes": 4671,
+          "git_blob_sha": "b108563d80e98de3e1ddec26a8bcda8453955bd9",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_CONTRACT_LOOKUP.md",
+          "sha256": "9a020074f17fdb698d5c1731fd3edc583bc9f83e0234e736a9fa83d834702e10"
+        },
+        {
+          "bytes": 2012,
+          "git_blob_sha": "0e8e2b6453f5e7854f1dc5da917e7f16d3d9f169",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_OPERATOR_UI.md",
+          "sha256": "3515f72332f14fc3236c7f3dc7e1ea1272b2d39edd89228e0f1ce1488e26b448"
+        },
+        {
+          "bytes": 5001,
+          "git_blob_sha": "66cc6b49aad0383a1ad0e11d76f238e4c48addd5",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_ORDER_SUBMISSION.md",
+          "sha256": "4b9d5a9c0982c78afecd565c520ad0516df250e0f7a80e70b386abbcd5648329"
+        },
+        {
+          "bytes": 4779,
+          "git_blob_sha": "afdc85503ca132369fbf5abbc36868b66c04804f",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_STATUS_FILL_CALLBACKS.md",
+          "sha256": "f1ce9dc0c8be85715b7ba2091f494616051cca1cf2107d4a3e48e7f627a56a6d"
+        },
+        {
+          "bytes": 2831,
+          "git_blob_sha": "a83ede5fd4d286ca6772be8bc11650cc2570a530",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_TRANSPORT_CHAOS.md",
+          "sha256": "2ea0fc818530d7c7e6578661a05a91c9d7aabe062133a8612dd46c637e5fac41"
+        },
+        {
+          "bytes": 4090,
+          "git_blob_sha": "871398259f5f7a592172564452ae98ffea02661e",
+          "mode": "100644",
+          "path": "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md",
+          "sha256": "3f995ea2c4d380b7e08ebb2e4367ba6d6043c3122638bbba99c2e85faebf659e"
+        },
+        {
+          "bytes": 2675,
+          "git_blob_sha": "7232a1d01f4584d684945bc18f7f4dd65588b6f8",
+          "mode": "100644",
+          "path": "docs/INCIDENT_RESPONSE.md",
+          "sha256": "ad841570f190afebeeb2c446d7dd36ebddc693aecffa0c9ebbc41a32a98787e1"
+        },
+        {
+          "bytes": 2821,
+          "git_blob_sha": "0a62684c3cd5b7561d3cf387148438d4f5e28e84",
+          "mode": "100644",
+          "path": "docs/LIVE_READINESS_EVIDENCE_DASHBOARD.md",
+          "sha256": "26a0cc89b709a7e2549b02501aceaeb8eed33cb61a72f4888388bc11fcb1d89d"
+        },
+        {
+          "bytes": 2787,
+          "git_blob_sha": "7a8f4b8fc5ed56036e8e8fc5329165867a530e6b",
+          "mode": "100644",
+          "path": "docs/LIVE_TRADING_READINESS_CHECKLIST.md",
+          "sha256": "eb044886960e62da855c56d4fb924d6dcac1115cfd109d85289323eb63ca3b9e"
+        },
+        {
+          "bytes": 1888,
+          "git_blob_sha": "51aa97bbf8c822b848eeec15a18b8630d9810f06",
+          "mode": "100644",
+          "path": "docs/LOCAL_PERSISTENCE.md",
+          "sha256": "051104bb74b5ccb9e1e1d7d2c82963a110c46f87780f766aa8eb0b619ba9f562"
+        },
+        {
+          "bytes": 1591,
+          "git_blob_sha": "0baeb232f5708445c709c00c9ec02fe48d9b45c1",
+          "mode": "100644",
+          "path": "docs/MARKET_DATA_REPLAY.md",
+          "sha256": "eb2e861a61a75f93a7585122eb91adee3b00545de978cda922c0d4e23ee82ff2"
+        },
+        {
+          "bytes": 4166,
+          "git_blob_sha": "72fced93b05f9924f7c2ad818a81a324b2d02a38",
+          "mode": "100644",
+          "path": "docs/OMS_STATE_MACHINE.md",
+          "sha256": "dc206824d162995fdb04a1ce344a8440bfd9b473deef7c007a2a7382ecce7763"
+        },
+        {
+          "bytes": 3845,
+          "git_blob_sha": "c74832f3a0ff94958e1bd8c20dbece20d7cce455",
+          "mode": "100644",
+          "path": "docs/OPERATIONS_CONTROLS.md",
+          "sha256": "6085e4bbdda0b88e975d8a9a7608c665688db522defaab40b8648ac16def49d4"
+        },
+        {
+          "bytes": 2525,
+          "git_blob_sha": "85c7ae3ae39d832441314cf7e7f8298dda660f08",
+          "mode": "100644",
+          "path": "docs/ORDER_INTENTS.md",
+          "sha256": "ff251cec901bea12591aae3033862cdfc4c256c3c2c96a2489a42f578edafed6"
+        },
+        {
+          "bytes": 1418,
+          "git_blob_sha": "e9af91d7e1278265d0be79d63800af72025df169",
+          "mode": "100644",
+          "path": "docs/ORDER_POSITION_DETAILS.md",
+          "sha256": "1405efeb5e90e195b9ac2d84d95051a150961f6f654519a29b709f32eb5f5c45"
+        },
+        {
+          "bytes": 3268,
+          "git_blob_sha": "8b495a8e763126cd0072974bcc3a158dbda0007c",
+          "mode": "100644",
+          "path": "docs/POST_SLICE_018_REVIEW.md",
+          "sha256": "5af77af11be94590eb9f25d6545f6abb5ab9d51a14bf6349f605f80acf5dae53"
+        },
+        {
+          "bytes": 28964,
+          "git_blob_sha": "3f96417a3113ba116b26d1cb7da1cc9d58e35d5d",
+          "mode": "100644",
+          "path": "docs/POST_SLICE_059_REVIEW.md",
+          "sha256": "8eba54d0b812cb82b8435ed2760956b14de3ad13db5cd8ddcb437400b3264cb8"
+        },
+        {
+          "bytes": 5412,
+          "git_blob_sha": "d12cae3cdcf6ab46c0ee5bba97912774d542cd99",
+          "mode": "100644",
+          "path": "docs/PRODUCT_GAP_ANALYSIS.md",
+          "sha256": "e84d05e5514f9df6e6f036a53b49eb95faed674e81b0476b38eb37c0c1362ae1"
+        },
+        {
+          "bytes": 330,
+          "git_blob_sha": "edfc045bd9ecb479d22ee120b381ebfe062d29fc",
+          "mode": "100644",
+          "path": "docs/PRODUCT_QUALITY_RUBRIC.md",
+          "sha256": "e0104862d3e63cbca6cde046bb3969473c1f99632667a67da6b4bf3342558bc3"
+        },
+        {
+          "bytes": 1121,
+          "git_blob_sha": "7df1fb99754a3d7e09bb7036c667dd5eb55440d2",
+          "mode": "100644",
+          "path": "docs/PRODUCT_REQUIREMENTS.md",
+          "sha256": "21cebf1fe2cfd8c872f7cf44b5de2093f1d0795b85d395702240c726432bb125"
+        },
+        {
+          "bytes": 2841,
+          "git_blob_sha": "329c7bd3cd49aca1e81460f28509401714eeb814",
+          "mode": "100644",
+          "path": "docs/PRODUCT_STRATEGY.md",
+          "sha256": "ef387e114d8c2ad2236beec41bcaf77776a64f7f73c9a58d20985369d97563e7"
+        },
+        {
+          "bytes": 1348,
+          "git_blob_sha": "eb152f65daae003af2a706cb5f01320c7fe2facb",
+          "mode": "100644",
+          "path": "docs/PROTECTION_MONITORING.md",
+          "sha256": "e9f86a9e3bb0bc7a1eabd729b657a850e7627773c6fab7704ac55ffdc62c4cab"
+        },
+        {
+          "bytes": 4720,
+          "git_blob_sha": "049525aed21e27869542cdc302bee41d9221ea75",
+          "mode": "100644",
+          "path": "docs/REACT_FLOW_VISUAL_CANVAS.md",
+          "sha256": "e2ca3c150d60bade6ff1ec6eb7376cab0e57e409295a6f54a3deb1c8def0599d"
+        },
+        {
+          "bytes": 4413,
+          "git_blob_sha": "862ca561029085acbd8a0474d6dad960efdcfcd1",
+          "mode": "100644",
+          "path": "docs/READ_API.md",
+          "sha256": "2b832d3cbff13cedf2474fbd5a773d0f62306fd2f9aa7de8becafc5e86dd37a7"
+        },
+        {
+          "bytes": 3657,
+          "git_blob_sha": "11997c5b9c82307735ae71360797a8db33ced547",
+          "mode": "100644",
+          "path": "docs/READ_MODELS.md",
+          "sha256": "df1746b38b72e7ccd8ed40c2e5080d0f2b32b272c56cefc53c68b0a1ac5555fc"
+        },
+        {
+          "bytes": 2427,
+          "git_blob_sha": "7df05f7385884750034c95d550798ecdb3cba5a7",
+          "mode": "100644",
+          "path": "docs/REPLAY_STRATEGY.md",
+          "sha256": "cae84d08988ed616da85d4382d714ccbcefbf94be415c8618bb9b4d3f0b3a075"
+        },
+        {
+          "bytes": 3100,
+          "git_blob_sha": "8453692e25fcef8531cdd9a48fe7f5dffd48b59f",
+          "mode": "100644",
+          "path": "docs/RESILIENCE_CHAOS.md",
+          "sha256": "28e3d52b1df5a7e17e0ee0b3d78156e4fed5658f8609aa2a6b2a1764f8e88eb7"
+        },
+        {
+          "bytes": 3021,
+          "git_blob_sha": "1de0102e04b07dde530aa7d8c1eb883d24fa96e8",
+          "mode": "100644",
+          "path": "docs/RISK_ENGINE.md",
+          "sha256": "eb683f62983300344e4f76011a90f5298502e1fd8a117d4910d58f84be37673a"
+        },
+        {
+          "bytes": 1858,
+          "git_blob_sha": "7237b8ba9e7bd4b63e088f3db2fad40c26863075",
+          "mode": "100644",
+          "path": "docs/ROADMAP.md",
+          "sha256": "083e01ec8286a793da939a319d39f6010bf476cd7ce238eae00e685d86724c8b"
+        },
+        {
+          "bytes": 6557,
+          "git_blob_sha": "dcc163c24ac7c60a6c828a9b6cabde3b61d7fb07",
+          "mode": "100644",
+          "path": "docs/SECURITY_BASELINE.md",
+          "sha256": "fd8d17d767fdbc690f0c7d51dee20afe6e08f324ec3625769f6332917c36e1a1"
+        },
+        {
+          "bytes": 1780,
+          "git_blob_sha": "a0e2ef027f351b808d3100f9753f7e3d473094bc",
+          "mode": "100644",
+          "path": "docs/SIMULATED_POSITIONS.md",
+          "sha256": "d4c7cdd84c915cb8f29f62e155a041696d73f86d686e138caad9d5d66d24f685"
+        },
+        {
+          "bytes": 1640,
+          "git_blob_sha": "6bf516603b0cb243a589bc2a0487b9d0b19672da",
+          "mode": "100644",
+          "path": "docs/SIMULATION_APPROVAL_API.md",
+          "sha256": "2bb0227175b4fd626d3d3297178d7df8ba1866695152499e1d7ce00f24492efc"
+        },
+        {
+          "bytes": 1707,
+          "git_blob_sha": "8ee7bca2437c224973547f51aaa69a84e82278f8",
+          "mode": "100644",
+          "path": "docs/SIMULATION_EXECUTION.md",
+          "sha256": "18188892c3ad0bd7dda6e4c589640ba0369565baa7c89d7574cc57042a888905"
+        },
+        {
+          "bytes": 1829,
+          "git_blob_sha": "65dc4c3c01abbd49c21284cb35859a4a331f0397",
+          "mode": "100644",
+          "path": "docs/SIMULATION_ORCHESTRATION.md",
+          "sha256": "e952c1d3fcd6f8919de009fadfe90c3c7269d555381b4bdf3b8f590c9478b2e2"
+        },
+        {
+          "bytes": 2113,
+          "git_blob_sha": "4a6007fb7856f554603c879cc41e3fc5b6049dde",
+          "mode": "100644",
+          "path": "docs/SIMULATION_RUNS.md",
+          "sha256": "0d85d261a13c0e5aaaa630dde98923cccfd28125fed92cbd6f42dbcc01cd46d5"
+        },
+        {
+          "bytes": 1092,
+          "git_blob_sha": "b8fe7f665703b1fe2c047a7196b13b8fc00186ac",
+          "mode": "100644",
+          "path": "docs/SIMULATION_RUN_DETAIL_UI.md",
+          "sha256": "e43b26f2ed7c9b81790a15b5a8f0495f0b7a643b6a6576caa1205a69cf041c95"
+        },
+        {
+          "bytes": 91324,
+          "git_blob_sha": "101620038c34e202d3d944fa368b4e7386e11a71",
+          "mode": "100644",
+          "path": "docs/SLICES.md",
+          "sha256": "c18b5408acfcaf31d80885a3635258df2151f78534df0ebe2efd8257062ffa34"
+        },
+        {
+          "bytes": 3163,
+          "git_blob_sha": "fa87692f4b2edda3b7e00739bfbf268dcb691dfc",
+          "mode": "100644",
+          "path": "docs/STRATEGY_DSL.md",
+          "sha256": "5cf7fb57a7d8e37b9ce7f2e9246f4c9a02c36329ec96bc2e035b9e50245c6890"
+        },
+        {
+          "bytes": 2730,
+          "git_blob_sha": "07cdb0f2daf2be6622f1d653a6f8a3ecae15e015",
+          "mode": "100644",
+          "path": "docs/UI_SHELL.md",
+          "sha256": "69d114733daeed4d23211cbc428edfc61277b2d55d9229461296a3de4d0ea0c4"
+        },
+        {
+          "bytes": 2691,
+          "git_blob_sha": "c52516127caa2388599f7e22252059c032392895",
+          "mode": "100644",
+          "path": "docs/VISUAL_WORKFLOW_BUILDER.md",
+          "sha256": "906726be6ae6575a8e32119f064d8a39f4963fd7578cdef2f2d3a822c31a9a4c"
+        },
+        {
+          "bytes": 14359,
+          "git_blob_sha": "ceff5156850dd4f6025934241e449a7a1e8c2b31",
+          "mode": "100644",
+          "path": "docs/execplans/candidate-slice-060-evidence-provenance-hardening.md",
+          "sha256": "2df806087b3e356fec07baa35511a4aabbedc7eee0ca3897ea01546876199e77"
+        },
+        {
+          "bytes": 12492,
+          "git_blob_sha": "618d4e6947cadeead3702972681885e9730d141b",
+          "mode": "100644",
+          "path": "docs/execplans/candidate-slice-061-independent-review-packet.md",
+          "sha256": "b70b0ef09ab70fcdda83689a3bd9eb0252625ff874a24d64b01ece3d10e9fb99"
+        },
+        {
+          "bytes": 49965,
+          "git_blob_sha": "e72d53b9ca85744809e91a3fdff97c42e41bfa7a",
+          "mode": "100644",
+          "path": "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "sha256": "b76575eaf048c13b91bc18ecb778c767b11d66da428d42ec9710ddfc1fade145"
+        },
+        {
+          "bytes": 7778,
+          "git_blob_sha": "795e8cfa3d02f8c9a99edd0e297c54828424c1ff",
+          "mode": "100644",
+          "path": "docs/execplans/post-slice-059-closeout-review.md",
+          "sha256": "cac5026e0332026f173f6cf63eeda9ee094cf5e47f312b3a607cb3a4d1ffb3ee"
+        },
+        {
+          "bytes": 2837,
+          "git_blob_sha": "d602220ecdf98a602bea87356f70bd05f3f91ef2",
+          "mode": "100644",
+          "path": "docs/execplans/slice-002-backend-frontend-skeleton.md",
+          "sha256": "c330f07200c83da40d49fcc2be1c856d05442468a17c51c15e9302561198a408"
+        },
+        {
+          "bytes": 3120,
+          "git_blob_sha": "14c96d68840930ccd6421525f1e9d3c11274994a",
+          "mode": "100644",
+          "path": "docs/execplans/slice-003-safe-configuration-hardening.md",
+          "sha256": "0953933507119064a1b5b6669fe8cbd824875ac1dff0eb1b41d3ff2ca61ab6c9"
+        },
+        {
+          "bytes": 2934,
+          "git_blob_sha": "b6885a2fbf8d1b82ef2d8dfcd29f86cd065a19b1",
+          "mode": "100644",
+          "path": "docs/execplans/slice-004-append-only-event-journal.md",
+          "sha256": "a2798cd921f97ca16f8140fb19c335eb5a19d715d97cd6fbee61beeb62513920"
+        },
+        {
+          "bytes": 2912,
+          "git_blob_sha": "394e8808860ad530ad9b54d7aa9705567f345a94",
+          "mode": "100644",
+          "path": "docs/execplans/slice-005-deterministic-market-data-replay.md",
+          "sha256": "7d4a37abce66d0f44517a671a75a77c147cade77b28dc60f8c534516cf8e5468"
+        },
+        {
+          "bytes": 4044,
+          "git_blob_sha": "8af5fd33498d3e00b5f26b87c6ffca0b5398595e",
+          "mode": "100644",
+          "path": "docs/execplans/slice-006-bar-builder.md",
+          "sha256": "5b83e70c12a6636c8c40b1ef9b1c03b041aeb7366a2c58e4782bb38f56c87619"
+        },
+        {
+          "bytes": 4100,
+          "git_blob_sha": "314bd3cd837cffd12fe8905ef84d79592eb0312e",
+          "mode": "100644",
+          "path": "docs/execplans/slice-007-first-replay-only-strategy.md",
+          "sha256": "f454c269860bf7faf14224f923fbf5fd4f2a2088f31a5e8b7e957ef21ea45269"
+        },
+        {
+          "bytes": 4307,
+          "git_blob_sha": "072b5e48e643430e02990df46174bd3c282e930b",
+          "mode": "100644",
+          "path": "docs/execplans/slice-008-risk-engine.md",
+          "sha256": "59138a9b89fd55b12b000655a201c724198bbfe1c85b5ad23d5348fda1cf8bef"
+        },
+        {
+          "bytes": 5381,
+          "git_blob_sha": "6481726987b849735ff68bb6e61917841451c0b5",
+          "mode": "100644",
+          "path": "docs/execplans/slice-009-fake-broker.md",
+          "sha256": "4f6506b5d6baab602dcec9b76d2847ef9dfbf0d0cca911025a9df85d48285520"
+        },
+        {
+          "bytes": 5895,
+          "git_blob_sha": "be2eff9be858103b25ebdc800dbc18246b736ee4",
+          "mode": "100644",
+          "path": "docs/execplans/slice-010-oms-state-machine.md",
+          "sha256": "a11cf6173aeade7946654775b7c8e6e7a09be7c8e643935daaaca0448000c994"
+        },
+        {
+          "bytes": 5687,
+          "git_blob_sha": "980aba4bb51df076ba52423512ef214377ddc787",
+          "mode": "100644",
+          "path": "docs/execplans/slice-011-approval-tickets.md",
+          "sha256": "00d62ed1439107e33cb9824194659bb1b30249fb71122270951d7891a0a967bb"
+        },
+        {
+          "bytes": 4531,
+          "git_blob_sha": "7698cbab05ff486040ce311735bb4443c7a7fdd0",
+          "mode": "100644",
+          "path": "docs/execplans/slice-012-alerts.md",
+          "sha256": "6ea1057a3b897656b1541a2439beece2900e5d4c83d35f12b2ad0e242b5ad60c"
+        },
+        {
+          "bytes": 4472,
+          "git_blob_sha": "9786e0ccad9fc0b0526e00a4b7f694df83b84516",
+          "mode": "100644",
+          "path": "docs/execplans/slice-013-ui-shell.md",
+          "sha256": "1374f2695e7d0def09a05bc7f1318171419cc3adc9049585efa7f1b9fd31ca6b"
+        },
+        {
+          "bytes": 4705,
+          "git_blob_sha": "dffdabaa9776b54c554c3159d03e1d720a0a23e5",
+          "mode": "100644",
+          "path": "docs/execplans/slice-014-strategy-dsl.md",
+          "sha256": "3c8e7c97fd2c4201b640bf6bbbfe904b7ed326d9c8a3b1b4204a3257072c1aa2"
+        },
+        {
+          "bytes": 4338,
+          "git_blob_sha": "985740985bbced11adb43406519ce07b9cdeff5c",
+          "mode": "100644",
+          "path": "docs/execplans/slice-015-visual-workflow-builder.md",
+          "sha256": "25373a66e9eb6dee710accb2704966929e857a4b244f6270075a00d6309d25e7"
+        },
+        {
+          "bytes": 5531,
+          "git_blob_sha": "70e6157876e6ee3bba921da5f2ea052136fa9559",
+          "mode": "100644",
+          "path": "docs/execplans/slice-016-ibkr-paper-adapter.md",
+          "sha256": "82e8bb6a9c63c0c33acea128e35c8b3f4560e53a898bcdfd553dff8feead57a5"
+        },
+        {
+          "bytes": 5788,
+          "git_blob_sha": "84217ab4ea9a7c3c819793e82771178a4fb5cde1",
+          "mode": "100644",
+          "path": "docs/execplans/slice-017-reconnect-reconciliation-chaos-tests.md",
+          "sha256": "0d17745b3e1477f6da0d281cbb369615d33135b73648a7acbd500b6520f785a0"
+        },
+        {
+          "bytes": 4665,
+          "git_blob_sha": "db0e9cd1b73ef9af1b2414f1a8ab28bea0905498",
+          "mode": "100644",
+          "path": "docs/execplans/slice-018-live-trading-readiness-checklist.md",
+          "sha256": "84cc21990139abc5f5d9ae2e04fc48d011bf4b8dab87891f66ee7a1812384210"
+        },
+        {
+          "bytes": 3277,
+          "git_blob_sha": "b207aad40dc6ddbaf61c137b2dd9311acbfbb2d2",
+          "mode": "100644",
+          "path": "docs/execplans/slice-019-product-gap-plan.md",
+          "sha256": "2250d45eafb5dac56d4bfc7c7cafac2bad2cdd4f49e2d82997deab32c50e7cf4"
+        },
+        {
+          "bytes": 4008,
+          "git_blob_sha": "9953afd7b34d3f6f3466ab1f7fc9c42b83f5736c",
+          "mode": "100644",
+          "path": "docs/execplans/slice-020-backend-read-models.md",
+          "sha256": "867f93e60c5c0670c92d14a7f91e7acf0c46d4650547de6a746a440291a935d6"
+        },
+        {
+          "bytes": 3300,
+          "git_blob_sha": "3fe8dbf7fbf145bb365ef7f443cd4e79ed858002",
+          "mode": "100644",
+          "path": "docs/execplans/slice-021-backend-read-only-api-endpoints.md",
+          "sha256": "56ba565184183cf9d6b83c2921229e8294c60122885ade3e95620e75aaae4e6e"
+        },
+        {
+          "bytes": 3341,
+          "git_blob_sha": "3c45f1406e8fd2a32413f899e2d95d90e6a50345",
+          "mode": "100644",
+          "path": "docs/execplans/slice-022-frontend-api-client.md",
+          "sha256": "5d077c86ae07b6581b8abce678f0ed20c0a763d6587791bcdb86d05f0addf079"
+        },
+        {
+          "bytes": 3456,
+          "git_blob_sha": "caaccf4b98f0bcb2832f4256f79e66c5eac1443c",
+          "mode": "100644",
+          "path": "docs/execplans/slice-023-connect-ui-to-backend-read-apis.md",
+          "sha256": "24e9f172faf23d1544fbeac8bdc71f6d231bbf6e9d24861ad02bd93de54f5354"
+        },
+        {
+          "bytes": 3433,
+          "git_blob_sha": "dd08a42b526b3939142afdb9a1b2607634534755",
+          "mode": "100644",
+          "path": "docs/execplans/slice-024-simulation-run-model.md",
+          "sha256": "0bb8ba3c62a550530deb1f1b5e539a144d57c729c82e67e95ea1efface5fd788"
+        },
+        {
+          "bytes": 3875,
+          "git_blob_sha": "f4a9bb2d1da3537117f7b0c2b5b0c7bcf42b7264",
+          "mode": "100644",
+          "path": "docs/execplans/slice-025-first-product-strategy.md",
+          "sha256": "ebff6cecd8ca2ef54811cfbe048d0db835ad85eca27d48265e9d8ec36c97f9e7"
+        },
+        {
+          "bytes": 3881,
+          "git_blob_sha": "51337a84c92abd53469b61f18a2f265cf3583544",
+          "mode": "100644",
+          "path": "docs/execplans/slice-026-order-intent-proposal-model.md",
+          "sha256": "f10c9076866fec238f9c648e13140ac5b6307c88bbc7e6b194c1e8952d7d9e82"
+        },
+        {
+          "bytes": 4367,
+          "git_blob_sha": "5898679b0af05df561696c59bb2bdad2ec8b7529",
+          "mode": "100644",
+          "path": "docs/execplans/slice-027-replay-risk-approval-orchestration.md",
+          "sha256": "3cf41b7c9f433c3df4df88293340fd7ec28cb7fef360ffdc3be0d4d97bde0c90"
+        },
+        {
+          "bytes": 3601,
+          "git_blob_sha": "bc8775ccc4403153d9f9a09351b0174a7870216c",
+          "mode": "100644",
+          "path": "docs/execplans/slice-028-simulation-approval-decisions.md",
+          "sha256": "9e490e672f2d79aad733a398d23bba38a4f6598ab02bc4601ac3267b2d432982"
+        },
+        {
+          "bytes": 3684,
+          "git_blob_sha": "963bb07725481c869edff7385341978d685c1b00",
+          "mode": "100644",
+          "path": "docs/execplans/slice-029-oms-fake-broker-orchestration.md",
+          "sha256": "93f6ab4e2fe3dd6caa3694e81952579e81361fb04b00842880b13111374d9bb7"
+        },
+        {
+          "bytes": 3544,
+          "git_blob_sha": "3adf64a521d9bb3decd874ae32eb3911020526ba",
+          "mode": "100644",
+          "path": "docs/execplans/slice-030-simulated-positions-protection-alerts.md",
+          "sha256": "f175d2170ce1f97f9609e9ff85fd45ffa0153ef4cd95109cdbeb9452333f64d7"
+        },
+        {
+          "bytes": 2691,
+          "git_blob_sha": "ca20523893be267c6b17fdf01a8f8116a3d97d7a",
+          "mode": "100644",
+          "path": "docs/execplans/slice-031-simulation-run-detail-ui.md",
+          "sha256": "d8f9f03170d6646d07646c9017a07f2114b5cb94424abd9d58378c0b918f974e"
+        },
+        {
+          "bytes": 2869,
+          "git_blob_sha": "71eda468fc5e5f217049312bf85b308f47d7dbb5",
+          "mode": "100644",
+          "path": "docs/execplans/slice-032-react-flow-visual-canvas.md",
+          "sha256": "b423775ccf05987a4129b1006cbcb23287d9e089776d14faff7559306e13eca8"
+        },
+        {
+          "bytes": 2416,
+          "git_blob_sha": "b07b90b6d09d500d7e5a07871497f0d853f9f911",
+          "mode": "100644",
+          "path": "docs/execplans/slice-033-editable-graph-layout.md",
+          "sha256": "5084ebc6f07e6574a5f3a536b1cb7b3adf958e67ac8b2fa2b2c4932c52a14cff"
+        },
+        {
+          "bytes": 2238,
+          "git_blob_sha": "26bc6e03fe16afdd7979e232e5ea7db9452611d7",
+          "mode": "100644",
+          "path": "docs/execplans/slice-034-typed-visual-node-catalog.md",
+          "sha256": "2b361c92ae7bed65c4e281f7e352d576a258b58cafd0d82e9df16e904dcef2c5"
+        },
+        {
+          "bytes": 2354,
+          "git_blob_sha": "a8ee31127950f5709e55865e4d8f561835b1726d",
+          "mode": "100644",
+          "path": "docs/execplans/slice-035-graph-validation.md",
+          "sha256": "3a6bdea7d26731a664268972347747a052a6997b3244d60a5fb6edbecd3530f5"
+        },
+        {
+          "bytes": 2372,
+          "git_blob_sha": "315eb31bb00f415559218189fee8c1846ded2702",
+          "mode": "100644",
+          "path": "docs/execplans/slice-036-graph-to-dsl-compiler.md",
+          "sha256": "4048d96f75279caba425a4b8794b9d97c59b2f768dbe0cb55e51b1830e46281b"
+        },
+        {
+          "bytes": 3698,
+          "git_blob_sha": "61336b558609ffaf4cb4cb8e60fddf71fdb3e725",
+          "mode": "100644",
+          "path": "docs/execplans/slice-037-workflow-persistence.md",
+          "sha256": "c736fbfaa6f52611d718fb43034e4477556c3ef05b39c937cce01e16a1bb4c48"
+        },
+        {
+          "bytes": 3774,
+          "git_blob_sha": "3e310db5133a34ebe58e82d09fbcb57efb905586",
+          "mode": "100644",
+          "path": "docs/execplans/slice-038-run-saved-simulation-workflows.md",
+          "sha256": "332d52bd8c03f9c2d6bdaacc79187a5fb62486dd52fd0f5b898814bd245f2d03"
+        },
+        {
+          "bytes": 3275,
+          "git_blob_sha": "1609eabb9d8ace5de9666b8c514e923d1aeb2bb2",
+          "mode": "100644",
+          "path": "docs/execplans/slice-039-visual-run-inspection.md",
+          "sha256": "a78e844ac45b89c0987f9997aafa1b9d441d521568ee0d25bf372650cc5df7cc"
+        },
+        {
+          "bytes": 3876,
+          "git_blob_sha": "0bde377a2d2a3b81d6a5ecab8280c5ae51343266",
+          "mode": "100644",
+          "path": "docs/execplans/slice-040-local-persistence-foundation.md",
+          "sha256": "fad06c283b23f9bfb078ee5fd8b567d200394a0d86766d00c0b04e3a2b967bc0"
+        },
+        {
+          "bytes": 3112,
+          "git_blob_sha": "7b6e161d3ecef20e6654738c364f555fdb285946",
+          "mode": "100644",
+          "path": "docs/execplans/slice-041-audit-explorer-ui.md",
+          "sha256": "1a464151c1ebd4430eb33bad0e4291868647cd7d1a75551f5aff0a2947ddd31c"
+        },
+        {
+          "bytes": 3178,
+          "git_blob_sha": "18c44f83f56e02968b1c43afab219ca40139fb87",
+          "mode": "100644",
+          "path": "docs/execplans/slice-042-approval-inbox-ui.md",
+          "sha256": "b61c3ffeefff9df263a7afd2b2fe6241406f9cdc4d7a686f490012fa355a3339"
+        },
+        {
+          "bytes": 3025,
+          "git_blob_sha": "1b8c5b49b2b0bfbb0c884cf0d4281cf6679cf89e",
+          "mode": "100644",
+          "path": "docs/execplans/slice-043-order-position-detail-pages.md",
+          "sha256": "d07199f5db8cc9b714fcb671ad2aa9d649219b94267de7ab4846b9d5d129f936"
+        },
+        {
+          "bytes": 3011,
+          "git_blob_sha": "6fd1d9422c6abffe41d5ac91a6eebed80dbf7df6",
+          "mode": "100644",
+          "path": "docs/execplans/slice-044-protection-monitoring-dashboard.md",
+          "sha256": "67d7d4a7acc53c9ddab47f6c9af37ef46e38d69d90d568c62bb0922c16be90df"
+        },
+        {
+          "bytes": 2896,
+          "git_blob_sha": "6e8066980bea1eeb0e73d73f1e6ace84acc64de4",
+          "mode": "100644",
+          "path": "docs/execplans/slice-045-audit-export-bundle.md",
+          "sha256": "0eadb629eb6ff92f51cb361b629942b314bd81ff2716e8802147525024dccd14"
+        },
+        {
+          "bytes": 5756,
+          "git_blob_sha": "06f59245749801b76838a77e69c332fe7a38d43b",
+          "mode": "100644",
+          "path": "docs/execplans/slice-046-ibkr-paper-transport-plan.md",
+          "sha256": "6d1416f3c961cdc7bec9bfa1c507dc12a77661e251463b74b8b35448f72b4054"
+        },
+        {
+          "bytes": 6634,
+          "git_blob_sha": "fe4e0a93b8eb028d4a84b3cb7605c3fb5dbdf6ae",
+          "mode": "100644",
+          "path": "docs/execplans/slice-047-local-ibkr-paper-connectivity-probe.md",
+          "sha256": "7acb55797e51578c23cbfc91e8daf693a58bea7cc5c7429a882a9f442fb6a22e"
+        },
+        {
+          "bytes": 8447,
+          "git_blob_sha": "95440713fca4826000cdef8b1534bb6bfc7d2254",
+          "mode": "100644",
+          "path": "docs/execplans/slice-048-paper-contract-lookup.md",
+          "sha256": "9018bd2c77bbd3950207efea3f180403ec41d6d1de28e4475ad01d6dd6393c0b"
+        },
+        {
+          "bytes": 10539,
+          "git_blob_sha": "d86ec2eec3fe096b8bd945bb31719a73e9ef1b33",
+          "mode": "100644",
+          "path": "docs/execplans/slice-049-paper-order-submission-adapter.md",
+          "sha256": "8f4055cd88fbd15a33717ab924fa9c054ae7300a92cfcea11b1497e480f18f1d"
+        },
+        {
+          "bytes": 9676,
+          "git_blob_sha": "34a736fa96f8d50320741c43269dd13b7ed8c9ad",
+          "mode": "100644",
+          "path": "docs/execplans/slice-050-paper-status-fill-callbacks.md",
+          "sha256": "9e983514c69ce2c08e024aa74e34803fec38ed67862d50680f46f0f7b555edbe"
+        },
+        {
+          "bytes": 7462,
+          "git_blob_sha": "e4f54b04c60332beeebfc060e48c2d8b63fc62e2",
+          "mode": "100644",
+          "path": "docs/execplans/slice-051-paper-transport-chaos-tests.md",
+          "sha256": "79e2bd3172c124e87d95feee085da8f06fb9c797d6d09fd0e99102f208a7e903"
+        },
+        {
+          "bytes": 6608,
+          "git_blob_sha": "0f8b5c094ca04f21d8aa4969352101605122a688",
+          "mode": "100644",
+          "path": "docs/execplans/slice-052-paper-trading-operator-ui.md",
+          "sha256": "f87030fce1f5201465d73ac271c3618bbe2fe96989c1a7315b19396365741cdc"
+        },
+        {
+          "bytes": 6300,
+          "git_blob_sha": "38c258be8d04ca109f829b55124c4bbe60fe9c59",
+          "mode": "100644",
+          "path": "docs/execplans/slice-053-deployment-secrets-management-plan.md",
+          "sha256": "98c1aa8cb0dfd282473c6e5b438f2e325935709609d25947c8b7456685713275"
+        },
+        {
+          "bytes": 7402,
+          "git_blob_sha": "458dc26fe9351f0156206be93420f744c5ac3350",
+          "mode": "100644",
+          "path": "docs/execplans/slice-054-authentication-authorization.md",
+          "sha256": "bd55d3452ca8712daaad9b9232cdce476b920e20ac18553166ac42c47908215d"
+        },
+        {
+          "bytes": 5082,
+          "git_blob_sha": "dbe852a578dfa70c429d3f018c82ee6cd3d9a44f",
+          "mode": "100644",
+          "path": "docs/execplans/slice-055-operator-roles-approval-permissions.md",
+          "sha256": "7d33fbd50972ed09882027e05a56820cf778b8e8f32c7a96d63089c0f3565914"
+        },
+        {
+          "bytes": 5302,
+          "git_blob_sha": "11cc57a51b5e498ca73f4d097a00a2cd6b255748",
+          "mode": "100644",
+          "path": "docs/execplans/slice-056-emergency-stop.md",
+          "sha256": "dd2820bedbd996479a3f01fdfe2de823a218b2f062db9354444f0f779dbe7313"
+        },
+        {
+          "bytes": 5069,
+          "git_blob_sha": "1f3fd2f7aab7fe35ef0ece8a7054260125931f5d",
+          "mode": "100644",
+          "path": "docs/execplans/slice-057-observability-retention-backup-incident-response.md",
+          "sha256": "b22282989c58913dd4f89e91ca3f7eeb5979ea32c6923410e291f3655195971f"
+        },
+        {
+          "bytes": 4406,
+          "git_blob_sha": "13dcac4834265e085c3a0d636b737ad319b75829",
+          "mode": "100644",
+          "path": "docs/execplans/slice-058-live-readiness-evidence-dashboard.md",
+          "sha256": "74101bec789c16796100fcffc5732b2c65f3be8225bbcddec6451cd66431d17b"
+        },
+        {
+          "bytes": 5610,
+          "git_blob_sha": "f1fbcfe69170579eaec9b635fb6ae5d873fe2ea2",
+          "mode": "100644",
+          "path": "docs/execplans/slice-059-controlled-paper-production-rollout-checklist.md",
+          "sha256": "ba9b2aa458987ecee202699020af7e40141c8f4cf584bdad735b168823f85d22"
+        },
+        {
+          "bytes": 377,
+          "git_blob_sha": "dccda13f80c1536ccec60079a22bb8d44fde45f2",
+          "mode": "100644",
+          "path": "frontend/eslint.config.js",
+          "sha256": "3b0b506581a19b8778d1823f5ab3d9ec7fff57476ca2ee235f7155227b92473b"
+        },
+        {
+          "bytes": 336,
+          "git_blob_sha": "77cb3c5cc62bc5e7f11a6b7ff452e39861e569c7",
+          "mode": "100644",
+          "path": "frontend/index.html",
+          "sha256": "8e652f93817a9bf751b0d31419ce61a6553c6a9f88c46b30e4141976c11e2f02"
+        },
+        {
+          "bytes": 160716,
+          "git_blob_sha": "2d65c50ac9ac9921a2a6c566ebb82b1976e7e25e",
+          "mode": "100644",
+          "path": "frontend/package-lock.json",
+          "sha256": "c31b590468021b4e5d69f0d24046deb9fba33513ae73fe2f2582ecf72538dc3e"
+        },
+        {
+          "bytes": 650,
+          "git_blob_sha": "1839df1ddb020b3b6ecd504e2a7545f658c6cb1c",
+          "mode": "100644",
+          "path": "frontend/package.json",
+          "sha256": "3eafd8dc40d3b2ac495aabc3764adc623c68fcf0aa4930958a3b5dd8170bbce6"
+        },
+        {
+          "bytes": 24135,
+          "git_blob_sha": "97b3923e325620e9d4548bdcd5e6974bf1807f4b",
+          "mode": "100644",
+          "path": "frontend/src/App.test.tsx",
+          "sha256": "680be5f152508512876718b98570e9be46a9341dbdc4330f29d5732cdbfa9b87"
+        },
+        {
+          "bytes": 75776,
+          "git_blob_sha": "e9f963ddd6439c6426d8a807e73d8b4f78f1d2f6",
+          "mode": "100644",
+          "path": "frontend/src/App.tsx",
+          "sha256": "79c846015d200faa9e6dfc3294cf9ac1a2066d3205802178978296da33094442"
+        },
+        {
+          "bytes": 1055,
+          "git_blob_sha": "038623b51ed176b3ea3d8496c11579bda46db69e",
+          "mode": "100644",
+          "path": "frontend/src/approvalInbox.test.ts",
+          "sha256": "8f501fd06aceba187fc8792bd2e4eef694b0d233e71a2194ff83ed8c3fa41a0c"
+        },
+        {
+          "bytes": 1495,
+          "git_blob_sha": "4caea16c1eae87c6f9c28e3cdb5febe26f0ffeba",
+          "mode": "100644",
+          "path": "frontend/src/approvalInbox.ts",
+          "sha256": "4a71067ac9768f70bb4b0b3c71aac753e7cf0b96c4ee4430bc6529322ba580c7"
+        },
+        {
+          "bytes": 1945,
+          "git_blob_sha": "728661f8ce49cd00def9d7e62b302f32894eb905",
+          "mode": "100644",
+          "path": "frontend/src/auditExplorer.test.ts",
+          "sha256": "6d113263092e8b097d44231922fa0b9930d91a37ac8953374f35a8b560c6f2e9"
+        },
+        {
+          "bytes": 1764,
+          "git_blob_sha": "284fd740b6498493afe97fe5dfce6fc975a8a940",
+          "mode": "100644",
+          "path": "frontend/src/auditExplorer.ts",
+          "sha256": "bd012bd80eb95251a375d72aab617d29e6e3d4fbf05c39eda93a8b4284119ea0"
+        },
+        {
+          "bytes": 2171,
+          "git_blob_sha": "238d6d44bc3e01024bdf4d4a90f7def8db4bbb67",
+          "mode": "100644",
+          "path": "frontend/src/evidenceProvenance.test.ts",
+          "sha256": "f0628e2bf10b9665d99bb76ff9c870ef0e31d594ccab8fbc9e0453c4b2429af3"
+        },
+        {
+          "bytes": 280,
+          "git_blob_sha": "5d58ad7af25f48fb2845acacc95cae202dc53b53",
+          "mode": "100644",
+          "path": "frontend/src/main.tsx",
+          "sha256": "0eba02cc42c665d63cc63a8d5120c2f8d761dfd2d607b3746d78be525e8dbc2c"
+        },
+        {
+          "bytes": 3249,
+          "git_blob_sha": "2ac1fb80e2e2484cbbf28ad50583c4e0bb1f0acd",
+          "mode": "100644",
+          "path": "frontend/src/orderPositionDetails.test.ts",
+          "sha256": "4a60c6a93372a3c4e2e0d28f0bcc712f45c083605826a8c3baacf6a62b32c6cd"
+        },
+        {
+          "bytes": 2106,
+          "git_blob_sha": "40133958aeed7adddb964283b8fdbb3168d29058",
+          "mode": "100644",
+          "path": "frontend/src/orderPositionDetails.ts",
+          "sha256": "b0a2eaf3dbc759392d317cc929915aa00cf17cbb6364ddd7e919b054395c3ed1"
+        },
+        {
+          "bytes": 4061,
+          "git_blob_sha": "7ede941f90f1b4238ac3a671a96cef4bef81a57f",
+          "mode": "100644",
+          "path": "frontend/src/protectionMonitoring.test.ts",
+          "sha256": "663b9d73fef1317b0e77e5630c59b5dbbecb18075be74972859a33dc5a42a96e"
+        },
+        {
+          "bytes": 3449,
+          "git_blob_sha": "4d34a6c134320471210c2a0d9a1543ab1bb4528f",
+          "mode": "100644",
+          "path": "frontend/src/protectionMonitoring.ts",
+          "sha256": "e6427c51693cf4dfa9d23cd10d58cae16dc451cf2cf53a1309d31a5eb212f686"
+        },
+        {
+          "bytes": 14399,
+          "git_blob_sha": "43046cf25166517e7e4983e19b5c728c2d81f64c",
+          "mode": "100644",
+          "path": "frontend/src/readApiClient.test.ts",
+          "sha256": "297448939a4494e76b99f7d62d01c5592b5703006233c9e103e9c39630ff553b"
+        },
+        {
+          "bytes": 27886,
+          "git_blob_sha": "45d5f5812faa9776543cb6fa6630df6cefb5ac62",
+          "mode": "100644",
+          "path": "frontend/src/readApiClient.ts",
+          "sha256": "69c8ede9e947639bfaa18c76493c783049d47c06d3587a4a168bb4c53f73ab57"
+        },
+        {
+          "bytes": 443,
+          "git_blob_sha": "45e6ae0cbcd7acee797affc1ae86eacd45c78b5e",
+          "mode": "100644",
+          "path": "frontend/src/safety.test.ts",
+          "sha256": "45754744973c7089e8f2e981dec26d1586e8dd47ceaf06af03e029b5fadfc061"
+        },
+        {
+          "bytes": 218,
+          "git_blob_sha": "e1f7c88e52e9167050917efb0c20e4befa543a22",
+          "mode": "100644",
+          "path": "frontend/src/safety.ts",
+          "sha256": "759d72b589797453c2d755cacdbdeb44b89fab45d1b890f64f51f0d14ed8a090"
+        },
+        {
+          "bytes": 1711,
+          "git_blob_sha": "68ed47462efb1310c628fee9349c817f856ae4f1",
+          "mode": "100644",
+          "path": "frontend/src/simulationApprovalApiClient.test.ts",
+          "sha256": "540a2b2be5367de6384ed8017d2627c98ed0174688a95d6448b37b33d01f5ebf"
+        },
+        {
+          "bytes": 2402,
+          "git_blob_sha": "45048acba0bf64005645be62959eb33f36f13053",
+          "mode": "100644",
+          "path": "frontend/src/simulationApprovalApiClient.ts",
+          "sha256": "c967a51b2493e81096a4713a0511306429ba91c015da3fb920fb788db930963f"
+        },
+        {
+          "bytes": 2006,
+          "git_blob_sha": "2dc3a4c0aed166ca8c3d0ee8445196e0a1943cf8",
+          "mode": "100644",
+          "path": "frontend/src/strategyBuilder.test.ts",
+          "sha256": "75a126ca89e678b9b274216eb7a10b9fb012803ad4761468f007eeb908679932"
+        },
+        {
+          "bytes": 2598,
+          "git_blob_sha": "3fff44e25bda46eb70d87f70b3936b93fbfaf5e6",
+          "mode": "100644",
+          "path": "frontend/src/strategyBuilder.ts",
+          "sha256": "c760562e20b36ba23eadf6e047b3e72687cfbd6d13df6ca84db70067bba0054e"
+        },
+        {
+          "bytes": 19047,
+          "git_blob_sha": "333e4bbca3a2ecbe5d17273778470ceb09054cbf",
+          "mode": "100644",
+          "path": "frontend/src/styles.css",
+          "sha256": "43b4cb190af28d492317cd19d7f2e1cc7a2a405397777930de9be622ada2eada"
+        },
+        {
+          "bytes": 4100,
+          "git_blob_sha": "b42ec15dd7b69426e2d3354c3b424dd3c6bcdc6a",
+          "mode": "100644",
+          "path": "frontend/src/visualSimulationWorkflowCanvas.test.ts",
+          "sha256": "383b18dc46f9099975e320cb8734dbd960fe02295791f4aed64f40870a46fcfd"
+        },
+        {
+          "bytes": 6573,
+          "git_blob_sha": "3ca7c88b60a02527f5bc063fa179f268ee972392",
+          "mode": "100644",
+          "path": "frontend/src/visualSimulationWorkflowCanvas.tsx",
+          "sha256": "79bbc14c42fa2468e92193f008be1743adcde2d9376e0cd08dd0f25362d3619a"
+        },
+        {
+          "bytes": 2762,
+          "git_blob_sha": "d0570ed7ca5b316c10ecb4cc5573175f04fbfb59",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowDsl.test.ts",
+          "sha256": "38d02955d07df3188fc92e57c2bd6d4d04f053520e757f5be8ed02ef293face6"
+        },
+        {
+          "bytes": 3044,
+          "git_blob_sha": "130f8ff8fca97811f16a20330336af8f8441c7f6",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowDsl.ts",
+          "sha256": "39515c92b6c8c6b28e3a6d237fba5bc97a3b9c3f19dea88de83aee2bff13cb95"
+        },
+        {
+          "bytes": 4030,
+          "git_blob_sha": "3eb0d3906f8fd7073157645ff52c634ea3a3cf48",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowNodeCatalog.ts",
+          "sha256": "4d441f9ece62d5066313120254e03e2da2ebb8b911a865f64382adde8fbfa9c2"
+        },
+        {
+          "bytes": 2080,
+          "git_blob_sha": "99d9035c8311164c6e4eb0a43da846a950c80251",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowRunInspection.test.ts",
+          "sha256": "8792d4120e99eefb363dffd9d62a6264113510ae4445224c84613e558bf1d1c3"
+        },
+        {
+          "bytes": 2674,
+          "git_blob_sha": "38b31252d4776fa65042a023cf3fc4e094fac42b",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowRunInspection.ts",
+          "sha256": "41278b9ddbf6856d71598d82b6359a9a997d889c20a0f628dc2e4169299aec6b"
+        },
+        {
+          "bytes": 3171,
+          "git_blob_sha": "dec3518cc735d31cdcc414d2a4fe6501b4d0bdfd",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowValidation.test.ts",
+          "sha256": "f86109735dea6fe31372d8bb4637813c051a15a42f60b7b7896c8c468b5d55e2"
+        },
+        {
+          "bytes": 4330,
+          "git_blob_sha": "9a5ffffec0de46adb52a1cab9d9b9da7301f87e8",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowValidation.ts",
+          "sha256": "2c046183d0764cf43b95fe075023d25179cc1b25d8dd2f9d0b64863ae6106bf6"
+        },
+        {
+          "bytes": 6076,
+          "git_blob_sha": "4289897242f02f1c616b9bd6711deb637363a4ee",
+          "mode": "100644",
+          "path": "frontend/src/workflowApiClient.test.ts",
+          "sha256": "9c5863a0602d53fef6288790042aea769b6d215d178b312219f5a9f42e8b7684"
+        },
+        {
+          "bytes": 5280,
+          "git_blob_sha": "fb514238e8360dfd275ff8e10653321c88b9d85f",
+          "mode": "100644",
+          "path": "frontend/src/workflowApiClient.ts",
+          "sha256": "a5dc6810f458164f2b8c699644e4fdef5550086794dffe2943fb311eb685a9d8"
+        },
+        {
+          "bytes": 545,
+          "git_blob_sha": "77637b52def7fe879841ca2d62b21f6c403607db",
+          "mode": "100644",
+          "path": "frontend/tsconfig.json",
+          "sha256": "dfc84de574c60d74f472e9708bcab10d45176d92c15ad2643c958ae0f82f6dc0"
+        },
+        {
+          "bytes": 255,
+          "git_blob_sha": "6c31b75a2090a2ca2439d4ddb411d1720b1fc443",
+          "mode": "100644",
+          "path": "frontend/vite.config.ts",
+          "sha256": "356c91684e5e8e52a1932b3f587a5c4c8ac1e96109c959302c22276160cc28d5"
+        },
+        {
+          "bytes": 3297,
+          "git_blob_sha": "9f44e4c0758a1d21a45fcf0af649c6f4dfa9945f",
+          "mode": "100644",
+          "path": "review/candidate-061/REVIEW_GUIDE.md",
+          "sha256": "458f700a34973f60a4681c060f5442e83576d4fc7377485dbfd829d09807727f"
+        },
+        {
+          "bytes": 170291,
+          "git_blob_sha": "684ad052db6c7984c6a17d390a7ed1f696bf8243",
+          "mode": "100644",
+          "path": "review/candidate-061/packet.json",
+          "sha256": "8fab09430088e9d20b0520f0ef009f8418783ccd097cbca8581304001c2780ca"
+        },
+        {
+          "bytes": 78,
+          "git_blob_sha": "bc50354ed176c1964d23e889dcb363e2c745196f",
+          "mode": "100644",
+          "path": "review/candidate-061/packet.sha256",
+          "sha256": "4151a042152f995005149a2612aeb28707abf75d3298d70127e2ebffd9599d2a"
+        },
+        {
+          "bytes": 18733,
+          "git_blob_sha": "915dd316174446f8ee60d312d329174cab54c6a8",
+          "mode": "100644",
+          "path": "review/candidate-061/spec.json",
+          "sha256": "2c0c7de06d22a6510dabb9eaa8f5fa9e424904f07fce75fbceb87e6c2c7a57df"
+        },
+        {
+          "bytes": 1769,
+          "git_blob_sha": "10fda333bd0cd697e558b2b847688f65fc89cbce",
+          "mode": "100644",
+          "path": "scripts/verify.ps1",
+          "sha256": "4df714c8868e7dd84c51e2cd277b030c1d29437c865186f72864c37267d8428e"
+        },
+        {
+          "bytes": 3432,
+          "git_blob_sha": "3c1370c9fab3c30d2996bcd414d2226676938995",
+          "mode": "100644",
+          "path": "scripts/verify_repo.py",
+          "sha256": "3f4828c8b17efce7bc7aa14b286adb1b584c585c0eed8744571cf09468f5aa82"
+        }
+      ],
+      "entry_count": 273
+    },
+    "tests": {
+      "content_sha256": "37fd89b477b65b3d339b9f1b96d0452a2f3ad8b0cfdd81d234ff0e914c891746",
+      "definition_count": 392,
+      "file_count": 58,
+      "files": [
+        {
+          "bytes": 9924,
+          "definition_count": 12,
+          "git_blob_sha": "31d0428499ea6f128c4337a587317f3f96d611ca",
+          "mode": "100644",
+          "path": "backend/tests/test_alerts.py",
+          "sha256": "77cddecd5acdbeb6b14e8b2332be6e4006170d4640a5a2ed79308ecc31774d34"
+        },
+        {
+          "bytes": 12527,
+          "definition_count": 12,
+          "git_blob_sha": "a15a9aa6fe66f4265f864b693face45b9b954135",
+          "mode": "100644",
+          "path": "backend/tests/test_approval_tickets.py",
+          "sha256": "240cbefa0a0e71030f36c907302cb849443110041ff771167df44e05f4ba2e8a"
+        },
+        {
+          "bytes": 11210,
+          "definition_count": 4,
+          "git_blob_sha": "a429fa6981b64ff1bf36448dcc11b1e1252e432c",
+          "mode": "100644",
+          "path": "backend/tests/test_audit_export.py",
+          "sha256": "74cf897c155ebf67749898b60e5577fd0c91297aa9e20ef7443ee0abe4cc0f69"
+        },
+        {
+          "bytes": 5985,
+          "definition_count": 6,
+          "git_blob_sha": "d88fbf6cee2e489859120700e36f3804cb425cd5",
+          "mode": "100644",
+          "path": "backend/tests/test_bar_builder.py",
+          "sha256": "14a6e6dc7ce2341cafd030e6269ab5b856ae8f8dc50fd9244bed98912fd2963b"
+        },
+        {
+          "bytes": 8440,
+          "definition_count": 6,
+          "git_blob_sha": "ee7bef8a4656c08d962b879de0ea69031431cd3f",
+          "mode": "100644",
+          "path": "backend/tests/test_candidate_slice_062_execplan.py",
+          "sha256": "357d98e6b910caa82d6342d76e3d17275f2a7f2ba1c9d4765929f8aa6a923f99"
+        },
+        {
+          "bytes": 2678,
+          "definition_count": 11,
+          "git_blob_sha": "0e4060a0d5a9c048d71c122b6a85d5983da4ec7f",
+          "mode": "100644",
+          "path": "backend/tests/test_config.py",
+          "sha256": "d5178fd02841dafd3ebeeaf1a9ddccfbd783f952be89e5d6e713939a23cc7015"
+        },
+        {
+          "bytes": 7062,
+          "definition_count": 4,
+          "git_blob_sha": "0e74d233914e04af8d787c8d28c14ad9796ecbde",
+          "mode": "100644",
+          "path": "backend/tests/test_deployment_planning_docs.py",
+          "sha256": "9d2b0f295449ae3e9c108d81e1e94f7aadd53f67b5b51125065787825bca84f6"
+        },
+        {
+          "bytes": 5286,
+          "definition_count": 4,
+          "git_blob_sha": "7142d8c1a81ae079aab733e75a9986f53ccc0327",
+          "mode": "100644",
+          "path": "backend/tests/test_emergency_stop.py",
+          "sha256": "7da72469cd7afe47c49143411b77235518a291a6b27ca42e134de1d49674eec5"
+        },
+        {
+          "bytes": 12049,
+          "definition_count": 6,
+          "git_blob_sha": "575ba7fc846d9d37a096e6df7be775b2706ce9f4",
+          "mode": "100644",
+          "path": "backend/tests/test_emergency_stop_api.py",
+          "sha256": "7a58594cbae741da208d0994346c79d3ed08ea520d825ba63ec1d5732ba98dbf"
+        },
+        {
+          "bytes": 4413,
+          "definition_count": 9,
+          "git_blob_sha": "87ee4a4b9242aec27dd2f3b3711415d29ac14fd0",
+          "mode": "100644",
+          "path": "backend/tests/test_event_journal.py",
+          "sha256": "6d75ebe8eead5874afb02fbc4b205d879df679f3140b9fab4bfc6714f832d7c5"
+        },
+        {
+          "bytes": 9155,
+          "definition_count": 6,
+          "git_blob_sha": "8fffee752369e59a2c90286c448f43e8351a6aca",
+          "mode": "100644",
+          "path": "backend/tests/test_evidence_provenance.py",
+          "sha256": "ef171ec447d46a1e23e1c35f39bdd964e1701bae815dcd81011c4721f3083844"
+        },
+        {
+          "bytes": 11398,
+          "definition_count": 11,
+          "git_blob_sha": "405f3167b45ce166e01e53a9ece2cd6ccc2a6313",
+          "mode": "100644",
+          "path": "backend/tests/test_fake_broker.py",
+          "sha256": "e03ab177f3770cc7f2c1648506323a1bc192cd9042ea7727e26447366ee2fec8"
+        },
+        {
+          "bytes": 1119,
+          "definition_count": 1,
+          "git_blob_sha": "a7a3caa2745e9b987f58ac69493ccf47d0610c17",
+          "mode": "100644",
+          "path": "backend/tests/test_health.py",
+          "sha256": "6226d7ea5a671a42c6a853f05e6f5bf124529a2db10c14ccfe27b03b026b0b17"
+        },
+        {
+          "bytes": 55398,
+          "definition_count": 38,
+          "git_blob_sha": "f71fbb07cbeae0078e3e84570689aec77ff85612",
+          "mode": "100644",
+          "path": "backend/tests/test_ibkr_paper_adapter.py",
+          "sha256": "55d8386afeb6492d050e612de82aa09007b76a790cb9cef7d6ff7251add5ab48"
+        },
+        {
+          "bytes": 18920,
+          "definition_count": 7,
+          "git_blob_sha": "6a1243522f75704fa16810c1fa503c57c493073f",
+          "mode": "100644",
+          "path": "backend/tests/test_ibkr_paper_transport_chaos.py",
+          "sha256": "2cba56f52c3787e0491b62567a3ebb30a57683299bcf2044e8dc25b31fdcee2a"
+        },
+        {
+          "bytes": 11341,
+          "definition_count": 8,
+          "git_blob_sha": "5b3d8462b1886578a658e50331bbeb8aa6e649ab",
+          "mode": "100644",
+          "path": "backend/tests/test_independent_review_packet.py",
+          "sha256": "1583b41b8b803d05559cf7708ff9cf07ffdf4b33ed8d1b4f3e9af3b471e6ad1f"
+        },
+        {
+          "bytes": 6182,
+          "definition_count": 6,
+          "git_blob_sha": "5fc602573e87db2a227dedbce7518f0d6cec8de5",
+          "mode": "100644",
+          "path": "backend/tests/test_live_readiness.py",
+          "sha256": "465b4c82cea1a40113f161a3724f3eaedd2a4e56a6036896d8f23206a9eabbe1"
+        },
+        {
+          "bytes": 8548,
+          "definition_count": 4,
+          "git_blob_sha": "83633f827eab033f32d1c722a84795db16d986c0",
+          "mode": "100644",
+          "path": "backend/tests/test_live_readiness_evidence.py",
+          "sha256": "6692e8c276ca3c9bd6641e28c23767a6d356784a88e0c0ac50c2c7d82058400f"
+        },
+        {
+          "bytes": 9451,
+          "definition_count": 4,
+          "git_blob_sha": "17b00ea2c6c6cc1076d87aa0a875737414cf4387",
+          "mode": "100644",
+          "path": "backend/tests/test_local_persistence.py",
+          "sha256": "51eafa1d62b3fc7b0643184222d0c4b159e90805ecd09b91c6549db1b6c5e4ee"
+        },
+        {
+          "bytes": 4245,
+          "definition_count": 9,
+          "git_blob_sha": "c5ffc7ad5eff07652ecb4a657f0d245ed62379c1",
+          "mode": "100644",
+          "path": "backend/tests/test_market_data_replay.py",
+          "sha256": "5c5f802db181a98c5a6587fc07b11f72f38389d9d13553e9fde53e849b28dca1"
+        },
+        {
+          "bytes": 14448,
+          "definition_count": 10,
+          "git_blob_sha": "b230c6013066222f67aded20125d2291270a2644",
+          "mode": "100644",
+          "path": "backend/tests/test_oms_state_machine.py",
+          "sha256": "bb42180f5b222a9a3799c43d7e27c2234a5da16283b26ff3e98a4368996e8c2f"
+        },
+        {
+          "bytes": 9143,
+          "definition_count": 4,
+          "git_blob_sha": "e08f077370f066985232fdc6c3efa64c20946563",
+          "mode": "100644",
+          "path": "backend/tests/test_operational_controls.py",
+          "sha256": "d78f40a999a25decf79482a4c7fe28758cbf22676c343837b1a9f87e3fa036c2"
+        },
+        {
+          "bytes": 6802,
+          "definition_count": 6,
+          "git_blob_sha": "83cd4326ec90509eb984900f5cbecbc49d0d48d0",
+          "mode": "100644",
+          "path": "backend/tests/test_operator_auth.py",
+          "sha256": "6f1d6c765d6970b071f5680f6c8d06b792f6cfb0286f54373d9eeff58b29ae8c"
+        },
+        {
+          "bytes": 8282,
+          "definition_count": 11,
+          "git_blob_sha": "6586de43b66ee4976e005c727eb081c2f608f9c0",
+          "mode": "100644",
+          "path": "backend/tests/test_order_intents.py",
+          "sha256": "a22c2740b8f606b6df58e442e17625e0866c76419e1e5370b168728bf4604470"
+        },
+        {
+          "bytes": 4028,
+          "definition_count": 5,
+          "git_blob_sha": "08593d5ca9a17aeca11da9f408ea8cf1b7146786",
+          "mode": "100644",
+          "path": "backend/tests/test_post_slice_059_review.py",
+          "sha256": "98401c91d3bc7b9787864d03210c57c0ee419bba580331d50350395d6b22c8f4"
+        },
+        {
+          "bytes": 12068,
+          "definition_count": 11,
+          "git_blob_sha": "b772c1b8ceb90cc0a6f28cfc528442d3c5d1d28e",
+          "mode": "100644",
+          "path": "backend/tests/test_product_strategy.py",
+          "sha256": "aa41770a125f74903fb27db58499cf28f7705386ce7160cf0db652c2d4732d22"
+        },
+        {
+          "bytes": 5813,
+          "definition_count": 5,
+          "git_blob_sha": "babbef6bede02546d94e84df49464a25c62fb117",
+          "mode": "100644",
+          "path": "backend/tests/test_read_api.py",
+          "sha256": "b8d1989372b159f201eb72030231979193e7811dbf4e3d10973d36a8e11b6502"
+        },
+        {
+          "bytes": 17655,
+          "definition_count": 8,
+          "git_blob_sha": "d92b34ed36807a04805a7ccd8eecb441bd39ee33",
+          "mode": "100644",
+          "path": "backend/tests/test_read_models.py",
+          "sha256": "199954817c0077ff062df690a043be2dacb860d59cc0ebfe5c9e2b2b055e9ca3"
+        },
+        {
+          "bytes": 8553,
+          "definition_count": 7,
+          "git_blob_sha": "88bafc98a92b35b158e3d23c1ce59682f0aecf68",
+          "mode": "100644",
+          "path": "backend/tests/test_replay_strategy.py",
+          "sha256": "71846bf05065826bab9ded4b95c8d9a66ea416924acb3b0abaa823c1d5829ba5"
+        },
+        {
+          "bytes": 9151,
+          "definition_count": 4,
+          "git_blob_sha": "6bef122edb51c8f5dfaad48b8cec0fb06bcdc08b",
+          "mode": "100644",
+          "path": "backend/tests/test_resilience.py",
+          "sha256": "04c1733d314b530d9a143be90fbb33824161f0b0ed5acfe15ab22ffd2eb1740d"
+        },
+        {
+          "bytes": 7559,
+          "definition_count": 8,
+          "git_blob_sha": "d66a3fd2d5a191a1762b7fa8c232d1f91b54905c",
+          "mode": "100644",
+          "path": "backend/tests/test_risk_engine.py",
+          "sha256": "86b82631a6f9e76c5b30f9508f84f0530a6860e4dd766d6718e0b1d6e0c7bad9"
+        },
+        {
+          "bytes": 8344,
+          "definition_count": 7,
+          "git_blob_sha": "0b9280a1b443f6c65ab6fe082a8c88240f495f50",
+          "mode": "100644",
+          "path": "backend/tests/test_simulated_positions.py",
+          "sha256": "3d0572084cd3d21ee3318504a574b2b6a2bfe3c7f3a821741146b6d0a0e876d9"
+        },
+        {
+          "bytes": 8949,
+          "definition_count": 9,
+          "git_blob_sha": "bcbd7f9512fad9ff874de1c9d13548168e1a33bc",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_approval_api.py",
+          "sha256": "8dd199f057b414a0392d95d69610e7933427144725f6a54a6d024d2581541898"
+        },
+        {
+          "bytes": 9001,
+          "definition_count": 6,
+          "git_blob_sha": "8f4059523486821b5379e82481958fc734236341",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_execution.py",
+          "sha256": "5fdfc7b4d6161695d0f6f8653ace27ae4e3c4d5c8c17c75b16e581a6036ce823"
+        },
+        {
+          "bytes": 12133,
+          "definition_count": 7,
+          "git_blob_sha": "997b947d2d7efa3f94384e070b3e44ecdd6b745a",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_orchestration.py",
+          "sha256": "0decf02fce03b7c304dab4682456c5589b9280a51c26b4821c03d4205768b44d"
+        },
+        {
+          "bytes": 10235,
+          "definition_count": 10,
+          "git_blob_sha": "faacc5cb2b071abba85db0b54eff91405c6cf1b4",
+          "mode": "100644",
+          "path": "backend/tests/test_simulation_runs.py",
+          "sha256": "069650ca658610b7c129cfe10d96b5ba03715f57152a97f1d0c9631c3fab98e0"
+        },
+        {
+          "bytes": 8461,
+          "definition_count": 8,
+          "git_blob_sha": "6db978edb88e3d02fe405c83aa81a1ec276b4913",
+          "mode": "100644",
+          "path": "backend/tests/test_strategy_dsl.py",
+          "sha256": "8806ed829d3b390ba840176592d65af957ae5929b01bf51d0f278fbe6b0e790c"
+        },
+        {
+          "bytes": 824,
+          "definition_count": 1,
+          "git_blob_sha": "52eb01ac14bf2cd773430ebf25543fdc27750d7b",
+          "mode": "100644",
+          "path": "backend/tests/test_verify_repo.py",
+          "sha256": "c1eb7f785893ec96989ba8ff3ede6a76c86ceecb8cdbf209032b533b588bc6f9"
+        },
+        {
+          "bytes": 11120,
+          "definition_count": 7,
+          "git_blob_sha": "52f25bc70ab37b345a3abaeee952d3dd4775a143",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_api.py",
+          "sha256": "6eab980b053dbc4f77b5eb624a98563b38b7d46ed8e0566fcc61d33b0200ae14"
+        },
+        {
+          "bytes": 10292,
+          "definition_count": 9,
+          "git_blob_sha": "502e4e8697e84087c38f3b781ec4403f1b430a6b",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_definitions.py",
+          "sha256": "4710fec9344f904e7b4530fc2775953027fb9a5e9f64f065ac71798664ee2678"
+        },
+        {
+          "bytes": 5908,
+          "definition_count": 5,
+          "git_blob_sha": "12559536fead03d830abe4250055b23161e6a340",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_dsl.py",
+          "sha256": "17d55231a9b3f2d8c400de3a5e180ead31468cfe5b0efcc5bf323eff46bb5b91"
+        },
+        {
+          "bytes": 11333,
+          "definition_count": 8,
+          "git_blob_sha": "a406d91435a41f5e0426198cc1e342d3ee036ee9",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_simulation_api.py",
+          "sha256": "932f8f1a036de751f1c673c51d80d39ab65268bd232ed2b0ccfe5de3390de434"
+        },
+        {
+          "bytes": 11748,
+          "definition_count": 8,
+          "git_blob_sha": "77df721b1f9e3f805862051a02745b91c9372b83",
+          "mode": "100644",
+          "path": "backend/tests/test_workflow_simulation_runs.py",
+          "sha256": "52f5e5d6006e043e21d11f9ad837830feee10bde9b493ffb618c45a9728c5d16"
+        },
+        {
+          "bytes": 24135,
+          "definition_count": 17,
+          "git_blob_sha": "97b3923e325620e9d4548bdcd5e6974bf1807f4b",
+          "mode": "100644",
+          "path": "frontend/src/App.test.tsx",
+          "sha256": "680be5f152508512876718b98570e9be46a9341dbdc4330f29d5732cdbfa9b87"
+        },
+        {
+          "bytes": 1055,
+          "definition_count": 2,
+          "git_blob_sha": "038623b51ed176b3ea3d8496c11579bda46db69e",
+          "mode": "100644",
+          "path": "frontend/src/approvalInbox.test.ts",
+          "sha256": "8f501fd06aceba187fc8792bd2e4eef694b0d233e71a2194ff83ed8c3fa41a0c"
+        },
+        {
+          "bytes": 1945,
+          "definition_count": 3,
+          "git_blob_sha": "728661f8ce49cd00def9d7e62b302f32894eb905",
+          "mode": "100644",
+          "path": "frontend/src/auditExplorer.test.ts",
+          "sha256": "6d113263092e8b097d44231922fa0b9930d91a37ac8953374f35a8b560c6f2e9"
+        },
+        {
+          "bytes": 2171,
+          "definition_count": 2,
+          "git_blob_sha": "238d6d44bc3e01024bdf4d4a90f7def8db4bbb67",
+          "mode": "100644",
+          "path": "frontend/src/evidenceProvenance.test.ts",
+          "sha256": "f0628e2bf10b9665d99bb76ff9c870ef0e31d594ccab8fbc9e0453c4b2429af3"
+        },
+        {
+          "bytes": 3249,
+          "definition_count": 3,
+          "git_blob_sha": "2ac1fb80e2e2484cbbf28ad50583c4e0bb1f0acd",
+          "mode": "100644",
+          "path": "frontend/src/orderPositionDetails.test.ts",
+          "sha256": "4a60c6a93372a3c4e2e0d28f0bcc712f45c083605826a8c3baacf6a62b32c6cd"
+        },
+        {
+          "bytes": 4061,
+          "definition_count": 3,
+          "git_blob_sha": "7ede941f90f1b4238ac3a671a96cef4bef81a57f",
+          "mode": "100644",
+          "path": "frontend/src/protectionMonitoring.test.ts",
+          "sha256": "663b9d73fef1317b0e77e5630c59b5dbbecb18075be74972859a33dc5a42a96e"
+        },
+        {
+          "bytes": 14399,
+          "definition_count": 4,
+          "git_blob_sha": "43046cf25166517e7e4983e19b5c728c2d81f64c",
+          "mode": "100644",
+          "path": "frontend/src/readApiClient.test.ts",
+          "sha256": "297448939a4494e76b99f7d62d01c5592b5703006233c9e103e9c39630ff553b"
+        },
+        {
+          "bytes": 443,
+          "definition_count": 1,
+          "git_blob_sha": "45e6ae0cbcd7acee797affc1ae86eacd45c78b5e",
+          "mode": "100644",
+          "path": "frontend/src/safety.test.ts",
+          "sha256": "45754744973c7089e8f2e981dec26d1586e8dd47ceaf06af03e029b5fadfc061"
+        },
+        {
+          "bytes": 1711,
+          "definition_count": 1,
+          "git_blob_sha": "68ed47462efb1310c628fee9349c817f856ae4f1",
+          "mode": "100644",
+          "path": "frontend/src/simulationApprovalApiClient.test.ts",
+          "sha256": "540a2b2be5367de6384ed8017d2627c98ed0174688a95d6448b37b33d01f5ebf"
+        },
+        {
+          "bytes": 2006,
+          "definition_count": 4,
+          "git_blob_sha": "2dc3a4c0aed166ca8c3d0ee8445196e0a1943cf8",
+          "mode": "100644",
+          "path": "frontend/src/strategyBuilder.test.ts",
+          "sha256": "75a126ca89e678b9b274216eb7a10b9fb012803ad4761468f007eeb908679932"
+        },
+        {
+          "bytes": 4100,
+          "definition_count": 7,
+          "git_blob_sha": "b42ec15dd7b69426e2d3354c3b424dd3c6bcdc6a",
+          "mode": "100644",
+          "path": "frontend/src/visualSimulationWorkflowCanvas.test.ts",
+          "sha256": "383b18dc46f9099975e320cb8734dbd960fe02295791f4aed64f40870a46fcfd"
+        },
+        {
+          "bytes": 2762,
+          "definition_count": 3,
+          "git_blob_sha": "d0570ed7ca5b316c10ecb4cc5573175f04fbfb59",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowDsl.test.ts",
+          "sha256": "38d02955d07df3188fc92e57c2bd6d4d04f053520e757f5be8ed02ef293face6"
+        },
+        {
+          "bytes": 2080,
+          "definition_count": 3,
+          "git_blob_sha": "99d9035c8311164c6e4eb0a43da846a950c80251",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowRunInspection.test.ts",
+          "sha256": "8792d4120e99eefb363dffd9d62a6264113510ae4445224c84613e558bf1d1c3"
+        },
+        {
+          "bytes": 3171,
+          "definition_count": 4,
+          "git_blob_sha": "dec3518cc735d31cdcc414d2a4fe6501b4d0bdfd",
+          "mode": "100644",
+          "path": "frontend/src/visualWorkflowValidation.test.ts",
+          "sha256": "f86109735dea6fe31372d8bb4637813c051a15a42f60b7b7896c8c468b5d55e2"
+        },
+        {
+          "bytes": 6076,
+          "definition_count": 3,
+          "git_blob_sha": "4289897242f02f1c616b9bd6711deb637363a4ee",
+          "mode": "100644",
+          "path": "frontend/src/workflowApiClient.test.ts",
+          "sha256": "9c5863a0602d53fef6288790042aea769b6d215d178b312219f5a9f42e8b7684"
+        }
+      ]
+    },
+    "verification": {
+      "backend_tests": {
+        "collected": 577,
+        "passed": 577
+      },
+      "checks": [
+        "Repository policy validation",
+        "Backend formatting, linting, compilation, and tests",
+        "Frontend linting, type checking, and tests",
+        "Resilience test suite"
+      ],
+      "commands": [
+        "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify.ps1"
+      ],
+      "content_sha256": "f0fe5b3699a20dabfb5051c53c820febc765f1c5cabe2aa2bd00044603c8d880",
+      "evidence_level": "local_self_recorded",
+      "frontend_tests": {
+        "files": 15,
+        "passed": 60
+      },
+      "limitations": [
+        "Verification was performed by repository automation and was not independently witnessed.",
+        "Integration, replay, and end-to-end verification stages remain script placeholders.",
+        "No SDK installation, broker contact, paper session, order request, callback, or external review is represented by these counts."
+      ],
+      "resilience_tests": {
+        "collected": 4,
+        "passed": 4
+      },
+      "result": "passed",
+      "tree_was_clean": true
+    }
+  },
+  "packet_id": "candidate_062_external_design_review_handoff",
+  "packet_type": "independent_review_packet",
+  "readiness": {
+    "blocking_evidence_count": 14,
+    "decision": "no_go",
+    "external_review_evidence": "missing",
+    "result": "not_ready",
+    "verified_evidence_count": 0
+  },
+  "reproducible_commands": [
+    "git rev-parse eafc3939f2c5cdc2a7fe09280381395e648bc28d^{commit}",
+    "git show -s --format=%T eafc3939f2c5cdc2a7fe09280381395e648bc28d",
+    "git rev-parse eafc3939f2c5cdc2a7fe09280381395e648bc28d:docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+    "$env:PYTHONPATH = (Resolve-Path .\\backend\\src).Path",
+    "python -m trading_oms_backend.independent_review_packet verify --repository . --packet review/candidate-062/packet.json --digest review/candidate-062/packet.sha256",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify.ps1"
+  ],
+  "review_scope": [
+    {
+      "objective": "Assess session lifecycle, queue and thread containment, failure transitions, and fail-closed unknown-state behavior.",
+      "scope_id": "architecture_failure_containment",
+      "title": "Connector architecture and failure containment"
+    },
+    {
+      "objective": "Assess the exact official API 10.48 artifact, license, digest, compatibility, and dependency provenance requirements.",
+      "scope_id": "dependency_supply_chain",
+      "title": "SDK provenance and supply-chain controls"
+    },
+    {
+      "objective": "Assess local-only connectivity, paper proof, private data containment, and account ambiguity blocking.",
+      "scope_id": "identity_secrets_network",
+      "title": "Paper identity, sensitive data, and network controls"
+    },
+    {
+      "objective": "Assess durable outbox, callback ledger, typed sanitization, correlation, and reconstruction requirements.",
+      "scope_id": "journal_auditability",
+      "title": "Transport journal and auditability"
+    },
+    {
+      "objective": "Assess risk, approval, OMS, idempotency, protection, reconciliation, and emergency gates before any request.",
+      "scope_id": "oms_approval_protection_reconciliation_emergency",
+      "title": "Order lifecycle safety controls"
+    },
+    {
+      "objective": "Assess operator response, alert limitations, recovery, rollback, and separately gated paper-lab planning.",
+      "scope_id": "operational_readiness",
+      "title": "Operator and operational boundaries"
+    },
+    {
+      "objective": "Assess immutable source binding and prevent design, test, packet, or paper-port facts from becoming unsupported evidence claims.",
+      "scope_id": "provenance_product_claims",
+      "title": "Evidence provenance and claim limits"
+    },
+    {
+      "objective": "Assess stale-data blocking, duplicate prevention, unknown-state blocking, protection, and live-trading prohibition.",
+      "scope_id": "trading_safety_risk",
+      "title": "Trading safety and risk"
+    }
+  ],
+  "review_status": "not_independently_reviewed",
+  "safety_scan": {
+    "finding_count": 0,
+    "policy": "candidate_061_packet_v1",
+    "result": "passed"
+  },
+  "schema_version": 1,
+  "tooling": {
+    "generator_path": "backend/src/trading_oms_backend/independent_review_packet.py",
+    "generator_sha256": "04e277f97e3d1ba3fb26fea55cc90e3c01bc5d8cc59f38e89bde8766123b1d0e",
+    "specification_path": "review/candidate-062/spec.json",
+    "specification_sha256": "b2eb89567e1bc6dede950e091c44e788eba46a0399a94f9c14742974154ef6c1"
+  },
+  "traceability": {
+    "content_sha256": "8d6db29d17ae146d29155dfb331b408d308afcb5f15236d6e270a2428db00cdc",
+    "control_count": 8,
+    "controls": [
+      {
+        "control_id": "c062_ctrl_architecture",
+        "evidence_level": "documented_design",
+        "implementation_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/IBKR_ADAPTER_DESIGN.md"
+        ],
+        "requirement": "A future connector must isolate SDK lifecycle, reader, queue, and failure states behind the adapter and fail closed.",
+        "review_scope_id": "architecture_failure_containment",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_candidate_slice_062_execplan.py"
+        ]
+      },
+      {
+        "control_id": "c062_ctrl_dependency",
+        "evidence_level": "documented_design",
+        "implementation_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+        ],
+        "requirement": "Candidate 063 must pin one official API 10.48 artifact with verified digest, license, dependencies, and compatibility before implementation.",
+        "review_scope_id": "dependency_supply_chain",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_candidate_slice_062_execplan.py"
+        ]
+      },
+      {
+        "control_id": "c062_ctrl_identity_network",
+        "evidence_level": "documented_and_tested",
+        "implementation_references": [
+          "docs/SECURITY_BASELINE.md",
+          "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+        ],
+        "requirement": "Paper proof, exactly-one-account handling, transient sensitive data, and local-only destination checks must remain fail closed.",
+        "review_scope_id": "identity_secrets_network",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_config.py",
+          "backend/tests/test_candidate_slice_062_execplan.py"
+        ]
+      },
+      {
+        "control_id": "c062_ctrl_journal",
+        "evidence_level": "documented_design",
+        "implementation_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/IBKR_PAPER_ADAPTER.md"
+        ],
+        "requirement": "Outbox, callback, status, fill, disconnect, reconnect, rejection, and reconciliation decisions must be durable, correlated, typed, sanitized, and append-only.",
+        "review_scope_id": "journal_auditability",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_event_journal.py",
+          "backend/tests/test_candidate_slice_062_execplan.py"
+        ]
+      },
+      {
+        "control_id": "c062_ctrl_operations",
+        "evidence_level": "documented_design",
+        "implementation_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "requirement": "Alert limitations, emergency response, rollback, recovery, and any future lab remain explicit human-gated blockers.",
+        "review_scope_id": "operational_readiness",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_emergency_stop.py",
+          "backend/tests/test_operational_controls.py"
+        ]
+      },
+      {
+        "control_id": "c062_ctrl_order_safety",
+        "evidence_level": "documented_design",
+        "implementation_references": [
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+          "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+        ],
+        "requirement": "No future paper request may bypass risk, approval, OMS, protection, emergency, idempotency, connection, and reconciliation gates.",
+        "review_scope_id": "oms_approval_protection_reconciliation_emergency",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_risk_engine.py",
+          "backend/tests/test_approval_tickets.py",
+          "backend/tests/test_oms_state_machine.py"
+        ]
+      },
+      {
+        "control_id": "c062_ctrl_provenance",
+        "evidence_level": "generated_manifest",
+        "implementation_references": [
+          "review/candidate-061/REVIEW_GUIDE.md",
+          "docs/POST_SLICE_059_REVIEW.md"
+        ],
+        "requirement": "The review must bind to exact source and must not promote internal preparation, tests, adapter seams, or documentation to external evidence.",
+        "review_scope_id": "provenance_product_claims",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_independent_review_packet.py",
+          "backend/tests/test_evidence_provenance.py"
+        ]
+      },
+      {
+        "control_id": "c062_ctrl_trading_safety",
+        "evidence_level": "documented_and_tested",
+        "implementation_references": [
+          "AGENTS.md",
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+        ],
+        "requirement": "Stale data, duplicate identity, unknown state, missing protection, or reconciliation ambiguity must block risk-increasing progression and live trading remains prohibited.",
+        "review_scope_id": "trading_safety_risk",
+        "review_status": "pending_independent_review",
+        "test_references": [
+          "backend/tests/test_risk_engine.py",
+          "backend/tests/test_resilience.py"
+        ]
+      }
+    ]
+  },
+  "unresolved_evidence": {
+    "blocking_count": 14,
+    "content_sha256": "1ba8edae6b68c3698d8d7986dce54e711f1332f364c121fbada515952c3d9f2b",
+    "item_count": 14,
+    "items": [
+      {
+        "blocking_reason": "Retention behavior and policy enforcement have not been demonstrated in a target environment.",
+        "category": "audit_retention",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "unverified"
+      },
+      {
+        "blocking_reason": "Target-environment identity and permission controls have not been independently validated.",
+        "category": "authentication_authorization",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "unverified"
+      },
+      {
+        "blocking_reason": "Backup integrity and restore recovery have not been demonstrated in a target environment.",
+        "category": "backup_restore",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "unverified"
+      },
+      {
+        "blocking_reason": "Emergency-stop behavior has local automated evidence but no independent or target-environment validation.",
+        "category": "emergency_stop",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "unverified"
+      },
+      {
+        "blocking_reason": "No independent architecture, trading-safety, or security reviewer has assessed and accepted the exact Candidate 062 design.",
+        "category": "external_review",
+        "evidence_references": [
+          "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md",
+          "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_reason": "No independently witnessed incident-response exercise is available.",
+        "category": "incident_response",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_reason": "The readiness model remains a local evidence summary and has not passed final review.",
+        "category": "live_readiness",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "unverified"
+      },
+      {
+        "blocking_reason": "No target-environment network exposure assessment is available.",
+        "category": "network_exposure",
+        "evidence_references": [
+          "docs/SECURITY_BASELINE.md"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_reason": "Local observability controls have not been validated against a target environment or operational objectives.",
+        "category": "observability",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "unverified"
+      },
+      {
+        "blocking_reason": "No named operator has accepted responsibilities or evidence for controlled operation.",
+        "category": "operator_signoff",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_reason": "No authenticated target-environment paper-trading observation history is available.",
+        "category": "paper_trading_history",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_reason": "Reconciliation has local automated evidence but no authenticated paper-session observation history.",
+        "category": "reconciliation",
+        "evidence_references": [
+          "docs/RESILIENCE_CHAOS.md"
+        ],
+        "status": "unverified"
+      },
+      {
+        "blocking_reason": "No independently witnessed rollback rehearsal or acceptance record is available.",
+        "category": "rollback",
+        "evidence_references": [
+          "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+        ],
+        "status": "missing"
+      },
+      {
+        "blocking_reason": "Sensitive-value handling is documented but not verified in a target deployment environment.",
+        "category": "secret_management",
+        "evidence_references": [
+          "docs/SECURITY_BASELINE.md"
+        ],
+        "status": "unverified"
+      }
+    ],
+    "verified_count": 0
+  }
+}
