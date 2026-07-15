@@ -21,7 +21,8 @@ engine, real alert delivery, production deployment, or live order submission exi
 - Simulation approval endpoints decide local approval tickets only and cannot execute orders.
 - Approved-order simulation execution uses only the local fake broker.
 - Simulated position protection alerts are local/no-op only.
-- Simulation run detail UI is read-only and cannot execute actions.
+- Simulation run inspector loads saved workflow-run history through existing read APIs, exposes
+  backend-recorded node and journal evidence, and cannot execute actions.
 - Fake broker behavior is local simulation only.
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.

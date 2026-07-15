@@ -1,12 +1,28 @@
 # Product Gap Analysis
 
-This document maps the stated product goals to the current repository state and the post-Slice-018
-delivery queue.
+This document originally mapped the stated product goals to the post-Slice-018 repository state and
+delivery queue. The historical map is retained below; current slice status lives in `docs/SLICES.md`.
 
 This is a planning and safety-boundary document. It is not approval for live trading, IBKR
 transport, production rollout, real credentials, or broker order transmission.
 
-## Current Position
+## Current Update
+
+The post-Slice-018 queue through Slice 059 and Candidates 060-062 delivered the connected read API,
+deterministic simulation orchestration, safe visual workflow foundation, local persistence
+foundation, operator views, paper-adapter foundation, resilience checks, and fail-closed readiness
+evidence described in `docs/SLICES.md`.
+
+The non-broker simulation-run-inspector candidate closes one remaining operator-trust gap: the UI no
+longer shows a hard-coded completed fake-broker run. It loads actual saved workflow simulation runs,
+shows backend-recorded node and journal evidence, and renders explicit empty/error states. Current
+workflow-run retention is process-local and remains a future durability gap.
+
+Candidate 063 connector implementation is deferred. No IBKR dependency, broker contact, order
+transport, credentials, account identifiers, deployment, rollout, production operation, or live
+trading is authorized by this update.
+
+## Historical Post-Slice-018 Position
 
 The repository has completed the first safety foundation:
 
@@ -31,7 +47,7 @@ The repository does not yet have a connected trading workflow product. The front
 mostly local/static inspection data, and backend domain modules are not yet orchestrated into a full
 simulation run.
 
-## Goal-To-Gap Map
+## Historical Post-Slice-018 Goal-To-Gap Map
 
 | Product goal | Current state | Gap to close |
 | --- | --- | --- |
@@ -51,7 +67,7 @@ simulation run.
 | IBKR paper adapter | Local adapter boundary exists without transport. | Add paper-only transport only after a separate explicit human approval and review. |
 | Production readiness | Checklist evaluator, deployment plan, local auth/roles, and local emergency stop exist. | Add observability, backup/restore, incident response, evidence dashboard, rollout checklist, and external review evidence. |
 
-## Visual Builder Clarification
+## Historical Visual Builder Clarification
 
 The current `Visual builder` is not the Make.com-style product goal. It is only a local, fixed,
 replay-only Strategy DSL preview for the `close_above_sma` strategy.
@@ -85,7 +101,7 @@ The next work proceeds through explicit gates:
 Gate A is limited to documentation and planning queue setup. Gates B through G require separate
 human approval before implementation starts.
 
-## Next Delivery Queue
+## Historical Next Delivery Queue
 
 The detailed queue now lives in `docs/SLICES.md`, beginning with Slice 019.
 

@@ -59,6 +59,16 @@ import {
   defaultVisualWorkflowDslCompileResult,
   formatVisualWorkflowDslPreview,
 } from "./visualWorkflowDsl";
+import {
+  createWorkflowApiClient,
+  type WorkflowApiClient,
+  type WorkflowNodeRunStatusApiView,
+} from "./workflowApiClient";
+import {
+  initialWorkflowRunInspectionState as initialWorkflowRunInspectionLoadState,
+  loadWorkflowRunInspection,
+  type WorkflowRunInspectionState,
+} from "./workflowRunInspector";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
 
@@ -76,18 +86,12 @@ type WorkflowRow = {
   tone: Tone;
 };
 
-type SimulationRunDetailItem = {
-  group: string;
-  label: string;
-  detail: string;
-  status: string;
-  tone: Tone;
-};
-
 type AppProps = {
   initialReadState?: ReadApiLoadState;
+  initialWorkflowRunInspectionState?: WorkflowRunInspectionState;
   readApiClient?: ReadApiClient;
   simulationApprovalApiClient?: SimulationApprovalApiClient;
+  workflowApiClient?: WorkflowApiClient;
 };
 
 const visualBuilderSection = "Visual builder" as const;
@@ -132,121 +136,12 @@ const shellSections = [
   ...workflowSections,
 ] as const;
 
-const simulationRunTimeline: SimulationRunDetailItem[] = [
-  {
-    group: "Timeline",
-    label: "Replay loaded",
-    detail: "AAPL session replay built 5-minute bars",
-    status: "completed",
-    tone: "good",
-  },
-  {
-    group: "Timeline",
-    label: "Signal generated",
-    detail: "First 5-minute breakout with 1.5x volume filter",
-    status: "long entry candidate",
-    tone: "info",
-  },
-  {
-    group: "Timeline",
-    label: "Risk evaluated",
-    detail: "Fresh data, known simulation broker state, protection plan present",
-    status: "passed",
-    tone: "good",
-  },
-  {
-    group: "Timeline",
-    label: "Approval decided",
-    detail: "Manual simulation approval recorded",
-    status: "approved",
-    tone: "good",
-  },
-  {
-    group: "Timeline",
-    label: "Fake broker filled",
-    detail: "Local fake broker acknowledged and filled the simulation order",
-    status: "filled",
-    tone: "good",
-  },
-  {
-    group: "Timeline",
-    label: "Protection monitored",
-    detail: "Missing expected stop-loss protection raised a local critical alert",
-    status: "critical alert",
-    tone: "critical",
-  },
-];
-
-const simulationRunDetailItems: SimulationRunDetailItem[] = [
-  {
-    group: "Signal",
-    label: "signal-001",
-    detail: "AAPL breakout above first 5-minute high",
-    status: "long entry candidate",
-    tone: "info",
-  },
-  {
-    group: "Risk",
-    label: "risk-001",
-    detail: "Duplicate, stale data, and unknown state checks passed",
-    status: "passed",
-    tone: "good",
-  },
-  {
-    group: "Approval",
-    label: "approval-ticket-001",
-    detail: "Manual simulation approval captured with actor and reason",
-    status: "approved",
-    tone: "good",
-  },
-  {
-    group: "OMS",
-    label: "order-001",
-    detail: "CREATED -> PENDING_APPROVAL -> APPROVED -> SUBMITTED -> FILLED",
-    status: "filled",
-    tone: "good",
-  },
-  {
-    group: "Fake broker",
-    label: "fake-client-001",
-    detail: "Simulation-only acknowledgement and fill",
-    status: "filled",
-    tone: "good",
-  },
-  {
-    group: "Fill",
-    label: "fill-001",
-    detail: "10 AAPL at 102.00 from local fake broker",
-    status: "simulated",
-    tone: "info",
-  },
-  {
-    group: "Position",
-    label: "position-AAPL",
-    detail: "Quantity 10, expected stop-loss protection missing",
-    status: "missing expected protection",
-    tone: "critical",
-  },
-  {
-    group: "Alert",
-    label: "alert-position-update-001",
-    detail: "Local no-op critical alert recorded",
-    status: "critical",
-    tone: "critical",
-  },
-  {
-    group: "Audit",
-    label: "journal",
-    detail: "Signal, proposal, risk, approval, OMS, fill, position, and alert events",
-    status: "append only",
-    tone: "info",
-  },
-];
-
 export function App({
   initialReadState,
+  initialWorkflowRunInspectionState,
   readApiClient,
   simulationApprovalApiClient,
+  workflowApiClient,
 }: AppProps = {}) {
   const [builderState, setBuilderState] = useState(defaultStrategyBuilderState);
   const [auditFilters, setAuditFilters] = useState(defaultAuditExplorerFilters);
@@ -255,9 +150,17 @@ export function App({
   const [readState, setReadState] = useState<ReadApiLoadState>(
     initialReadState ?? initialReadApiState,
   );
+  const [workflowRunInspection, setWorkflowRunInspection] = useState<WorkflowRunInspectionState>(
+    initialWorkflowRunInspectionState ?? initialWorkflowRunInspectionLoadState,
+  );
+  const [selectedWorkflowRunKey, setSelectedWorkflowRunKey] = useState<string | null>(null);
   const approvalClient = useMemo(
     () => simulationApprovalApiClient ?? createSimulationApprovalApiClient(),
     [simulationApprovalApiClient],
+  );
+  const workflowClient = useMemo(
+    () => workflowApiClient ?? createWorkflowApiClient(),
+    [workflowApiClient],
   );
   const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
   const workflowDslPreview = useMemo(
@@ -265,6 +168,8 @@ export function App({
     [],
   );
   const shouldLoadFromBackend = !initialReadState || initialReadState.status === "loading";
+  const shouldLoadWorkflowRuns =
+    !initialWorkflowRunInspectionState || initialWorkflowRunInspectionState.status === "loading";
   const snapshot = readState.snapshot;
   const summaryPanels = useMemo(() => buildSummaryPanels(snapshot), [snapshot]);
   const workflowRows = useMemo(() => buildWorkflowRows(snapshot), [snapshot]);
@@ -289,6 +194,13 @@ export function App({
     [auditFilters, snapshot.auditEvents],
   );
   const selectedAuditEvent = auditExplorerEvents[0] ?? null;
+  const selectedWorkflowRun = useMemo(
+    () =>
+      workflowRunInspection.items.find((item) => item.key === selectedWorkflowRunKey) ??
+      workflowRunInspection.items[0] ??
+      null,
+    [selectedWorkflowRunKey, workflowRunInspection.items],
+  );
 
   useEffect(() => {
     if (!shouldLoadFromBackend) {
@@ -308,6 +220,25 @@ export function App({
       isCurrent = false;
     };
   }, [readApiClient, shouldLoadFromBackend]);
+
+  useEffect(() => {
+    if (!shouldLoadWorkflowRuns) {
+      return;
+    }
+
+    let isCurrent = true;
+    setWorkflowRunInspection(initialWorkflowRunInspectionLoadState);
+
+    loadWorkflowRunInspection(workflowClient).then((state) => {
+      if (isCurrent) {
+        setWorkflowRunInspection(state);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [shouldLoadWorkflowRuns, workflowClient]);
 
   const updateApprovalForm = (
     ticketId: string,
@@ -570,42 +501,116 @@ export function App({
           <section className="run-detail-section" id={sectionId(simulationRunSection)}>
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Simulation run</p>
-                <h2>Run sim-run-001</h2>
+                <p className="eyebrow">Saved workflow runs</p>
+                <h2>
+                  {selectedWorkflowRun
+                    ? `Run ${selectedWorkflowRun.run.run_id}`
+                    : "Saved workflow runs"}
+                </h2>
               </div>
-              <StatusPill tone="good" label="Simulation only" />
+              <div className="status-strip" aria-label="Simulation run inspection posture">
+                <StatusPill tone="good" label="Simulation only" />
+                <StatusPill
+                  tone={workflowRunInspectionTone(workflowRunInspection)}
+                  label={workflowRunInspectionLabel(workflowRunInspection)}
+                />
+              </div>
             </div>
-            <div className="run-detail-layout">
-              <div className="run-timeline" aria-label="Simulation run timeline">
-                {simulationRunTimeline.map((item, index) => (
-                  <article className="timeline-step" key={item.label}>
-                    <span className="node-index" aria-label={`Timeline step ${index + 1}`}>
-                      {index + 1}
-                    </span>
-                    <div>
-                      <h3>{item.label}</h3>
-                      <p>{item.detail}</p>
-                    </div>
-                    <StatusPill tone={item.tone} label={item.status} />
-                  </article>
-                ))}
-              </div>
-              <div className="run-detail-grid" aria-label="Simulation run detail records">
-                {simulationRunDetailItems.map((item) => (
-                  <article className="run-detail-card" key={`${item.group}-${item.label}`}>
-                    <div className="panel-heading">
+            {workflowRunInspection.status === "loading" ? (
+              <p className="empty-state" aria-live="polite">
+                Loading saved workflow simulation runs
+              </p>
+            ) : null}
+            {workflowRunInspection.status === "error" ? (
+              <p className="empty-state state-note" role="alert">
+                {workflowRunInspection.errorMessage}
+              </p>
+            ) : null}
+            {workflowRunInspection.status === "loaded" && !selectedWorkflowRun ? (
+              <p className="empty-state">No saved workflow simulation runs</p>
+            ) : null}
+            {workflowRunInspection.status === "loaded" && selectedWorkflowRun ? (
+              <div className="run-detail-layout">
+                <div className="run-inspector-toolbar">
+                  <label>
+                    <span>Inspect run</span>
+                    <select
+                      name="workflowSimulationRun"
+                      onChange={(event) => setSelectedWorkflowRunKey(event.target.value)}
+                      value={selectedWorkflowRun.key}
+                    >
+                      {workflowRunInspection.items.map((item) => (
+                        <option key={item.key} value={item.key}>
+                          {item.run.run_id} | {item.workflowName} | {formatIdentifier(item.run.status)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <StatusPill
+                    tone={workflowNodeStatusTone(selectedWorkflowRun.run.status)}
+                    label={formatIdentifier(selectedWorkflowRun.run.status)}
+                  />
+                </div>
+
+                <dl className="posture-grid run-inspector-facts">
+                  <PostureItem label="Workflow" value={selectedWorkflowRun.workflowName} />
+                  <PostureItem label="Workflow ID" value={selectedWorkflowRun.workflowId} />
+                  <PostureItem
+                    label="Definition"
+                    value={`version ${selectedWorkflowRun.workflowVersion}`}
+                  />
+                  <PostureItem label="Run ID" value={selectedWorkflowRun.run.run_id} />
+                  <PostureItem
+                    label="Replay input"
+                    value={selectedWorkflowRun.run.simulation_run.replay_input_reference}
+                  />
+                  <PostureItem
+                    label="Approval ticket"
+                    value={selectedWorkflowRun.run.approval_ticket_id ?? "not created"}
+                  />
+                  <PostureItem label="Created" value={selectedWorkflowRun.run.created_at} />
+                  <PostureItem label="Updated" value={selectedWorkflowRun.run.updated_at} />
+                  <PostureItem
+                    label="Journal references"
+                    value={formatCount(
+                      selectedWorkflowRun.run.journal_references.length,
+                      "reference",
+                      "references",
+                    )}
+                  />
+                </dl>
+
+                <div className="run-history" aria-label="Saved workflow simulation run history">
+                  {workflowRunInspection.items.map((item) => (
+                    <div
+                      className={
+                        item.key === selectedWorkflowRun.key
+                          ? "run-history-row run-history-row-selected"
+                          : "run-history-row"
+                      }
+                      key={item.key}
+                    >
                       <div>
-                        <p className="eyebrow">{item.group}</p>
-                        <h3>{item.label}</h3>
+                        <h3>{item.run.run_id}</h3>
+                        <p>
+                          {item.workflowName} | version {item.workflowVersion} | {item.run.updated_at}
+                        </p>
                       </div>
-                      <span className={`swatch swatch-${item.tone}`} aria-hidden="true" />
+                      <StatusPill
+                        tone={workflowNodeStatusTone(item.run.status)}
+                        label={formatIdentifier(item.run.status)}
+                      />
                     </div>
-                    <p>{item.detail}</p>
-                    <StatusPill tone={item.tone} label={item.status} />
-                  </article>
-                ))}
+                  ))}
+                </div>
+
+                <div className="run-timeline" aria-label="Simulation run node status timeline">
+                  {selectedWorkflowRun.run.node_statuses.map((node, index) => (
+                    <WorkflowRunTimelineStep index={index} key={node.node_id} node={node} />
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : null}
           </section>
 
           <section className="approval-inbox-section" id={sectionId(approvalInboxSection)}>
@@ -1908,6 +1913,28 @@ function buildWorkflowRows(snapshot: OperationsApiSnapshot): Record<WorkflowSect
   };
 }
 
+function WorkflowRunTimelineStep({
+  index,
+  node,
+}: {
+  index: number;
+  node: WorkflowNodeRunStatusApiView;
+}) {
+  return (
+    <article className="timeline-step">
+      <span className="node-index" aria-label={`Timeline step ${index + 1}`}>
+        {index + 1}
+      </span>
+      <div>
+        <h3>{sentenceCaseIdentifier(node.node_type)}</h3>
+        <p>{node.detail}</p>
+        <span className="journal-reference">{node.journal_reference}</span>
+      </div>
+      <StatusPill tone={workflowNodeStatusTone(node.status)} label={formatIdentifier(node.status)} />
+    </article>
+  );
+}
+
 function StatusPill({ label, tone }: { label: string; tone: Tone }) {
   return <span className={`status-pill status-${tone}`}>{label}</span>;
 }
@@ -1975,6 +2002,36 @@ function formatApprovalMode(value: string) {
     return "Manual approval required";
   }
   return titleCase(formatIdentifier(value));
+}
+
+function workflowRunInspectionLabel(state: WorkflowRunInspectionState) {
+  if (state.status === "loading") {
+    return "Run history loading";
+  }
+  if (state.status === "error") {
+    return "Run history unavailable";
+  }
+  return formatCount(state.items.length, "saved run", "saved runs");
+}
+
+function workflowRunInspectionTone(state: WorkflowRunInspectionState): Tone {
+  if (state.status === "error") {
+    return "warning";
+  }
+  return state.status === "loaded" && state.items.length > 0 ? "info" : "neutral";
+}
+
+function workflowNodeStatusTone(status: string): Tone {
+  if (status === "completed" || status === "passed" || status === "filled") {
+    return "good";
+  }
+  if (status === "risk_blocked" || status === "failed" || status === "rejected") {
+    return "critical";
+  }
+  if (status.includes("waiting_for_approval") || status === "not_created") {
+    return "warning";
+  }
+  return "neutral";
 }
 
 function readStateLabel(readState: ReadApiLoadState) {
