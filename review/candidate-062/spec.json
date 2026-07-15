@@ -1,0 +1,508 @@
+{
+  "baseline": {
+    "commit_sha": "eafc3939f2c5cdc2a7fe09280381395e648bc28d",
+    "subject": "Plan Candidate Slice 062 IBKR paper connector (#43)",
+    "tree_sha": "d1074dd86dc6b03ce6683cf90d9f2bce7a2da723"
+  },
+  "baseline_verification": {
+    "backend_tests": {
+      "collected": 577,
+      "passed": 577
+    },
+    "checks": [
+      "Repository policy validation",
+      "Backend formatting, linting, compilation, and tests",
+      "Frontend linting, type checking, and tests",
+      "Resilience test suite"
+    ],
+    "commands": [
+      "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify.ps1"
+    ],
+    "evidence_level": "local_self_recorded",
+    "frontend_tests": {
+      "files": 15,
+      "passed": 60
+    },
+    "limitations": [
+      "Verification was performed by repository automation and was not independently witnessed.",
+      "Integration, replay, and end-to-end verification stages remain script placeholders.",
+      "No SDK installation, broker contact, paper session, order request, callback, or external review is represented by these counts."
+    ],
+    "resilience_tests": {
+      "collected": 4,
+      "passed": 4
+    },
+    "result": "passed",
+    "tree_was_clean": true
+  },
+  "evidence_documents": [
+    {
+      "evidence_level": "documented",
+      "path": "AGENTS.md",
+      "purpose": "Repository-wide trading safety rules and required implementation workflow.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/POST_SLICE_059_REVIEW.md",
+      "purpose": "No-go product gap review and independent-evidence program boundary.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+      "purpose": "Exact proposed Candidate Slice 063 paper-connector design under review.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md",
+      "purpose": "External-review topics, test expectations, and explicit non-approvals.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/IBKR_PAPER_ADAPTER.md",
+      "purpose": "Current adapter-only behavior, safety guards, and runtime limitations.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/IBKR_ADAPTER_DESIGN.md",
+      "purpose": "Existing broker-boundary responsibilities and future paper-only scope.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/RESILIENCE_CHAOS.md",
+      "purpose": "Current deterministic disconnect, reconnect, callback, and reconciliation evidence limits.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/SECURITY_BASELINE.md",
+      "purpose": "Secret, network, configuration, review, and live-prohibition boundary.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md",
+      "purpose": "Fourteen-category evidence gate and fail-closed readiness posture.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "docs/SLICES.md",
+      "purpose": "Candidate 062 completion record and Candidate 063 non-authorization boundary.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "documented",
+      "path": "review/candidate-061/REVIEW_GUIDE.md",
+      "purpose": "Prior deterministic packet review procedure and non-independence boundary.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "source_inspected",
+      "path": "backend/src/trading_oms_backend/independent_review_packet.py",
+      "purpose": "Canonical packet generation, Git-tree binding, verification, and safety scanning.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "automated_test",
+      "path": "backend/tests/test_independent_review_packet.py",
+      "purpose": "Deterministic packet identity, tamper rejection, and unsafe-content tests.",
+      "review_status": "pending_independent_review"
+    },
+    {
+      "evidence_level": "automated_test",
+      "path": "backend/tests/test_candidate_slice_062_execplan.py",
+      "purpose": "Candidate 062 plan structure, official-source distinction, and no-runtime-surface tests.",
+      "review_status": "pending_independent_review"
+    }
+  ],
+  "findings": [
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+      ],
+      "finding_id": "c062_001_sdk_provenance",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P1",
+      "summary": "The official TWS API 10.48 artifact filename, origin, version, SHA-256, license and redistribution terms, transitive dependencies, Python 3.12 compatibility, and compatible TWS/Gateway build are not independently accepted."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+      ],
+      "finding_id": "c062_002_paper_proof_and_account_ambiguity",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P0",
+      "summary": "Authoritative paper-session proof, exactly-one-account handling, account ambiguity blocking, and transient private data containment are not independently accepted."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/IBKR_PAPER_ADAPTER.md"
+      ],
+      "finding_id": "c062_003_client_order_identity_and_outbox",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P0",
+      "summary": "The dedicated client ID, persistent order-ID allocation, opaque order references, durable outbox, dispatch ambiguity, restart recovery, and idempotency design are not independently accepted."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/IBKR_PAPER_ADAPTER.md"
+      ],
+      "finding_id": "c062_004_callbacks_and_protection",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P0",
+      "summary": "Callback ordering, duplicate and conflict handling, fill correlation, bracket sequencing, expected protection, and missing-protection blocking are not independently accepted."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/RESILIENCE_CHAOS.md"
+      ],
+      "finding_id": "c062_005_reconnect_and_reconciliation",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P0",
+      "summary": "Disconnect, reconnect, reader failure, retrieval-window gaps, callback replay, position comparison, and reconciliation-before-new-risk behavior are not independently accepted."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/SECURITY_BASELINE.md",
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+      ],
+      "finding_id": "c062_006_network_and_private_data",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P0",
+      "summary": "Local-only destination enforcement, no-public-exposure evidence, private data redaction, and fail-closed handling of account ambiguity are not independently accepted."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "finding_id": "c062_007_alert_and_emergency_response",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P1",
+      "summary": "The local no-op alert limitation, missing-protection escalation, emergency-stop behavior, and operator response procedure are not independently accepted."
+    },
+    {
+      "blocking": true,
+      "evidence_references": [
+        "docs/POST_SLICE_059_REVIEW.md",
+        "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+      ],
+      "finding_id": "c062_008_independent_review_absent",
+      "owner_status": "unassigned",
+      "resolution_state": "open",
+      "severity": "P0",
+      "summary": "No independent architecture, trading-safety, or security reviewer has accepted the exact Candidate 062 design, its P0/P1 resolutions, or its residual risks."
+    }
+  ],
+  "packet_id": "candidate_062_external_design_review_handoff",
+  "reproducible_commands": [
+    "git rev-parse eafc3939f2c5cdc2a7fe09280381395e648bc28d^{commit}",
+    "git show -s --format=%T eafc3939f2c5cdc2a7fe09280381395e648bc28d",
+    "git rev-parse eafc3939f2c5cdc2a7fe09280381395e648bc28d:docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+    "$env:PYTHONPATH = (Resolve-Path .\\backend\\src).Path",
+    "python -m trading_oms_backend.independent_review_packet verify --repository . --packet review/candidate-062/packet.json --digest review/candidate-062/packet.sha256",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\verify.ps1"
+  ],
+  "review_scope": [
+    {
+      "objective": "Assess session lifecycle, queue and thread containment, failure transitions, and fail-closed unknown-state behavior.",
+      "scope_id": "architecture_failure_containment",
+      "title": "Connector architecture and failure containment"
+    },
+    {
+      "objective": "Assess the exact official API 10.48 artifact, license, digest, compatibility, and dependency provenance requirements.",
+      "scope_id": "dependency_supply_chain",
+      "title": "SDK provenance and supply-chain controls"
+    },
+    {
+      "objective": "Assess local-only connectivity, paper proof, private data containment, and account ambiguity blocking.",
+      "scope_id": "identity_secrets_network",
+      "title": "Paper identity, sensitive data, and network controls"
+    },
+    {
+      "objective": "Assess durable outbox, callback ledger, typed sanitization, correlation, and reconstruction requirements.",
+      "scope_id": "journal_auditability",
+      "title": "Transport journal and auditability"
+    },
+    {
+      "objective": "Assess risk, approval, OMS, idempotency, protection, reconciliation, and emergency gates before any request.",
+      "scope_id": "oms_approval_protection_reconciliation_emergency",
+      "title": "Order lifecycle safety controls"
+    },
+    {
+      "objective": "Assess operator response, alert limitations, recovery, rollback, and separately gated paper-lab planning.",
+      "scope_id": "operational_readiness",
+      "title": "Operator and operational boundaries"
+    },
+    {
+      "objective": "Assess immutable source binding and prevent design, test, packet, or paper-port facts from becoming unsupported evidence claims.",
+      "scope_id": "provenance_product_claims",
+      "title": "Evidence provenance and claim limits"
+    },
+    {
+      "objective": "Assess stale-data blocking, duplicate prevention, unknown-state blocking, protection, and live-trading prohibition.",
+      "scope_id": "trading_safety_risk",
+      "title": "Trading safety and risk"
+    }
+  ],
+  "schema_version": 1,
+  "traceability": [
+    {
+      "control_id": "c062_ctrl_architecture",
+      "evidence_level": "documented_design",
+      "implementation_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/IBKR_ADAPTER_DESIGN.md"
+      ],
+      "requirement": "A future connector must isolate SDK lifecycle, reader, queue, and failure states behind the adapter and fail closed.",
+      "review_scope_id": "architecture_failure_containment",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_candidate_slice_062_execplan.py"
+      ]
+    },
+    {
+      "control_id": "c062_ctrl_dependency",
+      "evidence_level": "documented_design",
+      "implementation_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+      ],
+      "requirement": "Candidate 063 must pin one official API 10.48 artifact with verified digest, license, dependencies, and compatibility before implementation.",
+      "review_scope_id": "dependency_supply_chain",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_candidate_slice_062_execplan.py"
+      ]
+    },
+    {
+      "control_id": "c062_ctrl_identity_network",
+      "evidence_level": "documented_and_tested",
+      "implementation_references": [
+        "docs/SECURITY_BASELINE.md",
+        "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+      ],
+      "requirement": "Paper proof, exactly-one-account handling, transient sensitive data, and local-only destination checks must remain fail closed.",
+      "review_scope_id": "identity_secrets_network",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_config.py",
+        "backend/tests/test_candidate_slice_062_execplan.py"
+      ]
+    },
+    {
+      "control_id": "c062_ctrl_journal",
+      "evidence_level": "documented_design",
+      "implementation_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/IBKR_PAPER_ADAPTER.md"
+      ],
+      "requirement": "Outbox, callback, status, fill, disconnect, reconnect, rejection, and reconciliation decisions must be durable, correlated, typed, sanitized, and append-only.",
+      "review_scope_id": "journal_auditability",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_event_journal.py",
+        "backend/tests/test_candidate_slice_062_execplan.py"
+      ]
+    },
+    {
+      "control_id": "c062_ctrl_order_safety",
+      "evidence_level": "documented_design",
+      "implementation_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md"
+      ],
+      "requirement": "No future paper request may bypass risk, approval, OMS, protection, emergency, idempotency, connection, and reconciliation gates.",
+      "review_scope_id": "oms_approval_protection_reconciliation_emergency",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_risk_engine.py",
+        "backend/tests/test_approval_tickets.py",
+        "backend/tests/test_oms_state_machine.py"
+      ]
+    },
+    {
+      "control_id": "c062_ctrl_operations",
+      "evidence_level": "documented_design",
+      "implementation_references": [
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md",
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "requirement": "Alert limitations, emergency response, rollback, recovery, and any future lab remain explicit human-gated blockers.",
+      "review_scope_id": "operational_readiness",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_emergency_stop.py",
+        "backend/tests/test_operational_controls.py"
+      ]
+    },
+    {
+      "control_id": "c062_ctrl_provenance",
+      "evidence_level": "generated_manifest",
+      "implementation_references": [
+        "review/candidate-061/REVIEW_GUIDE.md",
+        "docs/POST_SLICE_059_REVIEW.md"
+      ],
+      "requirement": "The review must bind to exact source and must not promote internal preparation, tests, adapter seams, or documentation to external evidence.",
+      "review_scope_id": "provenance_product_claims",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_independent_review_packet.py",
+        "backend/tests/test_evidence_provenance.py"
+      ]
+    },
+    {
+      "control_id": "c062_ctrl_trading_safety",
+      "evidence_level": "documented_and_tested",
+      "implementation_references": [
+        "AGENTS.md",
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+      ],
+      "requirement": "Stale data, duplicate identity, unknown state, missing protection, or reconciliation ambiguity must block risk-increasing progression and live trading remains prohibited.",
+      "review_scope_id": "trading_safety_risk",
+      "review_status": "pending_independent_review",
+      "test_references": [
+        "backend/tests/test_risk_engine.py",
+        "backend/tests/test_resilience.py"
+      ]
+    }
+  ],
+  "unresolved_evidence": [
+    {
+      "blocking_reason": "Target-environment identity and permission controls have not been independently validated.",
+      "category": "authentication_authorization",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "Retention behavior and policy enforcement have not been demonstrated in a target environment.",
+      "category": "audit_retention",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "Backup integrity and restore recovery have not been demonstrated in a target environment.",
+      "category": "backup_restore",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "Emergency-stop behavior has local automated evidence but no independent or target-environment validation.",
+      "category": "emergency_stop",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No independent architecture, trading-safety, or security reviewer has assessed and accepted the exact Candidate 062 design.",
+      "category": "external_review",
+      "evidence_references": [
+        "docs/IBKR_PAPER_TRANSPORT_EXTERNAL_REVIEW.md",
+        "docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "No independently witnessed incident-response exercise is available.",
+      "category": "incident_response",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "The readiness model remains a local evidence summary and has not passed final review.",
+      "category": "live_readiness",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No target-environment network exposure assessment is available.",
+      "category": "network_exposure",
+      "evidence_references": [
+        "docs/SECURITY_BASELINE.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "Local observability controls have not been validated against a target environment or operational objectives.",
+      "category": "observability",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No named operator has accepted responsibilities or evidence for controlled operation.",
+      "category": "operator_signoff",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "No authenticated target-environment paper-trading observation history is available.",
+      "category": "paper_trading_history",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "Reconciliation has local automated evidence but no authenticated paper-session observation history.",
+      "category": "reconciliation",
+      "evidence_references": [
+        "docs/RESILIENCE_CHAOS.md"
+      ],
+      "status": "unverified"
+    },
+    {
+      "blocking_reason": "No independently witnessed rollback rehearsal or acceptance record is available.",
+      "category": "rollback",
+      "evidence_references": [
+        "docs/CONTROLLED_PAPER_PRODUCTION_ROLLOUT_CHECKLIST.md"
+      ],
+      "status": "missing"
+    },
+    {
+      "blocking_reason": "Sensitive-value handling is documented but not verified in a target deployment environment.",
+      "category": "secret_management",
+      "evidence_references": [
+        "docs/SECURITY_BASELINE.md"
+      ],
+      "status": "unverified"
+    }
+  ]
+}
