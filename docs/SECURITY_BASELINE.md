@@ -100,3 +100,26 @@ security certification, evidence acceptance, production-readiness approval, pape
 rollout approval, or live-trading authorization. External-review evidence remains missing, all 14
 controlled-rollout evidence categories remain blocking, and the required decision remains
 `not_ready` / `no_go`.
+
+## Candidate Slice 062 Connector Planning
+
+Candidate Slice 062 is connector planning only. Its proposed dependency is the official native
+Python client from TWS API Latest 10.48, subject to exact artifact hash, license, dependency,
+compatibility, and external design review before any later implementation.
+
+Candidate Slice 062 does not add an SDK, broker connection, authenticated session, or order path.
+It does not add a socket call, callback listener, credential/account field, config key, endpoint,
+paper session, contract or market-data request, deployment, rollout, production operation, or live
+capability.
+
+Any later connector must remain default-off, paper-only, and localhost-only on `7497` or `4002`.
+Paper configuration and a paper port do not prove session mode. Account identifiers must remain
+transient private memory and must never enter repository files, persistence, logs, metrics, traces,
+errors, screenshots, tests, exports, alerts, or review packets. Zero or multiple accessible
+accounts, unproven paper mode, stale data, unknown broker state, or any reconciliation discrepancy
+must block risk-increasing work.
+
+External-review evidence remains missing. Candidate Slice 062 is not external review or
+paper-session evidence. Readiness remains `not_ready`, the decision remains `no_go`, zero
+controlled-rollout evidence categories are verified, and all 14 remain blocking. Candidate 063
+requires separate explicit approval and accepted architecture, trading-safety, and security review.
