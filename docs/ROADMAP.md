@@ -23,9 +23,10 @@ Create UI for signals, approval tickets, orders, positions, and audit events.
 ## Phase 5: React Flow visual builder
 
 Add visual workflow builder backed by typed DSL.
-The current frontend-local editor supports typed node/edge editing, continuous safety validation,
-and preview DSL compilation. Persistence and deterministic simulation-run controls remain a later,
-separately bounded simulation-only slice.
+The current editor supports typed node/edge editing, continuous frontend and authoritative backend
+safety validation, preview DSL compilation, and deliberate local workflow-definition list/load/
+create/update controls with optimistic version checks. Deterministic simulation-run start remains
+a later, separately bounded simulation-only slice with no broker transport.
 
 ## Phase 6: Alerts
 

@@ -13,6 +13,10 @@ export type WorkflowDefinitionSaveRequest = {
   document: VisualWorkflowDslDocument;
 };
 
+export type WorkflowDefinitionUpdateRequest = WorkflowDefinitionSaveRequest & {
+  expected_version: number;
+};
+
 export type WorkflowDefinitionApiView = {
   schema_version: 1;
   workflow_id: string;
@@ -71,7 +75,7 @@ export type WorkflowApiClient = {
   createWorkflow: (request: WorkflowDefinitionSaveRequest) => Promise<WorkflowDefinitionApiView>;
   updateWorkflow: (
     workflowId: string,
-    request: WorkflowDefinitionSaveRequest,
+    request: WorkflowDefinitionUpdateRequest,
   ) => Promise<WorkflowDefinitionApiView>;
   startSimulationRun: (
     workflowId: string,
@@ -185,9 +189,12 @@ async function defaultFetch(input: string, init: RequestInit) {
   return globalThis.fetch(input, init);
 }
 
-class WorkflowApiError extends Error {
+export class WorkflowApiError extends Error {
+  readonly status: number;
+
   constructor(path: string, status: number) {
     super(`Workflow API ${path} failed with status ${status}`);
     this.name = "WorkflowApiError";
+    this.status = status;
   }
 }

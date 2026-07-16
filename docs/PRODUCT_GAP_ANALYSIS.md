@@ -20,8 +20,12 @@ workflow-run retention is process-local and remains a future durability gap.
 
 The interactive visual-workflow-editor candidate closes the fixed-preview gap for local graph
 authoring. Operators can add, select, move, and remove typed simulation nodes, connect and remove
-typed edges, see continuous safety validation, and inspect regenerated preview DSL. Graph changes
-remain page-local: persistence, backend validation, and simulation-run start controls are still
+typed edges, see continuous safety validation, and inspect regenerated preview DSL.
+
+The validated persistence candidate closes the next gap by connecting that editor to the existing
+workflow-definition list/detail/create/update APIs. Definitions are validated before requests and
+again authoritatively before writes, stale updates fail with HTTP 409, and dirty drafts require
+explicit discard confirmation before replacement. Simulation-run start controls remain
 deliberately absent.
 
 Candidate 063 connector implementation is deferred. No IBKR dependency, broker contact, order
@@ -76,7 +80,8 @@ simulation run.
 ## Historical Visual Builder Clarification
 
 The current `Visual builder` is still not the complete Make.com-style product goal. It now provides
-local typed graph editing and preview compilation, but it does not persist or run the edited graph.
+typed graph editing, preview compilation, and local backend-validated definition persistence, but
+it does not run the edited graph.
 
 The future visual workflow builder must be delivered in safe layers:
 
@@ -85,7 +90,7 @@ The future visual workflow builder must be delivered in safe layers:
 3. typed node catalog - complete;
 4. graph validation - complete for local editor rules;
 5. graph-to-DSL compilation - complete for local preview;
-6. workflow persistence - existing APIs are available but not connected to this editor;
+6. workflow persistence - complete for deliberate local list/load/create/update with version checks;
 7. simulation-only execution - existing APIs are available but not connected to this editor;
 8. paper-only broker execution - deferred and separately gated.
 

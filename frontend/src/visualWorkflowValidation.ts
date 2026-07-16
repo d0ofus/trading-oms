@@ -19,6 +19,7 @@ export type VisualWorkflowValidationErrorCode =
   | "missing_required_node"
   | "duplicate_node_id"
   | "duplicate_node_type"
+  | "duplicate_edge"
   | "unsafe_action_node"
   | "unsupported_node"
   | "unsupported_edge_type"
@@ -104,6 +105,13 @@ export function validateVisualWorkflowGraph(
       code: "duplicate_node_type",
       message: `Duplicate node type '${nodeType}' is not allowed.`,
       nodeType,
+    });
+  }
+
+  for (const edge of duplicateValues(edges.map((edge) => `${edge.source}->${edge.target}`))) {
+    errors.push({
+      code: "duplicate_edge",
+      message: `Duplicate workflow edge '${edge}' is not allowed.`,
     });
   }
 

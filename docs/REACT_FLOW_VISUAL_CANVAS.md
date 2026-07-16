@@ -72,8 +72,9 @@ the default document uses:
 - `safety_gates.live_trading_enabled: false`
 - `safety_gates.arbitrary_code_allowed: false`
 
-The preview is local and non-executing. It does not create, save, run, submit, transmit, connect, or
-route anything.
+The generated preview is local and non-executing. The separate workflow library can persist a
+validated definition, but neither the preview nor persistence controls run, submit, transmit,
+connect, or route anything.
 
 ## Workflow Definition Persistence
 
@@ -85,9 +86,12 @@ Slice 037 adds local backend persistence for validated simulation workflow defin
 - `PUT /api/workflows/{workflow_id}`
 
 Saved definitions are versioned local records. Every create or update request must pass the backend
-workflow DSL parser before persistence. The endpoints do not run workflows, create simulation runs,
-submit orders, connect to a broker, or expose live-mode, credential, account, route, import, script,
-or eval fields.
+workflow DSL parser before persistence. Updates require the loaded positive `expected_version` and
+return HTTP 409 without mutation when a changed request is stale. The frontend now offers explicit
+list, load, new, create, and update controls with strict response validation, dirty-draft discard
+protection, and no autosave. The endpoints do not run workflows, create simulation runs, submit
+orders, connect to a broker, or expose live-mode, credential, account, route, import, script, or
+eval fields.
 
 ## Saved Workflow Simulation Runs
 

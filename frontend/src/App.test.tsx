@@ -79,10 +79,14 @@ describe("App", () => {
     expect(html).toContain("&quot;mode&quot;: &quot;replay&quot;");
     expect(html).toContain("&quot;strategy_type&quot;: &quot;close_above_sma&quot;");
     expect(text).toContain("Simulation workflow DSL");
-    expect(text).toContain("Workflow persistence");
-    expect(text).toContain("Local definition storage ready");
-    expect(text).toContain("Simulation replay endpoint ready");
-    expect(text).toContain("Manual approval wait only");
+    expect(text).toContain("Workflow library");
+    expect(text).toContain("Validated simulation definitions");
+    expect(text).toContain("Loading saved workflows");
+    expect(text).toContain("Create workflow");
+    expect(text).toContain("Update workflow");
+    expect(text).toContain("Discard current edits before load");
+    expect(text).not.toContain("Delete workflow");
+    expect(text).not.toContain("Run workflow");
     expect(text).not.toContain("Run inspection statuses");
     expect(text).not.toContain("workflow-run-001");
     expect(html).toContain("&quot;workflow_id&quot;: &quot;visual-simulation-workflow&quot;");
