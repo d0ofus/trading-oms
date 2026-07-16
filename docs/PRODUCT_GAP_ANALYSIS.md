@@ -18,6 +18,12 @@ longer shows a hard-coded completed fake-broker run. It loads actual saved workf
 shows backend-recorded node and journal evidence, and renders explicit empty/error states. Current
 workflow-run retention is process-local and remains a future durability gap.
 
+The interactive visual-workflow-editor candidate closes the fixed-preview gap for local graph
+authoring. Operators can add, select, move, and remove typed simulation nodes, connect and remove
+typed edges, see continuous safety validation, and inspect regenerated preview DSL. Graph changes
+remain page-local: persistence, backend validation, and simulation-run start controls are still
+deliberately absent.
+
 Candidate 063 connector implementation is deferred. No IBKR dependency, broker contact, order
 transport, credentials, account identifiers, deployment, rollout, production operation, or live
 trading is authorized by this update.
@@ -63,25 +69,25 @@ simulation run.
 | Event journal and audit log | Journal exists. | Add read APIs, audit explorer, filters, export, and event indexing. |
 | Alerts | Local/no-op alert domain exists. | Wire alerts to protection and run events; keep delivery local until a later approved adapter. |
 | UI shell | Read-only shell exists. | Connect shell to backend read APIs and add workflow-specific views. |
-| Visual workflow builder | Local fixed replay DSL preview exists. | Add React Flow style drag/drop graph editing, validation, DSL compilation, persistence, and simulation-only execution. |
+| Visual workflow builder | Interactive frontend-local typed graph editing, validation, and preview DSL compilation exist. | Connect validated graphs to existing persistence and deterministic simulation-run APIs under a separate simulation-only slice. |
 | IBKR paper adapter | Local adapter boundary exists without transport. | Add paper-only transport only after a separate explicit human approval and review. |
 | Production readiness | Checklist evaluator, deployment plan, local auth/roles, and local emergency stop exist. | Add observability, backup/restore, incident response, evidence dashboard, rollout checklist, and external review evidence. |
 
 ## Historical Visual Builder Clarification
 
-The current `Visual builder` is not the Make.com-style product goal. It is only a local, fixed,
-replay-only Strategy DSL preview for the `close_above_sma` strategy.
+The current `Visual builder` is still not the complete Make.com-style product goal. It now provides
+local typed graph editing and preview compilation, but it does not persist or run the edited graph.
 
 The future visual workflow builder must be delivered in safe layers:
 
-1. read-only graph inspection;
-2. drag/drop graph layout without execution;
-3. typed node catalog;
-4. graph validation;
-5. graph-to-DSL compilation;
-6. workflow persistence;
-7. simulation-only execution;
-8. paper-only broker execution after separate approval.
+1. read-only graph inspection - complete;
+2. drag/drop graph layout without execution - complete for canvas node movement;
+3. typed node catalog - complete;
+4. graph validation - complete for local editor rules;
+5. graph-to-DSL compilation - complete for local preview;
+6. workflow persistence - existing APIs are available but not connected to this editor;
+7. simulation-only execution - existing APIs are available but not connected to this editor;
+8. paper-only broker execution - deferred and separately gated.
 
 The builder must never compile arbitrary code, store credentials, bypass risk, bypass approval,
 bypass OMS, bypass audit logging, or create a live-trading path.

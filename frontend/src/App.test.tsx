@@ -8,6 +8,10 @@ import {
   type ReadApiLoadState,
 } from "./readApiClient";
 import type { WorkflowRunInspectionState } from "./workflowRunInspector";
+import {
+  createInitialVisualWorkflowEditorState,
+  removeVisualWorkflowNode,
+} from "./visualWorkflowEditor";
 
 function renderedText(element = <App />) {
   return renderToStaticMarkup(element)
@@ -41,11 +45,14 @@ describe("App", () => {
     expect(text).toContain("Alerts");
   });
 
-  it("renders the visual builder nodes and generated replay-only DSL", () => {
+  it("renders the interactive visual builder and generated replay-only DSL", () => {
     const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-    expect(html).toContain('aria-label="React Flow simulation workflow scaffold"');
+    expect(html).toContain('aria-label="Interactive simulation workflow editor"');
+    expect(text).toContain("Node palette");
+    expect(text).toContain("Remove selected");
+    expect(text).toContain("Reset graph");
     expect(text).toContain("Replay source");
     expect(text).toContain("Bar builder");
     expect(text).toContain("Strategy trigger");
@@ -59,8 +66,8 @@ describe("App", () => {
     expect(text).toContain("Audit sink");
     expect(text).toContain("Graph validation passed");
     expect(text).toContain("Risk, approval, audit, and supported-node checks passed");
-    expect(text).toContain("Editable layout");
-    expect(text).toContain("Node movement changes only local canvas positions");
+    expect(text).toContain("Required simulation safety path connected");
+    expect(text).toContain("Local graph only");
     expect(text).toContain("no transport");
     expect(text).toContain("No broker connectivity");
     expect(text).toContain("No order actions");
@@ -76,16 +83,32 @@ describe("App", () => {
     expect(text).toContain("Local definition storage ready");
     expect(text).toContain("Simulation replay endpoint ready");
     expect(text).toContain("Manual approval wait only");
-    expect(text).toContain("waiting for approval");
-    expect(text).toContain("blocked waiting for approval");
-    expect(text).toContain("risk blocked");
-    expect(text).toContain("filled");
-    expect(text).toContain("alert recorded");
-    expect(text).toContain("journal_sequence:14");
+    expect(text).not.toContain("Run inspection statuses");
+    expect(text).not.toContain("workflow-run-001");
     expect(html).toContain("&quot;workflow_id&quot;: &quot;visual-simulation-workflow&quot;");
     expect(html).toContain("&quot;mode&quot;: &quot;simulation&quot;");
     expect(html).toContain("&quot;runtime&quot;: &quot;preview_only&quot;");
     expect(html).toContain("&quot;live_trading_enabled&quot;: false");
+  });
+
+  it("blocks the workflow DSL document when the edited graph is invalid", () => {
+    const initialEditorState = removeVisualWorkflowNode(
+      createInitialVisualWorkflowEditorState(),
+      "approval-ticket",
+    ).state;
+    const html = renderToStaticMarkup(
+      <App
+        initialReadState={loadedReadState}
+        initialVisualWorkflowEditorState={initialEditorState}
+      />,
+    );
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Graph validation blocked");
+    expect(text).toContain("Missing required approval ticket node");
+    expect(text).toContain("Required simulation safety path is incomplete");
+    expect(html).toContain('&quot;status&quot;: &quot;invalid&quot;');
+    expect(html).not.toContain('&quot;broker&quot;: &quot;fake_broker_only&quot;');
   });
 
   it("renders the safety posture visibly", () => {

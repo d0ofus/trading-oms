@@ -1,21 +1,23 @@
 # Visual Workflow Builder
 
-Slice 015 introduces the first safe visual workflow builder foundation. Slice 032 adds the first
-React Flow canvas scaffold for Gate C.
+Slice 015 introduced the safe visual workflow builder foundation, and Slices 032-039 added the
+typed React Flow graph, validation, preview DSL compilation, local workflow persistence APIs, and
+simulation-only workflow APIs. The current non-broker editor candidate changes the fixed graph
+preview into an interactive frontend-local graph editor.
 
-It does not add live trading, broker integration, order intents, order submission, risk checks,
-approval execution workflow, OMS or fake broker orchestration, real market-data ingestion, backend
-API mutation, persistence, arbitrary expressions, custom scripts, code execution, file
-import/export, credentials, tokens, or secrets.
+This editor does not add live trading, broker integration, order submission, real market-data
+ingestion, backend mutation, persistence, workflow execution, arbitrary expressions, custom
+scripts, code execution, file import/export, credentials, tokens, or secrets.
 
 ## Purpose
 
-The visual builder is a frontend-only inspection and configuration surface for the typed
-replay-only Strategy DSL. It helps operators see the supported `close_above_sma` workflow as local
-nodes and inspect the generated JSON-compatible DSL document.
+The visual builder is a frontend-only editing and inspection surface for a typed simulation
+workflow and the existing replay-only Strategy DSL controls. It lets operators arrange the safe
+simulation node catalog, connect or remove workflow edges, see continuous graph validation, and
+inspect the generated JSON-compatible simulation workflow DSL document.
 
-The builder is local state only. It does not save, run, submit, transmit, connect, import, export,
-or call a backend mutation API.
+The edited graph remains React state only. It does not save, run, submit, transmit, connect to a
+broker, import, export, or call a backend mutation API.
 
 ## Visual Flow
 
@@ -28,19 +30,41 @@ Replay bars -> Close source -> Simple moving average -> Bias signal -> Strategy 
 Each node is descriptive only. Nodes do not execute orders, call brokers, fetch live market data, or
 run arbitrary code.
 
-The Gate C React Flow scaffold is fixed to:
+The initial React Flow graph is:
 
 ```text
 Replay source -> Bar builder -> Strategy trigger -> Risk check -> Approval ticket -> Fake broker -> Position update -> Alert -> Audit sink
 ```
 
-The scaffold is non-executing. Slice 033 allows local node movement only; nodes are still not
-connectable and graph layout changes are not persisted. Slice 034 moves the graph definitions into a
-typed node catalog with non-executing simulation workflow nodes.
+The graph remains non-executing. Operators can:
+
+- select and move nodes;
+- remove nodes and add them back from the typed palette;
+- connect nodes with typed workflow edges;
+- select and remove edges;
+- reset the graph to its deterministic initial state.
+
+Only one instance of each supported node type is allowed. Unsupported node and edge types cannot
+be introduced through the editor.
+
+## Continuous Validation
+
+Every edit is checked locally for:
+
+- required risk-check, manual-approval, and audit nodes;
+- duplicate node IDs and duplicate node types;
+- unsupported and explicitly unsafe action-node types;
+- unsupported edge types and unknown edge endpoints;
+- graph cycles;
+- the complete ordered simulation safety path from replay source through audit sink.
+
+Compilation returns no DSL document while any check fails. A valid graph compiles only to
+`mode: simulation`, `runtime: preview_only`, and `broker: fake_broker_only`, with live trading,
+broker transport, and arbitrary code explicitly disabled.
 
 ## Safe Controls
 
-The builder exposes only these local controls:
+The Strategy DSL panel still exposes only these local controls:
 
 - `symbol`
 - `lookback_bars`
@@ -63,17 +87,18 @@ The UI explicitly displays:
 - `No order actions`
 - `No credential fields`
 
-The builder contains no buttons, forms, order submission controls, broker connection controls,
+The builder contains no save or run buttons, order submission controls, broker connection controls,
 Telegram delivery controls, credential fields, import/export controls, or code execution controls.
 
 ## Current Limitations
 
-- Frontend-only local state.
-- Fixed node graph for `close_above_sma`.
-- React Flow canvas scaffold exists.
-- Local node layout editing exists.
-- No persistence or backend API integration.
-- No workflow save or run behavior.
+- Frontend-only, page-lifetime graph state.
+- One fixed typed node catalog; no custom node definitions.
+- No drag-from-palette gesture; palette buttons add removed catalog nodes and canvas dragging moves
+  existing nodes.
+- No connection ports with custom data schemas beyond the single `workflow` edge type.
+- Existing backend workflow APIs are intentionally not called by this editor.
+- No workflow save, update, or run behavior.
 - No file import or export.
-- No validation call to the backend Strategy DSL parser yet.
+- No backend validation call in this slice; compilation uses the typed frontend validator.
 - No custom strategy types, arbitrary expressions, scripts, or code execution.

@@ -2636,3 +2636,54 @@ Acceptance criteria:
   zero saved workflows, `app_mode=paper`, and `live_trading_enabled=false`.
 - [x] No mutation endpoint, broker transport, secret field, account field, rollout, production, or
   live-trading capability is added.
+
+---
+
+## Non-broker candidate - interactive visual workflow editor
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; simulation-only operator UX
+
+branch: `candidate-slice-interactive-visual-workflow-editor`
+
+Goal:
+Turn the fixed React Flow simulation preview into an interactive, continuously validated local
+graph editor without adding persistence, execution, broker behavior, or backend mutations.
+
+Scope:
+- compact palette for the existing typed safe simulation node catalog;
+- local node add, selection, movement, removal, and deterministic reset;
+- typed edge connection, selection, and removal;
+- duplicate-node and unsupported-node/edge prevention;
+- continuous required-gate, cycle, endpoint, and complete-safety-path validation;
+- preview DSL regeneration from the current edited graph.
+
+Completed:
+- [x] The ExecPlan was the first file edit.
+- [x] Graph state is frontend-local and initialized from deterministic catalog clones.
+- [x] Nodes can be selected, moved, removed, and restored from the typed palette.
+- [x] Typed workflow edges can be connected, selected, and removed.
+- [x] Duplicate node IDs/types, unsupported nodes/edges, unknown endpoints, cycles, missing required
+  gates, and an incomplete ordered safety path block compilation.
+- [x] Invalid graphs produce no compiled DSL document.
+- [x] The editor exposes no save, update, run, submit, transmit, broker, credential, account, code,
+  import, export, or live-mode control.
+
+Non-goals:
+- workflow persistence, update, backend validation, or simulation-run start controls;
+- backend mutation behavior, approval behavior, OMS/fake-broker behavior, or journal changes;
+- Candidate 063, IBKR dependencies, broker contact, credentials, account identifiers, deployment,
+  rollout, production operation, or live trading.
+
+Acceptance criteria:
+- [x] Failing-first tests cover deterministic state, node and edge mutations, duplicate and unsafe
+  input prevention, invalid-graph blocking, valid compilation, responsive-safe rendering, and
+  absent broker/live/secret affordances.
+- [x] Focused tests, the complete frontend suite, lint, type checking, and production build pass.
+- [x] Full repository verification passes with 587 backend and 72 frontend tests.
+- [x] Local backend and Vite services answer through `http://localhost:5173`; browser discovery
+  returned no available browser instance, so visual inspection is explicitly deferred and
+  responsive rendering remains covered by component/layout tests.
+- [x] No backend mutation, persistence call, workflow execution, broker transport, secret field,
+  account field, rollout, production, or live-trading capability is added.

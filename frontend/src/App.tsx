@@ -56,9 +56,13 @@ import {
 } from "./strategyBuilder";
 import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
 import {
-  defaultVisualWorkflowDslCompileResult,
+  compileVisualWorkflowDsl,
   formatVisualWorkflowDslPreview,
 } from "./visualWorkflowDsl";
+import {
+  createInitialVisualWorkflowEditorState,
+  type VisualWorkflowEditorState,
+} from "./visualWorkflowEditor";
 import {
   createWorkflowApiClient,
   type WorkflowApiClient,
@@ -88,6 +92,7 @@ type WorkflowRow = {
 
 type AppProps = {
   initialReadState?: ReadApiLoadState;
+  initialVisualWorkflowEditorState?: VisualWorkflowEditorState;
   initialWorkflowRunInspectionState?: WorkflowRunInspectionState;
   readApiClient?: ReadApiClient;
   simulationApprovalApiClient?: SimulationApprovalApiClient;
@@ -138,6 +143,7 @@ const shellSections = [
 
 export function App({
   initialReadState,
+  initialVisualWorkflowEditorState,
   initialWorkflowRunInspectionState,
   readApiClient,
   simulationApprovalApiClient,
@@ -147,6 +153,10 @@ export function App({
   const [auditFilters, setAuditFilters] = useState(defaultAuditExplorerFilters);
   const [approvalForms, setApprovalForms] = useState<Record<string, ApprovalInboxFormState>>({});
   const [approvalFeedback, setApprovalFeedback] = useState<Record<string, string>>({});
+  const [visualWorkflowEditorState, setVisualWorkflowEditorState] =
+    useState<VisualWorkflowEditorState>(() =>
+      initialVisualWorkflowEditorState ?? createInitialVisualWorkflowEditorState(),
+    );
   const [readState, setReadState] = useState<ReadApiLoadState>(
     initialReadState ?? initialReadApiState,
   );
@@ -163,9 +173,17 @@ export function App({
     [workflowApiClient],
   );
   const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
+  const workflowDslCompileResult = useMemo(
+    () =>
+      compileVisualWorkflowDsl(
+        visualWorkflowEditorState.nodes,
+        visualWorkflowEditorState.edges,
+      ),
+    [visualWorkflowEditorState.edges, visualWorkflowEditorState.nodes],
+  );
   const workflowDslPreview = useMemo(
-    () => formatVisualWorkflowDslPreview(defaultVisualWorkflowDslCompileResult),
-    [],
+    () => formatVisualWorkflowDslPreview(workflowDslCompileResult),
+    [workflowDslCompileResult],
   );
   const shouldLoadFromBackend = !initialReadState || initialReadState.status === "loading";
   const shouldLoadWorkflowRuns =
@@ -414,7 +432,10 @@ export function App({
             </div>
 
             <div className="builder-layout">
-              <VisualSimulationWorkflowCanvas />
+              <VisualSimulationWorkflowCanvas
+                editorState={visualWorkflowEditorState}
+                onEditorStateChange={setVisualWorkflowEditorState}
+              />
 
               <div className="builder-controls" aria-label="Safe Strategy DSL controls">
                 <label>
