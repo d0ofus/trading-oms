@@ -9,6 +9,10 @@ import {
   defaultVisualWorkflowDslCompileResult,
   formatVisualWorkflowDslPreview,
 } from "./visualWorkflowDsl";
+import {
+  createInitialVisualWorkflowEditorState,
+  moveVisualWorkflowNode,
+} from "./visualWorkflowEditor";
 
 describe("visualWorkflowDsl", () => {
   it("compiles the default graph to a simulation-only workflow DSL document", () => {
@@ -64,6 +68,30 @@ describe("visualWorkflowDsl", () => {
           nodeType: "risk_check",
         }),
       ]),
+    );
+  });
+
+  it("compiles current valid editor state and blocks an incomplete required path", () => {
+    const initial = createInitialVisualWorkflowEditorState();
+    const moved = moveVisualWorkflowNode(initial, "strategy-trigger", { x: 540, y: 180 }).state;
+    const compiled = compileVisualWorkflowDsl(moved.nodes, moved.edges);
+    const incomplete = compileVisualWorkflowDsl(
+      moved.nodes,
+      moved.edges.filter((edge) => edge.id !== "approval-ticket-to-fake-broker"),
+    );
+
+    expect(compiled.status).toBe("compiled");
+    if (compiled.status !== "compiled") {
+      throw new Error("valid edited workflow should compile");
+    }
+    expect(compiled.document.edges).toContainEqual({
+      source: "approval-ticket",
+      target: "fake-broker",
+    });
+    expect(incomplete.status).toBe("invalid");
+    expect(incomplete.document).toBeNull();
+    expect(incomplete.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "required_path_missing" })]),
     );
   });
 

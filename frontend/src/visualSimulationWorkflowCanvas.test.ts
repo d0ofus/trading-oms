@@ -1,17 +1,20 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
-  visualSimulationWorkflowEdges,
+  VisualSimulationWorkflowCanvas,
   visualSimulationWorkflowLayoutPolicy,
-  visualSimulationWorkflowNodeCatalog,
-  visualSimulationWorkflowRunInspection,
-  visualSimulationWorkflowStatusLegend,
-  visualSimulationWorkflowValidation,
+  visualSimulationWorkflowNodePalette,
 } from "./visualSimulationWorkflowCanvas";
+import {
+  createInitialVisualWorkflowEditorState,
+  removeVisualWorkflowNode,
+} from "./visualWorkflowEditor";
 
 describe("visualSimulationWorkflowCanvas", () => {
-  it("defines the expected static simulation workflow scaffold", () => {
-    expect(visualSimulationWorkflowNodeCatalog.map((node) => node.title)).toEqual([
+  it("exposes a compact palette for every typed simulation node", () => {
+    expect(visualSimulationWorkflowNodePalette.map((node) => node.title)).toEqual([
       "Replay source",
       "Bar builder",
       "Strategy trigger",
@@ -22,120 +25,88 @@ describe("visualSimulationWorkflowCanvas", () => {
       "Alert",
       "Audit sink",
     ]);
-
-    expect(visualSimulationWorkflowEdges.map((edge) => `${edge.source}->${edge.target}`)).toEqual([
-      "replay-source->bar-builder",
-      "bar-builder->strategy-trigger",
-      "strategy-trigger->risk-check",
-      "risk-check->approval-ticket",
-      "approval-ticket->fake-broker",
-      "fake-broker->position-update",
-      "position-update->alert",
-      "alert->audit-sink",
-    ]);
-  });
-
-  it("defines typed catalog entries required for risk-increasing simulation paths", () => {
-    expect(visualSimulationWorkflowNodeCatalog.map((node) => node.type)).toEqual([
-      "replay_source",
-      "bar_builder",
-      "strategy_trigger",
-      "risk_check",
-      "approval_ticket",
-      "fake_broker",
-      "position_update",
-      "alert",
-      "audit_sink",
-    ]);
-    expect(visualSimulationWorkflowNodeCatalog.every((node) => node.supportsExecution === false)).toBe(
+    expect(visualSimulationWorkflowNodePalette.every((node) => node.supportsExecution === false)).toBe(
       true,
     );
-    expect(
-      visualSimulationWorkflowNodeCatalog.every((node) => node.requiredForRiskIncreasingPath),
-    ).toBe(true);
   });
 
-  it("keeps the scaffold free of broker, credential, live, route, and code affordances", () => {
-    const serialized = JSON.stringify({
-      nodes: visualSimulationWorkflowNodeCatalog,
-      edges: visualSimulationWorkflowEdges,
-    }).toLowerCase();
-    const forbidden = [
-      "ibkr",
-      "account",
-      "credential",
-      "api_key",
-      "password",
-      "secret",
-      "token",
-      "live mode",
-      "live trading",
-      "submit",
-      "transmit",
-      "place order",
-      "route",
-      "broker host",
-      "javascript",
-      "script",
-      "eval",
-      "import",
-    ];
-
-    for (const term of forbidden) {
-      expect(serialized).not.toContain(term);
-    }
-  });
-
-  it("allows local layout editing without enabling connection, persistence, or execution", () => {
-    expect(visualSimulationWorkflowLayoutPolicy).toMatchObject({
-      mode: "local_editable_layout",
+  it("enables local graph editing while keeping persistence and execution disabled", () => {
+    expect(visualSimulationWorkflowLayoutPolicy).toEqual({
+      mode: "local_graph_editor",
       nodesDraggable: true,
-      nodesConnectable: false,
+      nodesConnectable: true,
       elementsSelectable: true,
+      nodesDeletable: true,
+      edgesDeletable: true,
       persistenceEnabled: false,
       executionEnabled: false,
+      canvasMinHeightPx: 440,
+      responsiveLayout: true,
     });
   });
 
-  it("exposes a passing validation result for the default catalog", () => {
-    expect(visualSimulationWorkflowValidation).toEqual({
-      status: "valid",
-      errors: [],
-    });
+  it("renders palette, graph tools, continuous validation, and stable canvas dimensions", () => {
+    const html = renderCanvas(createInitialVisualWorkflowEditorState());
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(html).toContain('aria-label="Safe simulation node palette"');
+    expect(html).toContain('aria-label="Add Replay source"');
+    expect(html).toContain('aria-label="Add Audit sink"');
+    expect(html).toContain('aria-label="Remove selected graph element"');
+    expect(html).toContain('aria-label="Reset local workflow graph"');
+    expect(html).toContain('aria-label="Interactive simulation workflow editor"');
+    expect(html).toContain("--workflow-canvas-min-height:440px");
+    expect(text).toContain("Node palette");
+    expect(text).toContain("Graph validation passed");
+    expect(text).toContain("Required simulation safety path connected");
+    expect(text).toContain("Local graph only");
+    expect(text).not.toContain("Run inspection statuses");
+    expect(text).not.toContain("workflow-run-001");
   });
 
-  it("exposes visual run inspection status and journal references", () => {
-    expect(visualSimulationWorkflowRunInspection).toMatchObject({
-      runId: "workflow-run-001",
-      status: "waiting_for_approval",
-    });
-    expect(visualSimulationWorkflowRunInspection.nodes.map((node) => node.status)).toEqual([
-      "completed",
-      "completed",
-      "completed",
-      "passed",
-      "waiting_for_approval",
-      "blocked_waiting_for_approval",
-      "blocked_waiting_for_approval",
-      "blocked_waiting_for_approval",
-      "completed",
-    ]);
-    expect(
-      visualSimulationWorkflowRunInspection.nodes.every((node) =>
-        node.journalReference.startsWith("journal_sequence:"),
-      ),
-    ).toBe(true);
+  it("renders current invalid graph errors and enables restoration from the typed palette", () => {
+    const state = removeVisualWorkflowNode(
+      createInitialVisualWorkflowEditorState(),
+      "risk-check",
+    ).state;
+    const html = renderCanvas(state);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Graph validation blocked");
+    expect(text).toContain("Missing required risk check node");
+    expect(text).toContain("Required simulation safety path is incomplete");
+    expect(html).toMatch(/aria-label="Add Risk check"(?![^>]*disabled)/);
   });
 
-  it("exposes read-only inspection vocabulary for risk blocks, fills, and alerts", () => {
-    expect(visualSimulationWorkflowStatusLegend).toEqual([
-      "completed",
-      "passed",
-      "risk_blocked",
-      "waiting_for_approval",
-      "blocked_waiting_for_approval",
-      "filled",
-      "alert_recorded",
-    ]);
+  it("keeps the editor free of persistence, execution, broker, credential, live, and code controls", () => {
+    const html = renderCanvas(createInitialVisualWorkflowEditorState()).toLowerCase();
+
+    for (const forbidden of [
+      "save workflow",
+      "run workflow",
+      "start simulation",
+      "connect broker",
+      "account id",
+      "credential field",
+      "broker host",
+      "broker port",
+      "submit order",
+      "transmit order",
+      "live mode",
+      "javascript",
+      "eval(",
+      "import script",
+    ]) {
+      expect(html).not.toContain(forbidden);
+    }
   });
 });
+
+function renderCanvas(editorState: ReturnType<typeof createInitialVisualWorkflowEditorState>) {
+  return renderToStaticMarkup(
+    createElement(VisualSimulationWorkflowCanvas, {
+      editorState,
+      onEditorStateChange: () => undefined,
+    }),
+  );
+}

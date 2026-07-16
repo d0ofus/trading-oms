@@ -12,14 +12,19 @@ export type VisualWorkflowGraphNodeInput = {
 export type VisualWorkflowGraphEdgeInput = {
   source: string;
   target: string;
+  type?: string;
 };
 
 export type VisualWorkflowValidationErrorCode =
   | "missing_required_node"
+  | "duplicate_node_id"
+  | "duplicate_node_type"
   | "unsafe_action_node"
   | "unsupported_node"
+  | "unsupported_edge_type"
   | "unknown_edge_endpoint"
-  | "cycle_detected";
+  | "cycle_detected"
+  | "required_path_missing";
 
 export type VisualWorkflowValidationError = {
   code: VisualWorkflowValidationErrorCode;
@@ -54,6 +59,18 @@ const requiredRiskIncreasingNodeTypes: Array<{
   { type: "audit_sink", label: "audit sink" },
 ];
 
+const requiredSimulationPath: VisualWorkflowNodeType[] = [
+  "replay_source",
+  "bar_builder",
+  "strategy_trigger",
+  "risk_check",
+  "approval_ticket",
+  "fake_broker",
+  "position_update",
+  "alert",
+  "audit_sink",
+];
+
 const unsafeActionNodeTypes = new Set([
   "broker_transport",
   "credential",
@@ -73,6 +90,22 @@ export function validateVisualWorkflowGraph(
   const errors: VisualWorkflowValidationError[] = [];
   const nodeIds = new Set(nodes.map((node) => node.id));
   const nodeTypes = new Set(nodes.map((node) => node.type));
+
+  for (const nodeId of duplicateValues(nodes.map((node) => node.id))) {
+    errors.push({
+      code: "duplicate_node_id",
+      message: `Duplicate node ID '${nodeId}' is not allowed.`,
+      nodeId,
+    });
+  }
+
+  for (const nodeType of duplicateValues(nodes.map((node) => node.type))) {
+    errors.push({
+      code: "duplicate_node_type",
+      message: `Duplicate node type '${nodeType}' is not allowed.`,
+      nodeType,
+    });
+  }
 
   for (const required of requiredRiskIncreasingNodeTypes) {
     if (!nodeTypes.has(required.type)) {
@@ -106,6 +139,12 @@ export function validateVisualWorkflowGraph(
   }
 
   for (const edge of edges) {
+    if (edge.type !== undefined && edge.type !== "workflow") {
+      errors.push({
+        code: "unsupported_edge_type",
+        message: `Unsupported edge type '${edge.type}'.`,
+      });
+    }
     if (!nodeIds.has(edge.source) || !nodeIds.has(edge.target)) {
       errors.push({
         code: "unknown_edge_endpoint",
@@ -121,10 +160,57 @@ export function validateVisualWorkflowGraph(
     });
   }
 
+  if (!hasRequiredSimulationPath(nodes, edges)) {
+    errors.push({
+      code: "required_path_missing",
+      message: "Required simulation safety path is incomplete.",
+    });
+  }
+
   return {
     status: errors.length === 0 ? "valid" : "invalid",
     errors,
   };
+}
+
+function hasRequiredSimulationPath(
+  nodes: VisualWorkflowGraphNodeInput[],
+  edges: VisualWorkflowGraphEdgeInput[],
+) {
+  const nodeIdByType = new Map<string, string>();
+  for (const nodeType of requiredSimulationPath) {
+    const matching = nodes.filter((node) => node.type === nodeType);
+    if (matching.length !== 1) {
+      return false;
+    }
+    nodeIdByType.set(nodeType, matching[0].id);
+  }
+
+  const safeEdges = new Set(
+    edges
+      .filter((edge) => edge.type === undefined || edge.type === "workflow")
+      .map((edge) => `${edge.source}->${edge.target}`),
+  );
+  for (let index = 0; index < requiredSimulationPath.length - 1; index += 1) {
+    const source = nodeIdByType.get(requiredSimulationPath[index]);
+    const target = nodeIdByType.get(requiredSimulationPath[index + 1]);
+    if (!source || !target || !safeEdges.has(`${source}->${target}`)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function duplicateValues(values: string[]) {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) {
+      duplicates.add(value);
+    }
+    seen.add(value);
+  }
+  return duplicates;
 }
 
 export function validateCatalogWorkflowGraph(

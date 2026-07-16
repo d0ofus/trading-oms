@@ -37,6 +37,7 @@ export type VisualWorkflowEdgeDefinition = {
   id: string;
   source: string;
   target: string;
+  type: "workflow";
 };
 
 export const simulationWorkflowNodeCatalog: VisualWorkflowNodeDefinition[] = [
@@ -157,5 +158,6 @@ function buildEdge(source: string, target: string): VisualWorkflowEdgeDefinition
     id: `${source}-to-${target}`,
     source,
     target,
+    type: "workflow",
   };
 }

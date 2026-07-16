@@ -101,4 +101,50 @@ describe("visualWorkflowValidation", () => {
       ]),
     );
   });
+
+  it("rejects duplicate node identities, duplicate node types, and unsupported edge types", () => {
+    const result = validateVisualWorkflowGraph(
+      [
+        { id: "risk-check", type: "risk_check" },
+        { id: "risk-check", type: "approval_ticket" },
+        { id: "audit-one", type: "audit_sink" },
+        { id: "audit-two", type: "audit_sink" },
+      ],
+      [
+        {
+          source: "risk-check",
+          target: "audit-one",
+          type: "broker_route",
+        },
+      ],
+    );
+
+    expect(result.status).toBe("invalid");
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "duplicate_node_id", nodeId: "risk-check" }),
+        expect.objectContaining({ code: "duplicate_node_type", nodeType: "audit_sink" }),
+        expect.objectContaining({ code: "unsupported_edge_type" }),
+      ]),
+    );
+  });
+
+  it("requires the complete ordered simulation safety path", () => {
+    const result = validateCatalogWorkflowGraph(
+      simulationWorkflowNodeCatalog,
+      simulationWorkflowEdgeCatalog.filter(
+        (edge) => edge.id !== "risk-check-to-approval-ticket",
+      ),
+    );
+
+    expect(result.status).toBe("invalid");
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "required_path_missing",
+          message: "Required simulation safety path is incomplete.",
+        }),
+      ]),
+    );
+  });
 });
