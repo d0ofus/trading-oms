@@ -85,6 +85,11 @@ describe("App", () => {
     expect(text).toContain("Create workflow");
     expect(text).toContain("Update workflow");
     expect(text).toContain("Discard current edits before load");
+    expect(text).toContain("Simulation run start");
+    expect(text).toContain("SIMULATION ONLY");
+    expect(text).toContain("Unavailable");
+    expect(text).toContain("Simulation safety state is unavailable");
+    expect(text).not.toContain("Start simulation");
     expect(text).not.toContain("Delete workflow");
     expect(text).not.toContain("Run workflow");
     expect(text).not.toContain("Run inspection statuses");

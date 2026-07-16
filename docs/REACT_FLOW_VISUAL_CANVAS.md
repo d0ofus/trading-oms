@@ -73,8 +73,8 @@ the default document uses:
 - `safety_gates.arbitrary_code_allowed: false`
 
 The generated preview is local and non-executing. The separate workflow library can persist a
-validated definition, but neither the preview nor persistence controls run, submit, transmit,
-connect, or route anything.
+validated definition. Neither the preview nor persistence controls run, submit, transmit, connect,
+or route anything; run start is a separate confirmed simulation-only operation.
 
 ## Workflow Definition Persistence
 
@@ -103,6 +103,13 @@ The endpoint reloads and validates the saved workflow DSL, runs the deterministi
 through strategy, risk, OMS pending approval, and manual approval-ticket creation, and journals
 per-node statuses. It stops at manual approval wait. Fake broker, position update, and alert nodes
 are marked blocked until approval; they are not executed by this endpoint.
+
+The visual editor now exposes a separate run-start panel only when a loaded saved definition is
+unchanged and valid. It shows the exact saved version and fixed local replay before requiring
+confirmation. The request carries `expected_workflow_version`; stale versions fail with HTTP 409
+before orchestration. Authorization and emergency stop remain backend-authoritative, retries are
+manual and reuse the exact request, and success refreshes and selects the API-backed run inspector
+record.
 
 ## Visual Run Inspection
 

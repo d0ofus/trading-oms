@@ -25,8 +25,9 @@ Create UI for signals, approval tickets, orders, positions, and audit events.
 Add visual workflow builder backed by typed DSL.
 The current editor supports typed node/edge editing, continuous frontend and authoritative backend
 safety validation, preview DSL compilation, and deliberate local workflow-definition list/load/
-create/update controls with optimistic version checks. Deterministic simulation-run start remains
-a later, separately bounded simulation-only slice with no broker transport.
+create/update controls with optimistic version checks. A deliberate simulation-only run-start
+control now binds one unchanged saved version to the fixed local replay, rechecks authorization and
+the emergency stop, and stops at manual approval. It adds no broker transport.
 
 ## Phase 6: Alerts
 

@@ -56,6 +56,7 @@ import {
 } from "./strategyBuilder";
 import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
 import { WorkflowPersistencePanel } from "./WorkflowPersistencePanel";
+import { WorkflowSimulationRunStartPanel } from "./WorkflowSimulationRunStartPanel";
 import {
   compileVisualWorkflowDsl,
   formatVisualWorkflowDslPreview,
@@ -86,6 +87,13 @@ import {
   type WorkflowPersistenceMetadata,
   type WorkflowPersistenceOperationState,
 } from "./workflowPersistence";
+import {
+  executeWorkflowSimulationRunStart,
+  prepareWorkflowSimulationRunStart,
+  workflowSimulationRunEligibility,
+  type WorkflowSimulationRunAttempt,
+  type WorkflowSimulationRunStartState,
+} from "./workflowSimulationRunStart";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
 
@@ -201,6 +209,9 @@ export function App({
     key: string;
     requestedAt: string;
   } | null>(null);
+  const [workflowSimulationRunStart, setWorkflowSimulationRunStart] =
+    useState<WorkflowSimulationRunStartState>({ status: "idle" });
+  const [workflowSimulationRunConfirmed, setWorkflowSimulationRunConfirmed] = useState(false);
   const [readState, setReadState] = useState<ReadApiLoadState>(
     initialReadState ?? initialReadApiState,
   );
@@ -240,6 +251,20 @@ export function App({
   const shouldLoadWorkflowDefinitions =
     !initialWorkflowDefinitionListState || initialWorkflowDefinitionListState.status === "loading";
   const snapshot = readState.snapshot;
+  const workflowSimulationRunStartContext = {
+    loadedWorkflow: loadedWorkflowRecord,
+    selectedWorkflowId,
+    draftDirty: workflowDraftDirty,
+    graphValid: workflowDslCompileResult.status === "compiled",
+    workflowListStatus: workflowDefinitionList.status,
+    persistenceStatus: workflowPersistenceOperation.status,
+    readStateStatus: readState.status,
+    canAdministerSystem: snapshot.operatorSession.can_administer_system,
+    emergencyStopActive: snapshot.emergencyStop.active,
+  } as const;
+  const workflowSimulationRunStartEligibility = workflowSimulationRunEligibility(
+    workflowSimulationRunStartContext,
+  );
   const summaryPanels = useMemo(() => buildSummaryPanels(snapshot), [snapshot]);
   const workflowRows = useMemo(() => buildWorkflowRows(snapshot), [snapshot]);
   const pendingApprovalTickets = useMemo(
@@ -327,7 +352,89 @@ export function App({
     };
   }, [shouldLoadWorkflowDefinitions, workflowClient]);
 
+  const resetWorkflowSimulationRunStart = () => {
+    setWorkflowSimulationRunStart({ status: "idle" });
+    setWorkflowSimulationRunConfirmed(false);
+  };
+
+  const reviewWorkflowSimulationRunStart = () => {
+    setWorkflowSimulationRunConfirmed(false);
+    setWorkflowSimulationRunStart(
+      prepareWorkflowSimulationRunStart(workflowSimulationRunStartContext),
+    );
+  };
+
+  const applyWorkflowSimulationRunStart = async (
+    attempt: WorkflowSimulationRunAttempt,
+  ) => {
+    const currentEligibility = workflowSimulationRunEligibility(
+      workflowSimulationRunStartContext,
+    );
+    if (currentEligibility.status !== "eligible") {
+      setWorkflowSimulationRunStart({ ...currentEligibility, attempt });
+      return;
+    }
+    if (
+      loadedWorkflowRecord?.workflow_id !== attempt.workflowId ||
+      loadedWorkflowRecord.version !== attempt.workflowVersion
+    ) {
+      setWorkflowSimulationRunStart({
+        status: "conflict",
+        message: "Saved workflow changed; reload before starting",
+        attempt,
+      });
+      return;
+    }
+
+    setWorkflowSimulationRunStart({ status: "starting", attempt });
+    const result = await executeWorkflowSimulationRunStart(workflowClient, attempt);
+    if (result.status !== "success") {
+      setWorkflowSimulationRunStart(result);
+      return;
+    }
+
+    const refreshedInspection = await loadWorkflowRunInspection(workflowClient);
+    setWorkflowRunInspection(refreshedInspection);
+    const selectedKey = `${attempt.workflowId}::${attempt.request.run_id}`;
+    if (
+      refreshedInspection.status !== "loaded" ||
+      !refreshedInspection.items.some((item) => item.key === selectedKey)
+    ) {
+      setWorkflowSimulationRunStart({
+        status: "unavailable",
+        message: "Run was created but inspection refresh is unavailable",
+        attempt,
+      });
+      return;
+    }
+
+    setSelectedWorkflowRunKey(selectedKey);
+    setWorkflowSimulationRunConfirmed(false);
+    setWorkflowSimulationRunStart(result);
+  };
+
+  const confirmWorkflowSimulationRunStart = () => {
+    if (
+      workflowSimulationRunStart.status !== "confirming" ||
+      !workflowSimulationRunConfirmed
+    ) {
+      return;
+    }
+    void applyWorkflowSimulationRunStart(workflowSimulationRunStart.attempt);
+  };
+
+  const retryWorkflowSimulationRunStart = () => {
+    if (
+      workflowSimulationRunStart.status !== "unavailable" ||
+      !workflowSimulationRunStart.attempt
+    ) {
+      return;
+    }
+    void applyWorkflowSimulationRunStart(workflowSimulationRunStart.attempt);
+  };
+
   const selectWorkflowDefinition = (workflowId: string | null) => {
+    resetWorkflowSimulationRunStart();
     setSelectedWorkflowId(workflowId);
     setWorkflowPersistenceOperation({ status: "idle" });
   };
@@ -339,6 +446,7 @@ export function App({
     ) {
       return;
     }
+    resetWorkflowSimulationRunStart();
     setWorkflowPersistenceOperation({ status: "loading" });
     const result = await loadWorkflowDefinition(workflowClient, selectedWorkflowId);
     if (result.status === "unavailable") {
@@ -371,6 +479,7 @@ export function App({
     if (!canReplaceWorkflowDraft(workflowDraftDirty, discardWorkflowEditsConfirmed)) {
       return;
     }
+    resetWorkflowSimulationRunStart();
     const editorState = createInitialVisualWorkflowEditorState();
     setVisualWorkflowEditorState(editorState);
     setWorkflowMetadata(defaultWorkflowMetadata);
@@ -385,6 +494,7 @@ export function App({
   };
 
   const applyWorkflowPersistence = async (intent: "create" | "update") => {
+    resetWorkflowSimulationRunStart();
     const expectedVersion = intent === "update" ? loadedWorkflowRecord?.version ?? null : null;
     const attemptKey = `${intent}:${expectedVersion ?? "new"}:${currentWorkflowFingerprint}`;
     const requestedAt =
@@ -469,7 +579,7 @@ export function App({
     <div className="app-shell">
       <header className="top-bar">
         <div>
-          <p className="eyebrow">Read-only operations shell</p>
+          <p className="eyebrow">Local simulation operations console</p>
           <h1>Trading OMS</h1>
         </div>
         <div className="status-strip" aria-label="Safety posture">
@@ -599,6 +709,7 @@ export function App({
               <VisualSimulationWorkflowCanvas
                 editorState={visualWorkflowEditorState}
                 onEditorStateChange={(state) => {
+                  resetWorkflowSimulationRunStart();
                   setVisualWorkflowEditorState(state);
                   setWorkflowPersistenceOperation({ status: "idle" });
                 }}
@@ -666,6 +777,7 @@ export function App({
                 onDiscardConfirmationChange={setDiscardWorkflowEditsConfirmed}
                 onLoad={() => void loadSelectedWorkflowDefinition()}
                 onMetadataChange={(metadata) => {
+                  resetWorkflowSimulationRunStart();
                   setWorkflowMetadata(metadata);
                   setWorkflowPersistenceOperation({ status: "idle" });
                 }}
@@ -674,6 +786,17 @@ export function App({
                 onUpdate={() => void applyWorkflowPersistence("update")}
                 operationState={workflowPersistenceOperation}
                 selectedWorkflowId={selectedWorkflowId}
+              />
+
+              <WorkflowSimulationRunStartPanel
+                confirmationChecked={workflowSimulationRunConfirmed}
+                eligibility={workflowSimulationRunStartEligibility}
+                onCancel={resetWorkflowSimulationRunStart}
+                onConfirmationChange={setWorkflowSimulationRunConfirmed}
+                onConfirm={confirmWorkflowSimulationRunStart}
+                onRetry={retryWorkflowSimulationRunStart}
+                onReview={reviewWorkflowSimulationRunStart}
+                state={workflowSimulationRunStart}
               />
 
               <div className="dsl-preview" aria-label="Generated Strategy DSL preview">

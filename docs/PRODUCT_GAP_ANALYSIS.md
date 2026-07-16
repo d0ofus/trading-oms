@@ -25,8 +25,13 @@ typed edges, see continuous safety validation, and inspect regenerated preview D
 The validated persistence candidate closes the next gap by connecting that editor to the existing
 workflow-definition list/detail/create/update APIs. Definitions are validated before requests and
 again authoritatively before writes, stale updates fail with HTTP 409, and dirty drafts require
-explicit discard confirmation before replacement. Simulation-run start controls remain
-deliberately absent.
+explicit discard confirmation before replacement.
+
+The saved-workflow simulation-run-start candidate closes the next simulation UX gap. An operator
+can review and explicitly confirm a run only for a loaded, unchanged, valid saved version and the
+fixed local replay fixture. The request carries the expected definition version, fails closed on
+authorization, emergency-stop, conflict, validation, or availability errors, and stops at manual
+approval. The successful run is selected in the API-backed inspector.
 
 Candidate 063 connector implementation is deferred. No IBKR dependency, broker contact, order
 transport, credentials, account identifiers, deployment, rollout, production operation, or live
@@ -73,7 +78,7 @@ simulation run.
 | Event journal and audit log | Journal exists. | Add read APIs, audit explorer, filters, export, and event indexing. |
 | Alerts | Local/no-op alert domain exists. | Wire alerts to protection and run events; keep delivery local until a later approved adapter. |
 | UI shell | Read-only shell exists. | Connect shell to backend read APIs and add workflow-specific views. |
-| Visual workflow builder | Interactive frontend-local typed graph editing, validation, and preview DSL compilation exist. | Connect validated graphs to existing persistence and deterministic simulation-run APIs under a separate simulation-only slice. |
+| Visual workflow builder | Interactive typed graph editing, validation, local versioned persistence, deliberate simulation-only run start, and API-backed run inspection exist. | Persist simulation-run evidence durably across backend restart before relying on it for operator history. |
 | IBKR paper adapter | Local adapter boundary exists without transport. | Add paper-only transport only after a separate explicit human approval and review. |
 | Production readiness | Checklist evaluator, deployment plan, local auth/roles, and local emergency stop exist. | Add observability, backup/restore, incident response, evidence dashboard, rollout checklist, and external review evidence. |
 
@@ -91,7 +96,7 @@ The future visual workflow builder must be delivered in safe layers:
 4. graph validation - complete for local editor rules;
 5. graph-to-DSL compilation - complete for local preview;
 6. workflow persistence - complete for deliberate local list/load/create/update with version checks;
-7. simulation-only execution - existing APIs are available but not connected to this editor;
+7. simulation-only execution - complete for deliberate saved-version start through manual approval wait;
 8. paper-only broker execution - deferred and separately gated.
 
 The builder must never compile arbitrary code, store credentials, bypass risk, bypass approval,

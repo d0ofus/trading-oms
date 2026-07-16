@@ -4,8 +4,9 @@ Slice 031 added the first static, read-only simulation run detail section. The n
 simulation-run-inspector candidate replaces those representative completion records with saved
 workflow simulation runs loaded from the backend.
 
-This slice does not add visual workflow editing, workflow persistence, IBKR transport, broker
-connectivity, execution controls, credentials, or live trading.
+The saved-workflow run-start candidate adds a separate deliberate simulation-only control next to
+the editor. It refreshes this inspector and selects the exact newly created run only after the
+backend returns a validated manual-approval-wait record. This inspector itself remains read-only.
 
 ## What The UI Shows
 
@@ -35,12 +36,15 @@ blocked exactly as returned by the backend.
 - The view does not expose credential fields or live-trading controls.
 - API failures discard partial data and render a generic unavailable state without exception text.
 - Empty and failed responses never fall back to a fabricated successful run.
+- A successful saved-workflow start must be present in a fresh API read before the inspector selects
+  it; a failed refresh remains unavailable and retains the exact idempotent request for explicit
+  retry.
 
 ## Current Limitations
 
 - Workflow simulation run records are process-local in the current backend runner and do not survive
   a backend restart.
 - The inspector does not compare runs or aggregate run metrics.
-- Workflow creation and run start remain separate existing API capabilities; this section provides
-  no mutation controls.
+- Workflow creation and run start remain separate controls; this inspector provides no mutation
+  control.
 - Candidate 063 IBKR connector work remains deferred.

@@ -19,6 +19,7 @@ from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionStore,
 )
 from trading_oms_backend.workflow_simulation_runs import (
+    WorkflowSimulationRunConflictError,
     WorkflowSimulationRunError,
     WorkflowSimulationRunner,
     WorkflowSimulationRunRequest,
@@ -75,6 +76,43 @@ def test_workflow_simulation_runner_runs_saved_workflow_to_approval_wait(
     assert "alert.intent.created" not in event_types
 
 
+def test_workflow_simulation_runner_uses_replay_clock_for_market_data_freshness(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path), JsonlEventJournal(journal_path)
+    )
+
+    record = runner.start_run(
+        "workflow-001",
+        _run_request(
+            requested_at="2026-07-16T10:01:00Z",
+            evaluated_at="2026-07-16T10:01:00Z",
+            approval_expires_at="2026-07-16T10:06:00Z",
+        ),
+    )
+
+    assert record.status == "waiting_for_approval"
+    assert record.approval_ticket_id == "workflow-run-001-approval-ticket"
+    risk_events = [
+        event for event in runner.journal_records() if event.event_type == "risk.decision.evaluated"
+    ]
+    assert len(risk_events) == 1
+    assert risk_events[0].payload["evaluated_at"] == "2026-07-08T13:45:10Z"
+
+
+@pytest.mark.parametrize(
+    "replay_input_reference",
+    ["fixtures/replay/other.jsonl", "https://example.invalid/replay.jsonl"],
+)
+def test_workflow_simulation_run_request_rejects_unapproved_replay_reference(
+    replay_input_reference: str,
+) -> None:
+    with pytest.raises(WorkflowSimulationRunError, match="replay_input_reference"):
+        _run_request(replay_input_reference=replay_input_reference)
+
+
 def test_workflow_simulation_runner_is_idempotent_for_identical_run_payload(
     workflow_paths: tuple[Path, Path],
 ) -> None:
@@ -90,6 +128,66 @@ def test_workflow_simulation_runner_is_idempotent_for_identical_run_payload(
 
     assert second == first
     assert len(runner.journal_records()) == event_count
+
+
+def test_workflow_simulation_runner_rejects_stale_workflow_version_before_journaling(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    store = _store_with_workflow(store_path)
+    store.update_workflow(
+        "workflow-001",
+        WorkflowDefinitionSaveRequest(
+            workflow_id="workflow-001",
+            display_name="Opening breakout simulation version two",
+            description="Validated visual simulation workflow",
+            document=_valid_workflow_dsl(),
+            requested_at="2026-07-08T00:01:00Z",
+            expected_version=1,
+        ),
+    )
+    runner = WorkflowSimulationRunner(store, JsonlEventJournal(journal_path))
+
+    with pytest.raises(
+        WorkflowSimulationRunConflictError,
+        match="expected_workflow_version does not match current workflow version",
+    ):
+        runner.start_run(
+            "workflow-001",
+            _run_request(expected_workflow_version=1),
+        )
+
+    assert runner.journal_records() == ()
+    assert runner.list_runs("workflow-001") == ()
+
+
+@pytest.mark.parametrize("expected_workflow_version", [0, -1, True, "1"])
+def test_workflow_simulation_run_request_requires_positive_integer_workflow_version(
+    expected_workflow_version: object,
+) -> None:
+    with pytest.raises(WorkflowSimulationRunError, match="expected_workflow_version"):
+        _run_request(expected_workflow_version=expected_workflow_version)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {"evaluated_at": "2026-07-08T13:29:54Z"},
+            "evaluated_at must not be before requested_at",
+        ),
+        (
+            {"approval_expires_at": "2026-07-08T13:45:10Z"},
+            "approval_expires_at must be after evaluated_at",
+        ),
+    ],
+)
+def test_workflow_simulation_run_request_requires_ordered_timestamps(
+    overrides: dict[str, str],
+    message: str,
+) -> None:
+    with pytest.raises(WorkflowSimulationRunError, match=message):
+        _run_request(**overrides)
 
 
 def test_workflow_simulation_runner_lists_and_loads_run_inspection_records(
@@ -250,6 +348,7 @@ def _store_with_workflow(store_path: Path) -> WorkflowDefinitionStore:
 
 def _run_request(**overrides: Any) -> WorkflowSimulationRunRequest:
     values = {
+        "expected_workflow_version": 1,
         "run_id": "workflow-run-001",
         "requested_at": "2026-07-08T13:29:55Z",
         "evaluated_at": "2026-07-08T13:45:10Z",

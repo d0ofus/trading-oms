@@ -235,6 +235,7 @@ def _workflow_body() -> dict[str, object]:
 
 def _run_body() -> dict[str, object]:
     return {
+        "expected_workflow_version": 1,
         "run_id": "workflow-run-001",
         "requested_at": "2026-07-08T13:29:55Z",
         "evaluated_at": "2026-07-08T13:45:10Z",
