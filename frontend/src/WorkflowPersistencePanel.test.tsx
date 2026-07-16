@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { WorkflowPersistencePanel } from "./WorkflowPersistencePanel";
+import {
+  WorkflowPersistencePanel,
+  workflowPersistenceLayoutPolicy,
+} from "./WorkflowPersistencePanel";
+import type { WorkflowDefinitionApiView } from "./workflowApiClient";
 import type {
   WorkflowDefinitionListState,
   WorkflowPersistenceMetadata,
@@ -15,6 +19,16 @@ const metadata: WorkflowPersistenceMetadata = {
 };
 
 describe("WorkflowPersistencePanel", () => {
+  it("publishes stable desktop and mobile layout constraints", () => {
+    expect(workflowPersistenceLayoutPolicy).toEqual({
+      desktopColumns: 2,
+      mobileColumns: 1,
+      minControlHeightPx: 40,
+      responsiveLayout: true,
+      autosaveEnabled: false,
+    });
+  });
+
   it.each([
     [{ status: "loading", items: [] }, { status: "idle" }, "Loading saved workflows"],
     [{ status: "loaded", items: [] }, { status: "idle" }, "No saved workflows"],
@@ -58,6 +72,7 @@ describe("WorkflowPersistencePanel", () => {
       );
 
       expect(html).toContain(expectedText);
+      expect(html).toContain("New local definition");
       expect(html).toContain("Create workflow");
       expect(html).toContain("Update workflow");
       expect(html).toContain("Discard current edits before load");
@@ -66,4 +81,36 @@ describe("WorkflowPersistencePanel", () => {
       expect(html).not.toContain("Connect broker");
     },
   );
+
+  it("distinguishes unchanged saved definitions from unsaved changes", () => {
+    const saved = {
+      workflow_id: "workflow-001",
+      display_name: "Opening breakout simulation",
+      version: 3,
+    } as WorkflowDefinitionApiView;
+    const baseProps = {
+      canPersist: true,
+      discardConfirmed: false,
+      listState: { status: "loaded", items: [saved] } as WorkflowDefinitionListState,
+      loadedWorkflowId: "workflow-001",
+      metadata,
+      onCreate: () => undefined,
+      onDiscardConfirmationChange: () => undefined,
+      onLoad: () => undefined,
+      onMetadataChange: () => undefined,
+      onNew: () => undefined,
+      onSelect: () => undefined,
+      onUpdate: () => undefined,
+      operationState: { status: "idle" } as WorkflowPersistenceOperationState,
+      selectedWorkflowId: "workflow-001",
+    };
+
+    const unchanged = renderToStaticMarkup(
+      <WorkflowPersistencePanel {...baseProps} dirty={false} />,
+    );
+    const dirty = renderToStaticMarkup(<WorkflowPersistencePanel {...baseProps} dirty />);
+
+    expect(unchanged).toContain("Unchanged saved definition");
+    expect(dirty).toContain("Unsaved changes");
+  });
 });

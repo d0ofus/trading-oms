@@ -165,6 +165,8 @@ in this slice.
 - Stale updates return a visible version conflict and do not mutate storage or local edits.
 - Dirty state is accurate; failed saves preserve edits; load/new cannot overwrite dirty work without
   explicit discard confirmation; no autosave occurs.
+- The panel explicitly distinguishes a new local definition, an unchanged saved definition, and
+  unsaved changes, with a tested two-column desktop and one-column mobile layout policy.
 - All requested loading, empty, saving, success, validation-error, conflict, and unavailable states
   are visible and tested.
 - Exact typed payloads contain only safe metadata, DSL, timestamps, and update expected version.
@@ -178,7 +180,7 @@ exercise has confirmed create version 1, list/detail load, update version 2, sta
 invalid graph HTTP 400, `live_trading_enabled: false`, and `broker_transport_allowed: false`.
 Browser discovery and the required troubleshooting pass found no available browser instance, so
 no visual browser claim is made; component rendering and responsive layout tests remain the visual
-fallback evidence. Final full verification passes with 598 backend and 86 frontend tests, plus
+fallback evidence. Final full verification passes with 598 backend and 88 frontend tests, plus
 formatting, lint, type, repository safety, production-build, and resilience checks.
 
 ## 13. Risks and assumptions

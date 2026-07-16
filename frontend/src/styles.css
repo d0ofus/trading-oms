@@ -841,6 +841,18 @@ dd {
   font-size: 0.78rem;
 }
 
+.workflow-draft-state {
+  justify-self: start;
+  margin: 0;
+  border: 1px solid #9fb2a1;
+  border-radius: 6px;
+  background: #edf4ed;
+  color: #31513a;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 6px 9px;
+}
+
 .workflow-library-controls,
 .workflow-metadata-fields {
   display: grid;

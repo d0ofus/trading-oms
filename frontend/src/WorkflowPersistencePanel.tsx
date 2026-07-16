@@ -24,6 +24,14 @@ type WorkflowPersistencePanelProps = {
   onUpdate: () => void;
 };
 
+export const workflowPersistenceLayoutPolicy = {
+  desktopColumns: 2,
+  mobileColumns: 1,
+  minControlHeightPx: 40,
+  responsiveLayout: true,
+  autosaveEnabled: false,
+} as const;
+
 export function WorkflowPersistencePanel({
   canPersist,
   dirty,
@@ -47,6 +55,12 @@ export function WorkflowPersistencePanel({
       ? listState.items.find((item) => item.workflow_id === selectedWorkflowId) ?? null
       : null;
   const loadBlocked = dirty && !discardConfirmed;
+  const draftState =
+    loadedWorkflowId === null
+      ? "New local definition"
+      : dirty
+        ? "Unsaved changes"
+        : "Unchanged saved definition";
 
   return (
     <div className="workflow-persistence" aria-label="Validated workflow persistence">
@@ -57,6 +71,10 @@ export function WorkflowPersistencePanel({
         </div>
         <span className="workflow-persistence-mode">local versioned storage</span>
       </div>
+
+      <p className="workflow-draft-state" aria-label="Workflow draft state">
+        {draftState}
+      </p>
 
       <div className="workflow-library-controls">
         <label>

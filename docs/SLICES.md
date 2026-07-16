@@ -2706,6 +2706,7 @@ Scope:
 - strict validation of untrusted list/detail/create/update responses;
 - deterministic saved-definition sorting and DSL-to-editor reconstruction;
 - explicit new/load/create/update commands with no autosave or delete;
+- explicit `New local definition`, `Unchanged saved definition`, and `Unsaved changes` draft state;
 - semantic dirty tracking and explicit discard confirmation before draft replacement;
 - optimistic update concurrency through positive `expected_version` and HTTP 409 conflicts;
 - backend parity for exact DSL shape, duplicate nodes/edges, supported nodes/edges, cycles, required
@@ -2732,7 +2733,7 @@ Acceptance criteria:
   payloads, optimistic concurrency, dirty/discard behavior, state rendering, and absent unsafe
   controls.
 - [x] Focused backend and frontend tests, frontend lint/type/build, and runtime API checks pass.
-- [x] Final full repository verification passes with 598 backend and 86 frontend tests.
+- [x] Final full repository verification passes with 598 backend and 88 frontend tests.
 - [x] Backend and Vite answer through `http://localhost:5173`; no in-app browser instance was
   available after discovery and troubleshooting, so visual inspection is explicitly deferred and
   responsive/component rendering remains test-covered.
