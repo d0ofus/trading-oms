@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   WORKFLOW_API_ENDPOINTS,
+  WorkflowApiError,
   createWorkflowApiClient,
   type WorkflowDefinitionApiView,
   type WorkflowDefinitionSaveRequest,
+  type WorkflowDefinitionUpdateRequest,
   type WorkflowSimulationRunApiView,
   type WorkflowSimulationRunRequest,
 } from "./workflowApiClient";
@@ -59,6 +61,11 @@ const saveRequest: WorkflowDefinitionSaveRequest = {
   description: "Validated visual simulation workflow",
   requested_at: "2026-07-08T00:00:00Z",
   document: sampleDocument,
+};
+
+const updateRequest: WorkflowDefinitionUpdateRequest = {
+  ...saveRequest,
+  expected_version: 1,
 };
 
 const savedWorkflow: WorkflowDefinitionApiView = {
@@ -120,7 +127,7 @@ describe("workflow API client", () => {
     await client.listWorkflows();
     await client.getWorkflow("workflow-001");
     await client.createWorkflow(saveRequest);
-    await client.updateWorkflow("workflow-001", saveRequest);
+    await client.updateWorkflow("workflow-001", updateRequest);
     await client.startSimulationRun("workflow-001", simulationRunRequest);
     await client.listSimulationRuns("workflow-001");
     await client.getSimulationRun("workflow-001", "workflow-run-001");
@@ -138,8 +145,20 @@ describe("workflow API client", () => {
       ],
     ]);
     expect(calls[2].init?.body).toBe(JSON.stringify(saveRequest));
-    expect(calls[3].init?.body).toBe(JSON.stringify(saveRequest));
+    expect(calls[3].init?.body).toBe(JSON.stringify(updateRequest));
     expect(calls[4].init?.body).toBe(JSON.stringify(simulationRunRequest));
+  });
+
+  it("exposes response status without exposing response payloads", async () => {
+    const client = createWorkflowApiClient({
+      fetchImpl: async () => new Response("private backend detail", { status: 409 }),
+    });
+
+    const error = await client.getWorkflow("workflow-001").catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(WorkflowApiError);
+    expect(error).toMatchObject({ status: 409 });
+    expect(String(error)).not.toContain("private backend detail");
   });
 
   it("loads simulation run responses as approval-wait records", async () => {

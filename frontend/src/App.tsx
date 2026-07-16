@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildApprovalDecisionRequest,
@@ -55,6 +55,7 @@ import {
   updateStrategyBuilderState,
 } from "./strategyBuilder";
 import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
+import { WorkflowPersistencePanel } from "./WorkflowPersistencePanel";
 import {
   compileVisualWorkflowDsl,
   formatVisualWorkflowDslPreview,
@@ -66,6 +67,7 @@ import {
 import {
   createWorkflowApiClient,
   type WorkflowApiClient,
+  type WorkflowDefinitionApiView,
   type WorkflowNodeRunStatusApiView,
 } from "./workflowApiClient";
 import {
@@ -73,6 +75,17 @@ import {
   loadWorkflowRunInspection,
   type WorkflowRunInspectionState,
 } from "./workflowRunInspector";
+import {
+  canReplaceWorkflowDraft,
+  loadWorkflowDefinition,
+  loadWorkflowDefinitions,
+  persistWorkflowDefinition,
+  workflowDefinitionToEditorState,
+  workflowDraftFingerprint,
+  type WorkflowDefinitionListState,
+  type WorkflowPersistenceMetadata,
+  type WorkflowPersistenceOperationState,
+} from "./workflowPersistence";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
 
@@ -93,10 +106,17 @@ type WorkflowRow = {
 type AppProps = {
   initialReadState?: ReadApiLoadState;
   initialVisualWorkflowEditorState?: VisualWorkflowEditorState;
+  initialWorkflowDefinitionListState?: WorkflowDefinitionListState;
   initialWorkflowRunInspectionState?: WorkflowRunInspectionState;
   readApiClient?: ReadApiClient;
   simulationApprovalApiClient?: SimulationApprovalApiClient;
   workflowApiClient?: WorkflowApiClient;
+};
+
+const defaultWorkflowMetadata: WorkflowPersistenceMetadata = {
+  workflowId: "workflow-local-001",
+  displayName: "Opening breakout simulation",
+  description: "Validated visual simulation workflow",
 };
 
 const visualBuilderSection = "Visual builder" as const;
@@ -144,6 +164,7 @@ const shellSections = [
 export function App({
   initialReadState,
   initialVisualWorkflowEditorState,
+  initialWorkflowDefinitionListState,
   initialWorkflowRunInspectionState,
   readApiClient,
   simulationApprovalApiClient,
@@ -157,6 +178,29 @@ export function App({
     useState<VisualWorkflowEditorState>(() =>
       initialVisualWorkflowEditorState ?? createInitialVisualWorkflowEditorState(),
     );
+  const [workflowMetadata, setWorkflowMetadata] = useState<WorkflowPersistenceMetadata>(
+    defaultWorkflowMetadata,
+  );
+  const [workflowDefinitionList, setWorkflowDefinitionList] =
+    useState<WorkflowDefinitionListState>(
+      initialWorkflowDefinitionListState ?? { status: "loading", items: [] },
+    );
+  const [workflowPersistenceOperation, setWorkflowPersistenceOperation] =
+    useState<WorkflowPersistenceOperationState>({ status: "idle" });
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [loadedWorkflowRecord, setLoadedWorkflowRecord] =
+    useState<WorkflowDefinitionApiView | null>(null);
+  const [discardWorkflowEditsConfirmed, setDiscardWorkflowEditsConfirmed] = useState(false);
+  const [workflowBaselineFingerprint, setWorkflowBaselineFingerprint] = useState(() =>
+    workflowDraftFingerprint(
+      defaultWorkflowMetadata,
+      initialVisualWorkflowEditorState ?? createInitialVisualWorkflowEditorState(),
+    ),
+  );
+  const workflowPersistenceAttempt = useRef<{
+    key: string;
+    requestedAt: string;
+  } | null>(null);
   const [readState, setReadState] = useState<ReadApiLoadState>(
     initialReadState ?? initialReadApiState,
   );
@@ -185,9 +229,16 @@ export function App({
     () => formatVisualWorkflowDslPreview(workflowDslCompileResult),
     [workflowDslCompileResult],
   );
+  const currentWorkflowFingerprint = useMemo(
+    () => workflowDraftFingerprint(workflowMetadata, visualWorkflowEditorState),
+    [visualWorkflowEditorState, workflowMetadata],
+  );
+  const workflowDraftDirty = currentWorkflowFingerprint !== workflowBaselineFingerprint;
   const shouldLoadFromBackend = !initialReadState || initialReadState.status === "loading";
   const shouldLoadWorkflowRuns =
     !initialWorkflowRunInspectionState || initialWorkflowRunInspectionState.status === "loading";
+  const shouldLoadWorkflowDefinitions =
+    !initialWorkflowDefinitionListState || initialWorkflowDefinitionListState.status === "loading";
   const snapshot = readState.snapshot;
   const summaryPanels = useMemo(() => buildSummaryPanels(snapshot), [snapshot]);
   const workflowRows = useMemo(() => buildWorkflowRows(snapshot), [snapshot]);
@@ -257,6 +308,119 @@ export function App({
       isCurrent = false;
     };
   }, [shouldLoadWorkflowRuns, workflowClient]);
+
+  useEffect(() => {
+    if (!shouldLoadWorkflowDefinitions) {
+      return;
+    }
+
+    let isCurrent = true;
+    setWorkflowDefinitionList({ status: "loading", items: [] });
+    loadWorkflowDefinitions(workflowClient).then((state) => {
+      if (isCurrent) {
+        setWorkflowDefinitionList(state);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [shouldLoadWorkflowDefinitions, workflowClient]);
+
+  const selectWorkflowDefinition = (workflowId: string | null) => {
+    setSelectedWorkflowId(workflowId);
+    setWorkflowPersistenceOperation({ status: "idle" });
+  };
+
+  const loadSelectedWorkflowDefinition = async () => {
+    if (
+      !selectedWorkflowId ||
+      !canReplaceWorkflowDraft(workflowDraftDirty, discardWorkflowEditsConfirmed)
+    ) {
+      return;
+    }
+    setWorkflowPersistenceOperation({ status: "loading" });
+    const result = await loadWorkflowDefinition(workflowClient, selectedWorkflowId);
+    if (result.status === "unavailable") {
+      setWorkflowPersistenceOperation(result);
+      return;
+    }
+    try {
+      const editorState = workflowDefinitionToEditorState(result.record);
+      const metadata = {
+        workflowId: result.record.workflow_id,
+        displayName: result.record.display_name,
+        description: result.record.description,
+      };
+      setVisualWorkflowEditorState(editorState);
+      setWorkflowMetadata(metadata);
+      setLoadedWorkflowRecord(result.record);
+      setWorkflowBaselineFingerprint(workflowDraftFingerprint(metadata, editorState));
+      setDiscardWorkflowEditsConfirmed(false);
+      setWorkflowPersistenceOperation({ status: "idle" });
+      workflowPersistenceAttempt.current = null;
+    } catch {
+      setWorkflowPersistenceOperation({
+        status: "unavailable",
+        errorMessage: "Selected workflow is unavailable; current edits were kept",
+      });
+    }
+  };
+
+  const startNewWorkflowDefinition = () => {
+    if (!canReplaceWorkflowDraft(workflowDraftDirty, discardWorkflowEditsConfirmed)) {
+      return;
+    }
+    const editorState = createInitialVisualWorkflowEditorState();
+    setVisualWorkflowEditorState(editorState);
+    setWorkflowMetadata(defaultWorkflowMetadata);
+    setSelectedWorkflowId(null);
+    setLoadedWorkflowRecord(null);
+    setWorkflowBaselineFingerprint(
+      workflowDraftFingerprint(defaultWorkflowMetadata, editorState),
+    );
+    setDiscardWorkflowEditsConfirmed(false);
+    setWorkflowPersistenceOperation({ status: "idle" });
+    workflowPersistenceAttempt.current = null;
+  };
+
+  const applyWorkflowPersistence = async (intent: "create" | "update") => {
+    const expectedVersion = intent === "update" ? loadedWorkflowRecord?.version ?? null : null;
+    const attemptKey = `${intent}:${expectedVersion ?? "new"}:${currentWorkflowFingerprint}`;
+    const requestedAt =
+      workflowPersistenceAttempt.current?.key === attemptKey
+        ? workflowPersistenceAttempt.current.requestedAt
+        : new Date().toISOString();
+    workflowPersistenceAttempt.current = { key: attemptKey, requestedAt };
+    setWorkflowPersistenceOperation({ status: "saving", intent });
+
+    const result = await persistWorkflowDefinition({
+      client: workflowClient,
+      intent,
+      metadata: workflowMetadata,
+      compileResult: workflowDslCompileResult,
+      requestedAt,
+      currentRecord: loadedWorkflowRecord,
+    });
+    setWorkflowPersistenceOperation(result);
+    if (result.status !== "saved") {
+      return;
+    }
+
+    setWorkflowDefinitionList((current) => {
+      const existing = current.status === "loaded" ? current.items : [];
+      const items = [
+        ...existing.filter((item) => item.workflow_id !== result.record.workflow_id),
+        result.record,
+      ].sort((left, right) => left.workflow_id.localeCompare(right.workflow_id));
+      return { status: "loaded", items };
+    });
+    setSelectedWorkflowId(result.record.workflow_id);
+    setLoadedWorkflowRecord(result.record);
+    setWorkflowBaselineFingerprint(currentWorkflowFingerprint);
+    setDiscardWorkflowEditsConfirmed(false);
+    workflowPersistenceAttempt.current = null;
+  };
 
   const updateApprovalForm = (
     ticketId: string,
@@ -434,7 +598,10 @@ export function App({
             <div className="builder-layout">
               <VisualSimulationWorkflowCanvas
                 editorState={visualWorkflowEditorState}
-                onEditorStateChange={setVisualWorkflowEditorState}
+                onEditorStateChange={(state) => {
+                  setVisualWorkflowEditorState(state);
+                  setWorkflowPersistenceOperation({ status: "idle" });
+                }}
               />
 
               <div className="builder-controls" aria-label="Safe Strategy DSL controls">
@@ -488,19 +655,26 @@ export function App({
                 </label>
               </div>
 
-              <div className="persistence-status" aria-label="Workflow persistence status">
-                <div className="section-heading">
-                  <h2>Workflow persistence</h2>
-                  <span>versioned local storage</span>
-                </div>
-                <div className="persistence-grid">
-                  <StatusPill tone="good" label="Local definition storage ready" />
-                  <StatusPill tone="good" label="Simulation replay endpoint ready" />
-                  <StatusPill tone="neutral" label="Validated DSL required" />
-                  <StatusPill tone="neutral" label="Simulation definitions only" />
-                  <StatusPill tone="neutral" label="Manual approval wait only" />
-                </div>
-              </div>
+              <WorkflowPersistencePanel
+                canPersist={workflowDslCompileResult.status === "compiled"}
+                dirty={workflowDraftDirty}
+                discardConfirmed={discardWorkflowEditsConfirmed}
+                listState={workflowDefinitionList}
+                loadedWorkflowId={loadedWorkflowRecord?.workflow_id ?? null}
+                metadata={workflowMetadata}
+                onCreate={() => void applyWorkflowPersistence("create")}
+                onDiscardConfirmationChange={setDiscardWorkflowEditsConfirmed}
+                onLoad={() => void loadSelectedWorkflowDefinition()}
+                onMetadataChange={(metadata) => {
+                  setWorkflowMetadata(metadata);
+                  setWorkflowPersistenceOperation({ status: "idle" });
+                }}
+                onNew={startNewWorkflowDefinition}
+                onSelect={selectWorkflowDefinition}
+                onUpdate={() => void applyWorkflowPersistence("update")}
+                operationState={workflowPersistenceOperation}
+                selectedWorkflowId={selectedWorkflowId}
+              />
 
               <div className="dsl-preview" aria-label="Generated Strategy DSL preview">
                 <div className="section-heading">

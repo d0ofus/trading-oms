@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from trading_oms_backend.audit_export import AuditExportError, build_audit_export_bundle
 from trading_oms_backend.config import get_settings
@@ -39,6 +39,7 @@ from trading_oms_backend.simulation_approval_service import (
     reset_simulation_approval_service as _reset_simulation_approval_service,
 )
 from trading_oms_backend.workflow_definitions import (
+    WorkflowDefinitionConflictError,
     WorkflowDefinitionError,
     WorkflowDefinitionSaveRequest,
     WorkflowDefinitionStore,
@@ -61,12 +62,15 @@ class ApprovalDecisionBody(BaseModel):
 
 
 class WorkflowDefinitionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
     workflow_id: str
     display_name: str
     description: str
     requested_at: str
     document: dict[str, Any]
     schema_version: int = 1
+    expected_version: int | None = None
 
 
 class WorkflowSimulationRunBody(BaseModel):
@@ -396,6 +400,8 @@ def update_workflow(
     try:
         request = _workflow_definition_request(definition)
         record = get_workflow_definition_store().update_workflow(workflow_id, request)
+    except WorkflowDefinitionConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except WorkflowDefinitionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return record.to_json_dict()
@@ -670,6 +676,7 @@ def _workflow_definition_request(
         description=definition.description,
         document=definition.document,
         requested_at=definition.requested_at,
+        expected_version=definition.expected_version,
     )
 
 

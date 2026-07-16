@@ -27,6 +27,18 @@ REQUIRED_WORKFLOW_NODE_TYPES = {
     "audit_sink",
 }
 
+REQUIRED_SIMULATION_PATH = (
+    "replay_source",
+    "bar_builder",
+    "strategy_trigger",
+    "risk_check",
+    "approval_ticket",
+    "fake_broker",
+    "position_update",
+    "alert",
+    "audit_sink",
+)
+
 FORBIDDEN_WORKFLOW_TOKENS = (
     "account",
     "api_key",
@@ -58,6 +70,7 @@ class WorkflowDslNode:
 class WorkflowDslEdge:
     source: str
     target: str
+    id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -69,6 +82,20 @@ class WorkflowDslDocument:
 
 def parse_workflow_dsl_document(payload: Mapping[str, Any]) -> WorkflowDslDocument:
     _reject_forbidden_content(payload, "workflow")
+    _reject_unexpected_fields(
+        payload,
+        {
+            "schema_version",
+            "workflow_id",
+            "mode",
+            "runtime",
+            "broker",
+            "nodes",
+            "edges",
+            "safety_gates",
+        },
+        "workflow",
+    )
 
     if payload.get("schema_version") != 1:
         raise WorkflowDslError("schema_version must be 1")
@@ -90,6 +117,7 @@ def parse_workflow_dsl_document(payload: Mapping[str, Any]) -> WorkflowDslDocume
         "live_trading_enabled": False,
         "arbitrary_code_allowed": False,
     }
+    _reject_unexpected_fields(safety_gates, set(expected_safety_gates), "safety_gates")
     for key, expected_value in expected_safety_gates.items():
         if safety_gates.get(key) is not expected_value:
             raise WorkflowDslError(f"safety_gates.{key} must be {expected_value!r}")
@@ -109,6 +137,11 @@ def parse_workflow_dsl_document(payload: Mapping[str, Any]) -> WorkflowDslDocume
 
 def _parse_node(value: Any) -> WorkflowDslNode:
     item = _require_mapping(value, "node")
+    _reject_unexpected_fields(
+        item,
+        {"id", "type", "required_for_risk_increasing_path"},
+        "node",
+    )
     node_id = _require_safe_string(item.get("id"), "node.id")
     node_type = _require_safe_string(item.get("type"), "node.type")
     required = item.get("required_for_risk_increasing_path")
@@ -123,13 +156,24 @@ def _parse_node(value: Any) -> WorkflowDslNode:
 
 def _parse_edge(value: Any) -> WorkflowDslEdge:
     item = _require_mapping(value, "edge")
+    _reject_unexpected_fields(item, {"id", "source", "target"}, "edge")
+    edge_id = item.get("id")
     return WorkflowDslEdge(
         source=_require_safe_string(item.get("source"), "edge.source"),
         target=_require_safe_string(item.get("target"), "edge.target"),
+        id=None if edge_id is None else _require_safe_string(edge_id, "edge.id"),
     )
 
 
 def _validate_node_types(nodes: tuple[WorkflowDslNode, ...]) -> None:
+    duplicate_ids = _duplicate_values(node.id for node in nodes)
+    if duplicate_ids:
+        raise WorkflowDslError(f"duplicate node id: {', '.join(duplicate_ids)}")
+
+    duplicate_types = _duplicate_values(node.type for node in nodes)
+    if duplicate_types:
+        raise WorkflowDslError(f"duplicate node type: {', '.join(duplicate_types)}")
+
     node_types = {node.type for node in nodes}
     missing_required = sorted(REQUIRED_WORKFLOW_NODE_TYPES - node_types)
     if missing_required:
@@ -142,12 +186,38 @@ def _validate_node_types(nodes: tuple[WorkflowDslNode, ...]) -> None:
 
 def _validate_edges(nodes: tuple[WorkflowDslNode, ...], edges: tuple[WorkflowDslEdge, ...]) -> None:
     node_ids = {node.id for node in nodes}
+    duplicate_edge_ids = _duplicate_values(edge.id for edge in edges if edge.id is not None)
+    if duplicate_edge_ids:
+        raise WorkflowDslError(f"duplicate edge id: {', '.join(duplicate_edge_ids)}")
+    duplicate_edges = _duplicate_values(f"{edge.source}->{edge.target}" for edge in edges)
+    if duplicate_edges:
+        raise WorkflowDslError(f"duplicate edge: {', '.join(duplicate_edges)}")
     for edge in edges:
         if edge.source not in node_ids or edge.target not in node_ids:
             raise WorkflowDslError(f"edge {edge.source}->{edge.target} references an unknown node")
 
     if _has_cycle(node_ids, edges):
         raise WorkflowDslError("workflow graph contains a cycle")
+
+    node_id_by_type = {node.type: node.id for node in nodes}
+    edge_pairs = {(edge.source, edge.target) for edge in edges}
+    for source_type, target_type in zip(
+        REQUIRED_SIMULATION_PATH, REQUIRED_SIMULATION_PATH[1:], strict=False
+    ):
+        source = node_id_by_type.get(source_type)
+        target = node_id_by_type.get(target_type)
+        if source is None or target is None or (source, target) not in edge_pairs:
+            raise WorkflowDslError("required simulation safety path is incomplete")
+
+
+def _duplicate_values(values: Any) -> list[str]:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if value in seen:
+            duplicates.add(value)
+        seen.add(value)
+    return sorted(duplicates)
 
 
 def _has_cycle(node_ids: set[str], edges: tuple[WorkflowDslEdge, ...]) -> bool:
@@ -185,6 +255,16 @@ def _require_mapping(value: Any, field_name: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise WorkflowDslError(f"{field_name} must be an object")
     return value
+
+
+def _reject_unexpected_fields(
+    value: Mapping[str, Any],
+    allowed_fields: set[str],
+    field_name: str,
+) -> None:
+    unexpected = sorted(set(value) - allowed_fields)
+    if unexpected:
+        raise WorkflowDslError(f"{field_name} contains unexpected fields: {', '.join(unexpected)}")
 
 
 def _require_safe_string(value: Any, field_name: str) -> str:

@@ -54,6 +54,21 @@ def test_workflow_dsl_rejects_missing_required_nodes() -> None:
         parse_workflow_dsl_document(payload)
 
 
+@pytest.mark.parametrize("duplicate_field", ["id", "type"])
+def test_workflow_dsl_rejects_duplicate_node_ids_or_types(duplicate_field: str) -> None:
+    payload = _valid_workflow_dsl()
+    nodes = cast(list[dict[str, object]], payload["nodes"])
+    duplicate = dict(nodes[0])
+    duplicate["id"] = "duplicate-replay-source"
+    if duplicate_field == "id":
+        duplicate["id"] = nodes[0]["id"]
+        duplicate["type"] = "bar_builder"
+    nodes.append(duplicate)
+
+    with pytest.raises(WorkflowDslError, match=f"duplicate node {duplicate_field}"):
+        parse_workflow_dsl_document(payload)
+
+
 def test_workflow_dsl_rejects_unsupported_nodes_and_forbidden_shapes() -> None:
     payload = _valid_workflow_dsl()
     payload["nodes"].append(
@@ -91,6 +106,45 @@ def test_workflow_dsl_rejects_unknown_edge_endpoint_and_cycles() -> None:
     payload["edges"].append({"source": "audit-sink", "target": "risk-check"})
 
     with pytest.raises(WorkflowDslError, match="cycle"):
+        parse_workflow_dsl_document(payload)
+
+    payload = _valid_workflow_dsl()
+    edges = cast(list[dict[str, object]], payload["edges"])
+    edges.append(dict(edges[0]))
+
+    with pytest.raises(WorkflowDslError, match="duplicate edge"):
+        parse_workflow_dsl_document(payload)
+
+
+@pytest.mark.parametrize("shape", ["document", "node", "edge", "safety_gates"])
+def test_workflow_dsl_rejects_unknown_fields(shape: str) -> None:
+    payload = _valid_workflow_dsl()
+    if shape == "document":
+        payload["unexpected"] = "value"
+    elif shape == "node":
+        nodes = cast(list[dict[str, object]], payload["nodes"])
+        nodes[0]["unexpected"] = "value"
+    elif shape == "edge":
+        edges = cast(list[dict[str, object]], payload["edges"])
+        edges[0]["unexpected"] = "value"
+    else:
+        gates = cast(dict[str, object], payload["safety_gates"])
+        gates["unexpected"] = False
+
+    with pytest.raises(WorkflowDslError, match="unexpected fields"):
+        parse_workflow_dsl_document(payload)
+
+
+def test_workflow_dsl_rejects_incomplete_required_simulation_safety_path() -> None:
+    payload = _valid_workflow_dsl()
+    edges = cast(list[dict[str, object]], payload["edges"])
+    payload["edges"] = [
+        edge
+        for edge in edges
+        if not (edge["source"] == "risk-check" and edge["target"] == "approval-ticket")
+    ]
+
+    with pytest.raises(WorkflowDslError, match="required simulation safety path is incomplete"):
         parse_workflow_dsl_document(payload)
 
 

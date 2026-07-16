@@ -18,6 +18,10 @@ class WorkflowDefinitionError(ValueError):
     """Raised when a saved visual workflow definition is invalid or unsafe."""
 
 
+class WorkflowDefinitionConflictError(WorkflowDefinitionError):
+    """Raised when an update was based on a stale saved workflow version."""
+
+
 FORBIDDEN_METADATA_TOKENS = (*FORBIDDEN_WORKFLOW_TOKENS, "live trading")
 
 
@@ -29,6 +33,7 @@ class WorkflowDefinitionSaveRequest:
     document: Mapping[str, Any]
     requested_at: str
     schema_version: int = 1
+    expected_version: int | None = None
 
     def __post_init__(self) -> None:
         _validate_schema_version(self.schema_version)
@@ -36,11 +41,13 @@ class WorkflowDefinitionSaveRequest:
         _validated_metadata_text(self.display_name, "display_name")
         _validated_metadata_text(self.description, "description")
         _parse_timestamp(self.requested_at, "requested_at")
+        if self.expected_version is not None:
+            _positive_integer(self.expected_version, "expected_version")
         _normalize_document(self.document)
         _assert_json_serializable(self.to_payload(), "workflow definition save request")
 
     def to_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "schema_version": self.schema_version,
             "workflow_id": self.workflow_id,
             "display_name": self.display_name,
@@ -48,6 +55,9 @@ class WorkflowDefinitionSaveRequest:
             "document": _normalize_document(self.document),
             "requested_at": self.requested_at,
         }
+        if self.expected_version is not None:
+            payload["expected_version"] = self.expected_version
+        return payload
 
 
 @dataclass(frozen=True)
@@ -119,6 +129,8 @@ class WorkflowDefinitionStore:
     ) -> WorkflowDefinitionRecord:
         if not isinstance(request, WorkflowDefinitionSaveRequest):
             raise WorkflowDefinitionError("request must be WorkflowDefinitionSaveRequest")
+        if request.expected_version is not None:
+            raise WorkflowDefinitionError("expected_version is only valid for updates")
 
         records = self._load_records()
         existing = records.get(request.workflow_id)
@@ -155,8 +167,18 @@ class WorkflowDefinitionStore:
         existing = records.get(workflow_id)
         if existing is None:
             raise WorkflowDefinitionError("unknown workflow_id")
+        if request.expected_version is None:
+            raise WorkflowDefinitionError("expected_version is required for updates")
         if existing.matches_request(request):
-            return existing
+            if request.expected_version in {existing.version, existing.version - 1}:
+                return existing
+            raise WorkflowDefinitionConflictError(
+                "expected_version does not match current workflow version"
+            )
+        if request.expected_version != existing.version:
+            raise WorkflowDefinitionConflictError(
+                "expected_version does not match current workflow version"
+            )
         if _parse_timestamp(request.requested_at, "requested_at") < _parse_timestamp(
             existing.updated_at,
             "updated_at",

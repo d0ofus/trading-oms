@@ -809,6 +809,169 @@ dd {
   gap: 8px;
 }
 
+.workflow-persistence {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid #d7dfd6;
+  border-radius: 8px;
+  background: #f8faf7;
+  padding: 16px;
+}
+
+.workflow-persistence .section-heading {
+  align-items: start;
+  gap: 12px;
+}
+
+.workflow-persistence .section-heading h2,
+.workflow-persistence .section-heading p {
+  margin: 0;
+}
+
+.workflow-persistence .section-heading h2 {
+  font-size: 1rem;
+}
+
+.workflow-persistence .section-heading p,
+.workflow-persistence-mode,
+.workflow-persistence-actions span {
+  color: #68736c;
+  font-size: 0.78rem;
+}
+
+.workflow-library-controls,
+.workflow-metadata-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workflow-persistence label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #4d5852;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.workflow-persistence input,
+.workflow-persistence select,
+.workflow-persistence textarea {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #c7d2c7;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2923;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+}
+
+.workflow-persistence input,
+.workflow-persistence select {
+  min-height: 40px;
+}
+
+.workflow-persistence textarea {
+  resize: vertical;
+}
+
+.workflow-persistence input:focus,
+.workflow-persistence select:focus,
+.workflow-persistence textarea:focus {
+  border-color: #4d8b5b;
+  outline: 2px solid #d8efdb;
+  outline-offset: 1px;
+}
+
+.workflow-library-actions,
+.workflow-persistence-actions {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workflow-library-actions button,
+.workflow-persistence-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 1px solid #8a9d8c;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #26382b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.workflow-persistence-actions button {
+  border-color: #39734a;
+  background: #2f6a41;
+  color: #ffffff;
+}
+
+.workflow-library-actions button:hover:not(:disabled),
+.workflow-library-actions button:focus-visible,
+.workflow-persistence-actions button:hover:not(:disabled),
+.workflow-persistence-actions button:focus-visible {
+  outline: 2px solid #cce7d1;
+  outline-offset: 1px;
+}
+
+.workflow-library-actions button:disabled,
+.workflow-persistence-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.discard-confirmation {
+  display: flex !important;
+  align-items: center;
+  justify-self: start;
+  gap: 8px !important;
+}
+
+.discard-confirmation input {
+  min-height: 16px;
+  width: 16px;
+  margin: 0;
+}
+
+.workflow-description-field {
+  grid-column: 1 / -1;
+}
+
+.persistence-feedback {
+  margin: 0;
+  border-left: 3px solid #6f7e72;
+  background: #eef2ed;
+  color: #35413a;
+  font-size: 0.82rem;
+  padding: 9px 11px;
+}
+
+.persistence-feedback-success {
+  border-left-color: #2f7a46;
+  background: #e8f5eb;
+  color: #245a35;
+}
+
+.persistence-feedback-error {
+  border-left-color: #b8493f;
+  background: #fff0ee;
+  color: #7c2f29;
+}
+
 .dsl-preview {
   grid-column: 1 / -1;
   overflow: hidden;
@@ -1418,6 +1581,15 @@ dd {
   .provenance-notice,
   .section-grid {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-library-controls,
+  .workflow-metadata-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-description-field {
+    grid-column: auto;
   }
 
   .flow-palette-list {

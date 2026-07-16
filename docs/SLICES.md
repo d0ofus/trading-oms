@@ -2687,3 +2687,54 @@ Acceptance criteria:
   responsive rendering remains covered by component/layout tests.
 - [x] No backend mutation, persistence call, workflow execution, broker transport, secret field,
   account field, rollout, production, or live-trading capability is added.
+
+---
+
+## Non-broker candidate - validated visual workflow persistence UI
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; approved simulation-definition persistence UX only
+
+branch: `candidate-slice-validated-workflow-persistence-ui`
+
+Goal:
+Connect the interactive typed editor to the existing workflow-definition APIs for deliberate,
+backend-validated local list, load, create, and update without adding workflow execution.
+
+Scope:
+- strict validation of untrusted list/detail/create/update responses;
+- deterministic saved-definition sorting and DSL-to-editor reconstruction;
+- explicit new/load/create/update commands with no autosave or delete;
+- semantic dirty tracking and explicit discard confirmation before draft replacement;
+- optimistic update concurrency through positive `expected_version` and HTTP 409 conflicts;
+- backend parity for exact DSL shape, duplicate nodes/edges, supported nodes/edges, cycles, required
+  gates, complete ordered simulation path, forbidden content, and disabled unsafe modes;
+- visible loading, empty, saving, success, validation, conflict, and unavailable states.
+
+Completed:
+- [x] The ExecPlan was the first file edit.
+- [x] Frontend-invalid graphs and metadata produce zero persistence requests.
+- [x] Backend validation completes before every local definition write.
+- [x] Stale changed updates do not mutate storage; exact safe retries remain idempotent.
+- [x] Failed loads/writes preserve the current draft and do not render backend response details.
+- [x] The generated simulation DSL remains visible and invalidity blocks persistence.
+- [x] Real localhost API checks cover create, list, load, update, conflict, and invalid rejection.
+
+Non-goals:
+- workflow or simulation-run start controls, execution, delete, or autosave;
+- approval, risk, OMS, fake-broker, position, alert, journal, or emergency-stop behavior changes;
+- Candidate 063, IBKR dependencies, broker contact, credentials, account identifiers, deployment,
+  rollout, production operation, or live trading.
+
+Acceptance criteria:
+- [x] Failing-first backend and frontend tests cover safety validation, strict records, exact
+  payloads, optimistic concurrency, dirty/discard behavior, state rendering, and absent unsafe
+  controls.
+- [x] Focused backend and frontend tests, frontend lint/type/build, and runtime API checks pass.
+- [x] Final full repository verification passes with 598 backend and 86 frontend tests.
+- [x] Backend and Vite answer through `http://localhost:5173`; no in-app browser instance was
+  available after discovery and troubleshooting, so visual inspection is explicitly deferred and
+  responsive/component rendering remains test-covered.
+- [x] No workflow execution, broker transport, secret/account field, deployment, rollout,
+  production, or live-trading capability is added.

@@ -111,6 +111,7 @@ def test_workflow_definition_update_versions_records_and_is_idempotent(
         _save_request(
             description="Updated local visual workflow definition",
             requested_at="2026-07-08T00:05:00Z",
+            expected_version=1,
         ),
     )
     repeated = store.update_workflow(
@@ -118,6 +119,7 @@ def test_workflow_definition_update_versions_records_and_is_idempotent(
         _save_request(
             description="Updated local visual workflow definition",
             requested_at="2026-07-08T00:05:00Z",
+            expected_version=1,
         ),
     )
 
@@ -136,11 +138,71 @@ def test_workflow_definition_update_rejects_unknown_or_mismatched_workflows(
     store = WorkflowDefinitionStore(workflow_store_path)
 
     with pytest.raises(WorkflowDefinitionError, match="unknown workflow_id"):
-        store.update_workflow("workflow-001", _save_request())
+        store.update_workflow("workflow-001", _save_request(expected_version=1))
 
     store.create_workflow(_save_request())
     with pytest.raises(WorkflowDefinitionError, match="path workflow_id must match body"):
-        store.update_workflow("workflow-001", _save_request(workflow_id="workflow-002"))
+        store.update_workflow(
+            "workflow-001",
+            _save_request(workflow_id="workflow-002", expected_version=1),
+        )
+
+
+def test_workflow_definition_update_requires_matching_expected_version_without_lost_updates(
+    workflow_store_path: Path,
+) -> None:
+    store = WorkflowDefinitionStore(workflow_store_path)
+    created = store.create_workflow(_save_request())
+
+    with pytest.raises(WorkflowDefinitionError, match="expected_version is required"):
+        store.update_workflow(
+            "workflow-001",
+            _save_request(description="Missing version"),
+        )
+
+    updated_request = _save_request(
+        description="Version two definition",
+        requested_at="2026-07-08T00:05:00Z",
+        expected_version=created.version,
+    )
+    updated = store.update_workflow("workflow-001", updated_request)
+    repeated = store.update_workflow("workflow-001", updated_request)
+
+    assert updated.version == 2
+    assert repeated == updated
+
+    with pytest.raises(WorkflowDefinitionError, match="expected_version does not match"):
+        store.update_workflow(
+            "workflow-001",
+            _save_request(
+                description="Version two definition",
+                requested_at="2026-07-08T00:05:00Z",
+                expected_version=999,
+            ),
+        )
+
+    with pytest.raises(WorkflowDefinitionError, match="expected_version does not match"):
+        store.update_workflow(
+            "workflow-001",
+            _save_request(
+                description="Stale conflicting edit",
+                requested_at="2026-07-08T00:10:00Z",
+                expected_version=1,
+            ),
+        )
+
+    assert store.get_workflow("workflow-001") == updated
+
+
+def test_workflow_definition_create_rejects_expected_version(
+    workflow_store_path: Path,
+) -> None:
+    store = WorkflowDefinitionStore(workflow_store_path)
+
+    with pytest.raises(WorkflowDefinitionError, match="expected_version is only valid for updates"):
+        store.create_workflow(_save_request(expected_version=1))
+
+    assert store.list_workflows() == ()
 
 
 def test_workflow_definition_store_rejects_invalid_or_unsafe_documents(

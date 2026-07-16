@@ -58,6 +58,7 @@ def test_workflow_api_creates_lists_loads_and_updates_safe_workflows(
         json=_workflow_body(
             description="Updated local visual workflow definition",
             requested_at="2026-07-08T00:05:00Z",
+            expected_version=1,
         ),
     )
 
@@ -86,6 +87,7 @@ def test_workflow_api_create_and_update_are_idempotent_for_identical_payloads(
         json=_workflow_body(
             description="Updated local visual workflow definition",
             requested_at="2026-07-08T00:05:00Z",
+            expected_version=1,
         ),
     )
     second_update = client.put(
@@ -93,6 +95,7 @@ def test_workflow_api_create_and_update_are_idempotent_for_identical_payloads(
         json=_workflow_body(
             description="Updated local visual workflow definition",
             requested_at="2026-07-08T00:05:00Z",
+            expected_version=1,
         ),
     )
 
@@ -102,6 +105,62 @@ def test_workflow_api_create_and_update_are_idempotent_for_identical_payloads(
     assert first_update.status_code == 200
     assert second_update.status_code == 200
     assert second_update.json() == first_update.json()
+
+
+def test_workflow_api_enforces_update_versions_and_preserves_record_on_conflict(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    client = TestClient(app)
+
+    create_with_version = client.post(
+        "/api/workflows",
+        json=_workflow_body(expected_version=1),
+    )
+    created = client.post("/api/workflows", json=_workflow_body())
+    missing_version = client.put(
+        "/api/workflows/workflow-001",
+        json=_workflow_body(description="Missing version"),
+    )
+    updated = client.put(
+        "/api/workflows/workflow-001",
+        json=_workflow_body(
+            description="Version two definition",
+            requested_at="2026-07-08T00:05:00Z",
+            expected_version=1,
+        ),
+    )
+    repeated = client.put(
+        "/api/workflows/workflow-001",
+        json=_workflow_body(
+            description="Version two definition",
+            requested_at="2026-07-08T00:05:00Z",
+            expected_version=1,
+        ),
+    )
+    stale = client.put(
+        "/api/workflows/workflow-001",
+        json=_workflow_body(
+            description="Stale conflicting edit",
+            requested_at="2026-07-08T00:10:00Z",
+            expected_version=1,
+        ),
+    )
+    loaded = client.get("/api/workflows/workflow-001")
+
+    assert create_with_version.status_code == 400
+    assert "only valid for updates" in create_with_version.json()["detail"]
+    assert created.status_code == 200
+    assert missing_version.status_code == 400
+    assert "expected_version is required" in missing_version.json()["detail"]
+    assert updated.status_code == 200
+    assert updated.json()["version"] == 2
+    assert repeated.status_code == 200
+    assert repeated.json() == updated.json()
+    assert stale.status_code == 409
+    assert "expected_version does not match" in stale.json()["detail"]
+    assert loaded.json() == updated.json()
 
 
 def test_workflow_api_rejects_unsafe_documents_and_unknown_workflows(
@@ -126,6 +185,26 @@ def test_workflow_api_rejects_unsafe_documents_and_unknown_workflows(
     assert unknown_response.status_code == 404
     assert mismatch_response.status_code == 400
     assert "path workflow_id must match body" in mismatch_response.json()["detail"]
+
+
+def test_workflow_api_rejects_extra_fields_and_non_integer_update_versions(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    client = TestClient(app)
+    extra_field = _workflow_body()
+    extra_field["token"] = "must-be-rejected"
+
+    extra_response = client.post("/api/workflows", json=extra_field)
+    client.post("/api/workflows", json=_workflow_body())
+    bool_version = client.put(
+        "/api/workflows/workflow-001",
+        json=_workflow_body(expected_version=True),
+    )
+
+    assert extra_response.status_code == 422
+    assert bool_version.status_code == 422
 
 
 def test_workflow_api_requires_admin_permission_for_definition_mutations(

@@ -129,6 +129,22 @@ describe("visualWorkflowValidation", () => {
     );
   });
 
+  it("rejects duplicate workflow edges", () => {
+    const edges = [...simulationWorkflowEdgeCatalog, { ...simulationWorkflowEdgeCatalog[0] }];
+
+    const result = validateCatalogWorkflowGraph(simulationWorkflowNodeCatalog, edges);
+
+    expect(result.status).toBe("invalid");
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "duplicate_edge",
+          message: "Duplicate workflow edge 'replay-source->bar-builder' is not allowed.",
+        }),
+      ]),
+    );
+  });
+
   it("requires the complete ordered simulation safety path", () => {
     const result = validateCatalogWorkflowGraph(
       simulationWorkflowNodeCatalog,
