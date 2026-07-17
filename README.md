@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a read-only protection monitoring dashboard, a read-only paper trading operator section, deterministic local audit export bundles, a typed replay-only Strategy DSL, an interactive typed visual workflow editor with backend-validated versioned local definition persistence and deliberate fixed-replay simulation start, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, simulation-only approval decision endpoints, approved-order OMS/fake-broker simulation execution, simulated positions with protection alerts, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a read-only protection monitoring dashboard, a read-only paper trading operator section, deterministic local audit export bundles, a typed replay-only Strategy DSL, an interactive typed visual workflow editor with backend-validated versioned local definition persistence and deliberate fixed-replay simulation start, restart-safe local workflow-run evidence bound to the append-only journal, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No concrete IBKR application-protocol connector, authenticated broker session, production strategy
 engine, real alert delivery, production deployment, or live order submission exists.
@@ -26,6 +26,9 @@ engine, real alert delivery, production deployment, or live order submission exi
 - Saved workflow run start requires an unchanged validated version, fixed local replay, local admin
   authorization, inactive emergency stop, and explicit two-step confirmation. It stops at manual
   approval and adds no broker transport.
+- Saved workflow run history persists the exact request and approval-wait evidence locally. Exact
+  retry after restart does not rerun; incomplete or contradictory SQLite/JSONL evidence is
+  unavailable rather than partially displayed.
 - Fake broker behavior is local simulation only.
 - OMS behavior is local state transition validation only.
 - Approval ticket behavior is local decision recording only.
@@ -56,8 +59,9 @@ engine, real alert delivery, production deployment, or live order submission exi
   preview-only simulation DSL compilation, and deliberate backend-validated local definition
   list/load/create/update with optimistic version checks. It has no run, delete, broker,
   credential, arbitrary-code, or live-trading controls.
-- Local SQLite persistence behavior is local storage and journal indexing only; it rejects secrets,
-  live-enabled payloads, broker routing fields, and order-transmission-shaped payloads.
+- Local SQLite persistence behavior includes restart-safe saved-workflow run evidence and local
+  journal indexing only; it rejects secrets, live-enabled payloads, broker routing fields, and
+  order-transmission-shaped payloads.
 - IBKR paper adapter behavior is a paper-only validation boundary with a localhost TCP reachability
   probe, injected connector contracts, callback validation, and journaling. Default contract lookup
   and order submission remain unavailable without a separately implemented connector.

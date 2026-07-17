@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import sqlite3
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -10,6 +11,7 @@ from pytest import MonkeyPatch
 from trading_oms_backend import app as app_module
 from trading_oms_backend.app import (
     app,
+    reconstruct_workflow_services,
     reset_emergency_stop_service,
     reset_workflow_definition_service,
     reset_workflow_simulation_runner_service,
@@ -150,6 +152,76 @@ def test_workflow_simulation_api_lists_and_loads_run_inspection_records(
     assert loaded.status_code == 200
     assert loaded.json() == created.json()
     assert missing.status_code == 404
+
+
+def test_workflow_simulation_api_recovers_list_get_and_exact_retry_after_reconstruction(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    created = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(),
+    )
+    journal_count = len(app_module.get_workflow_simulation_runner().journal_records())
+
+    reconstruct_workflow_services()
+
+    listed = client.get("/api/workflows/workflow-001/simulation-runs")
+    loaded = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    retried = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(),
+    )
+
+    assert created.status_code == 200
+    assert listed.status_code == 200
+    assert listed.json() == [created.json()]
+    assert loaded.status_code == 200
+    assert loaded.json() == created.json()
+    assert retried.status_code == 200
+    assert retried.json() == created.json()
+    assert len(app_module.get_workflow_simulation_runner().journal_records()) == journal_count
+
+
+def test_workflow_simulation_api_hides_corrupt_persistence_details(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    created = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(),
+    )
+    connection = sqlite3.connect(app_module._workflow_simulation_database_path())
+    try:
+        connection.execute("UPDATE workflow_simulation_run_evidence SET record_json = 'not-json'")
+        connection.commit()
+    finally:
+        connection.close()
+
+    reconstruct_workflow_services()
+    listed = client.get("/api/workflows/workflow-001/simulation-runs")
+    loaded = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    retried = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(),
+    )
+
+    assert created.status_code == 200
+    for response in (listed, loaded, retried):
+        assert response.status_code == 503
+        assert response.json() == {"detail": "workflow simulation evidence is unavailable"}
+        response_text = response.text.lower()
+        assert "sqlite" not in response_text
+        assert "record_json" not in response_text
+        assert str(app_module._workflow_simulation_database_path()).lower() not in response_text
 
 
 def test_workflow_simulation_api_rejects_unknown_or_conflicting_runs(

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import inspect
+import json
+import sqlite3
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -14,6 +17,7 @@ from trading_oms_backend.emergency_stop import (
     EmergencyStopService,
 )
 from trading_oms_backend.event_journal import JsonlEventJournal
+from trading_oms_backend.local_persistence import LocalSqlitePersistenceStore
 from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionSaveRequest,
     WorkflowDefinitionStore,
@@ -23,6 +27,7 @@ from trading_oms_backend.workflow_simulation_runs import (
     WorkflowSimulationRunError,
     WorkflowSimulationRunner,
     WorkflowSimulationRunRequest,
+    WorkflowSimulationRunUnavailableError,
 )
 
 
@@ -47,7 +52,11 @@ def test_workflow_simulation_runner_runs_saved_workflow_to_approval_wait(
     store_path, journal_path = workflow_paths
     store = _store_with_workflow(store_path)
     journal = JsonlEventJournal(journal_path)
-    runner = WorkflowSimulationRunner(store, journal)
+    runner = WorkflowSimulationRunner(
+        store,
+        journal,
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
 
     record = runner.start_run("workflow-001", _run_request())
 
@@ -81,7 +90,9 @@ def test_workflow_simulation_runner_uses_replay_clock_for_market_data_freshness(
 ) -> None:
     store_path, journal_path = workflow_paths
     runner = WorkflowSimulationRunner(
-        _store_with_workflow(store_path), JsonlEventJournal(journal_path)
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
     )
 
     record = runner.start_run(
@@ -118,7 +129,9 @@ def test_workflow_simulation_runner_is_idempotent_for_identical_run_payload(
 ) -> None:
     store_path, journal_path = workflow_paths
     runner = WorkflowSimulationRunner(
-        _store_with_workflow(store_path), JsonlEventJournal(journal_path)
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
     )
     request = _run_request()
 
@@ -146,7 +159,11 @@ def test_workflow_simulation_runner_rejects_stale_workflow_version_before_journa
             expected_version=1,
         ),
     )
-    runner = WorkflowSimulationRunner(store, JsonlEventJournal(journal_path))
+    runner = WorkflowSimulationRunner(
+        store,
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
 
     with pytest.raises(
         WorkflowSimulationRunConflictError,
@@ -195,7 +212,9 @@ def test_workflow_simulation_runner_lists_and_loads_run_inspection_records(
 ) -> None:
     store_path, journal_path = workflow_paths
     runner = WorkflowSimulationRunner(
-        _store_with_workflow(store_path), JsonlEventJournal(journal_path)
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
     )
 
     record = runner.start_run("workflow-001", _run_request())
@@ -211,7 +230,9 @@ def test_workflow_simulation_runner_rejects_unknown_or_conflicting_runs(
 ) -> None:
     store_path, journal_path = workflow_paths
     runner = WorkflowSimulationRunner(
-        _store_with_workflow(store_path), JsonlEventJournal(journal_path)
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
     )
 
     with pytest.raises(WorkflowSimulationRunError, match="unknown workflow_id"):
@@ -235,10 +256,304 @@ def test_workflow_simulation_runner_revalidates_saved_workflow_before_running(
         '"live_trading_enabled": false', '"live_trading_enabled": true'
     )
     store_path.write_text(unsafe_payload, encoding="utf-8")
-    runner = WorkflowSimulationRunner(store, JsonlEventJournal(journal_path))
+    runner = WorkflowSimulationRunner(
+        store,
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
 
     with pytest.raises(WorkflowSimulationRunError, match="live_trading_enabled"):
         runner.start_run("workflow-001", _run_request())
+
+
+def test_workflow_simulation_runner_recovers_list_get_and_exact_retry_after_restart(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    request = _run_request()
+    first_runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+
+    first = first_runner.start_run("workflow-001", request)
+    journal_count = len(first_runner.journal_records())
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+
+    assert restarted_runner.list_runs("workflow-001") == (first,)
+    assert restarted_runner.get_run("workflow-001", request.run_id) == first
+    assert restarted_runner.start_run("workflow-001", request) == first
+    assert len(restarted_runner.journal_records()) == journal_count
+
+
+def test_workflow_simulation_runner_rejects_conflicting_retry_after_restart(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+
+    with pytest.raises(WorkflowSimulationRunError, match="conflicting run_id"):
+        restarted_runner.start_run(
+            "workflow-001",
+            _run_request(evaluated_at="2026-07-08T13:46:00Z"),
+        )
+
+
+def test_workflow_simulation_runner_lists_recovered_runs_in_deterministic_order(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request(run_id="workflow-run-002"))
+    runner.start_run("workflow-001", _run_request(run_id="workflow-run-001"))
+
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+
+    assert [record.run_id for record in restarted_runner.list_runs("workflow-001")] == [
+        "workflow-run-001",
+        "workflow-run-002",
+    ]
+
+
+def test_workflow_simulation_runner_serializes_concurrent_exact_duplicates(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
+    request = _run_request()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(runner.start_run, "workflow-001", request) for _ in range(2)]
+    records = [future.result() for future in futures]
+
+    assert records[0] == records[1]
+    assert len(runner.list_runs("workflow-001")) == 1
+    assert (
+        sum(record.event_type == "simulation_run.created" for record in runner.journal_records())
+        == 1
+    )
+
+
+def test_workflow_simulation_runner_fails_closed_for_pending_evidence(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence = LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3"))
+    request = _run_request()
+    persistence.reserve_workflow_simulation_run(
+        {"workflow_id": "workflow-001", **request.to_payload()}
+    )
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=persistence,
+    )
+
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        runner.list_runs("workflow-001")
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        runner.start_run("workflow-001", request)
+
+
+def test_workflow_simulation_runner_prevents_cross_instance_duplicate_orchestration(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    _store_with_workflow(store_path)
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runners = tuple(
+        WorkflowSimulationRunner(
+            WorkflowDefinitionStore(store_path),
+            JsonlEventJournal(journal_path),
+            persistence_store=LocalSqlitePersistenceStore(persistence_path),
+        )
+        for _ in range(2)
+    )
+    request = _run_request()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(runner.start_run, "workflow-001", request) for runner in runners]
+    records = []
+    unavailable = []
+    for future in futures:
+        try:
+            records.append(future.result())
+        except WorkflowSimulationRunUnavailableError as exc:
+            unavailable.append(exc)
+
+    assert records
+    assert all(record == records[0] for record in records)
+    assert all(str(error) == "workflow simulation evidence is unavailable" for error in unavailable)
+    journal_records = JsonlEventJournal(journal_path).read_all()
+    assert sum(record.event_type == "simulation_run.created" for record in journal_records) == 1
+
+
+def test_workflow_simulation_runner_fails_closed_for_corrupt_persisted_record(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    connection = sqlite3.connect(persistence_path)
+    try:
+        connection.execute("UPDATE workflow_simulation_run_evidence SET record_json = '{'")
+        connection.commit()
+    finally:
+        connection.close()
+
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted_runner.get_run("workflow-001", "workflow-run-001")
+
+
+def test_workflow_simulation_runner_fails_closed_for_missing_journal_reference(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    journal_lines = journal_path.read_text(encoding="utf-8").splitlines()
+    journal_path.write_text("\n".join(journal_lines[:-1]) + "\n", encoding="utf-8")
+
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted_runner.list_runs("workflow-001")
+
+
+@pytest.mark.parametrize(
+    "corruption_sql",
+    [
+        "journal_manifest_json = NULL",
+        "journal_manifest_sha256 = 'invalid-digest'",
+        "journal_manifest_json = replace(journal_manifest_json, "
+        "'\"schema_version\":1', "
+        '\'"unexpected":"field","schema_version":1\')',
+    ],
+)
+def test_workflow_simulation_runner_fails_closed_for_partial_or_corrupt_manifest(
+    workflow_paths: tuple[Path, Path],
+    corruption_sql: str,
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    connection = sqlite3.connect(persistence_path)
+    try:
+        connection.execute(f"UPDATE workflow_simulation_run_evidence SET {corruption_sql}")
+        connection.commit()
+    finally:
+        connection.close()
+
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted_runner.list_runs("workflow-001")
+
+
+def test_workflow_simulation_runner_fails_closed_for_contradictory_journal_record(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    journal_lines = journal_path.read_text(encoding="utf-8").splitlines()
+    altered = json.loads(journal_lines[0])
+    altered["payload"]["run_id"] = "contradictory-run"
+    journal_lines[0] = json.dumps(altered, sort_keys=True, separators=(",", ":"))
+    journal_path.write_text("\n".join(journal_lines) + "\n", encoding="utf-8")
+
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted_runner.list_runs("workflow-001")
+
+
+def test_workflow_simulation_runner_fails_closed_for_corrupt_journal_json(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    journal_lines = journal_path.read_text(encoding="utf-8").splitlines()
+    journal_lines[0] = "{"
+    journal_path.write_text("\n".join(journal_lines) + "\n", encoding="utf-8")
+
+    restarted_runner = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted_runner.get_run("workflow-001", "workflow-run-001")
 
 
 def test_workflow_simulation_runner_blocks_start_when_emergency_stop_is_active(
@@ -258,6 +573,7 @@ def test_workflow_simulation_runner_blocks_start_when_emergency_stop_is_active(
     runner = WorkflowSimulationRunner(
         _store_with_workflow(store_path),
         journal,
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
         emergency_stop_service=emergency_stop,
     )
 
@@ -280,7 +596,9 @@ def test_workflow_simulation_run_payloads_exclude_broker_network_and_secret_affo
 ) -> None:
     store_path, journal_path = workflow_paths
     runner = WorkflowSimulationRunner(
-        _store_with_workflow(store_path), JsonlEventJournal(journal_path)
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
     )
 
     record = runner.start_run("workflow-001", _run_request())

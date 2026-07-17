@@ -16,6 +16,7 @@ from trading_oms_backend.emergency_stop import (
     EmergencyStopService,
 )
 from trading_oms_backend.event_journal import JournalRecord, JsonlEventJournal
+from trading_oms_backend.local_persistence import LocalSqlitePersistenceStore
 from trading_oms_backend.operator_auth import (
     ADMINISTER_SYSTEM_PERMISSION,
     APPROVE_SIMULATION_PERMISSION,
@@ -49,6 +50,7 @@ from trading_oms_backend.workflow_simulation_runs import (
     WorkflowSimulationRunError,
     WorkflowSimulationRunner,
     WorkflowSimulationRunRequest,
+    WorkflowSimulationRunUnavailableError,
 )
 
 app = FastAPI(title="Trading OMS", version="0.1.0")
@@ -355,6 +357,8 @@ def start_workflow_simulation_run(
         )
     except WorkflowSimulationRunConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except WorkflowSimulationRunUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except WorkflowSimulationRunError as exc:
         if "emergency stop is active" in str(exc):
             raise HTTPException(status_code=423, detail=str(exc)) from exc
@@ -371,9 +375,13 @@ def list_workflow_simulation_runs(request: Request, workflow_id: str) -> list[di
         resource="workflow_simulation_runs",
         action="view",
     )
-    return [
-        record.to_json_dict() for record in get_workflow_simulation_runner().list_runs(workflow_id)
-    ]
+    try:
+        return [
+            record.to_json_dict()
+            for record in get_workflow_simulation_runner().list_runs(workflow_id)
+        ]
+    except WorkflowSimulationRunUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/api/workflows/{workflow_id}/simulation-runs/{run_id}")
@@ -386,6 +394,8 @@ def get_workflow_simulation_run(request: Request, workflow_id: str, run_id: str)
     )
     try:
         record = get_workflow_simulation_runner().get_run(workflow_id, run_id)
+    except WorkflowSimulationRunUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except WorkflowSimulationRunError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return record.to_json_dict()
@@ -503,9 +513,7 @@ _operator_auth_journal: JsonlEventJournal | None = None
 _emergency_stop_temp_dir: TemporaryDirectory[str] | None = None
 _emergency_stop_journal: JsonlEventJournal | None = None
 _emergency_stop_service: EmergencyStopService | None = None
-_workflow_temp_dir: TemporaryDirectory[str] | None = None
 _workflow_store: WorkflowDefinitionStore | None = None
-_workflow_simulation_temp_dir: TemporaryDirectory[str] | None = None
 _workflow_simulation_runner: WorkflowSimulationRunner | None = None
 
 
@@ -518,6 +526,7 @@ def get_workflow_definition_store() -> WorkflowDefinitionStore:
 
 def reset_workflow_definition_service() -> WorkflowDefinitionStore:
     global _workflow_simulation_runner, _workflow_store
+    _clear_workflow_local_state()
     _workflow_store = _build_workflow_definition_store()
     _workflow_simulation_runner = None
     return _workflow_store
@@ -575,8 +584,16 @@ def operator_auth_journal_records() -> tuple[JournalRecord, ...]:
 
 def reset_workflow_simulation_runner_service() -> WorkflowSimulationRunner:
     global _workflow_simulation_runner
+    _clear_workflow_simulation_state()
     _workflow_simulation_runner = _build_workflow_simulation_runner()
     return _workflow_simulation_runner
+
+
+def reconstruct_workflow_services() -> None:
+    """Drop process-local objects while preserving durable workflow and run evidence."""
+    global _workflow_simulation_runner, _workflow_store
+    _workflow_store = None
+    _workflow_simulation_runner = None
 
 
 def _apply_simulation_approval_decision(
@@ -701,13 +718,7 @@ def _workflow_simulation_run_request(
 
 
 def _build_workflow_definition_store() -> WorkflowDefinitionStore:
-    global _workflow_temp_dir
-    if _workflow_temp_dir is None:
-        _workflow_temp_dir = tempfile.TemporaryDirectory(prefix="trading-oms-workflows-")
-    store_path = Path(_workflow_temp_dir.name) / "workflow-definitions.json"
-    if store_path.exists():
-        store_path.unlink()
-    return WorkflowDefinitionStore(store_path)
+    return WorkflowDefinitionStore(_workflow_definition_path())
 
 
 def _build_operator_auth_journal() -> JsonlEventJournal:
@@ -735,16 +746,37 @@ def _build_emergency_stop_service() -> EmergencyStopService:
 
 
 def _build_workflow_simulation_runner() -> WorkflowSimulationRunner:
-    global _workflow_simulation_temp_dir
-    if _workflow_simulation_temp_dir is None:
-        _workflow_simulation_temp_dir = tempfile.TemporaryDirectory(
-            prefix="trading-oms-workflow-runs-"
-        )
-    journal_path = Path(_workflow_simulation_temp_dir.name) / "workflow-simulation-journal.jsonl"
-    if journal_path.exists():
-        journal_path.unlink()
     return WorkflowSimulationRunner(
         get_workflow_definition_store(),
-        JsonlEventJournal(journal_path),
+        JsonlEventJournal(_workflow_simulation_journal_path()),
+        persistence_store=LocalSqlitePersistenceStore(_workflow_simulation_database_path()),
         emergency_stop_service=get_emergency_stop_service(),
     )
+
+
+def _workflow_local_state_root() -> Path:
+    return Path(__file__).resolve().parents[3] / ".tmp" / "trading-oms-local-state"
+
+
+def _workflow_definition_path() -> Path:
+    return _workflow_local_state_root() / "workflow-definitions.json"
+
+
+def _workflow_simulation_journal_path() -> Path:
+    return _workflow_local_state_root() / "workflow-simulation-journal.jsonl"
+
+
+def _workflow_simulation_database_path() -> Path:
+    return _workflow_local_state_root() / "workflow-simulation.sqlite3"
+
+
+def _clear_workflow_simulation_state() -> None:
+    for path in (_workflow_simulation_journal_path(), _workflow_simulation_database_path()):
+        if path.exists():
+            path.unlink()
+
+
+def _clear_workflow_local_state() -> None:
+    if _workflow_definition_path().exists():
+        _workflow_definition_path().unlink()
+    _clear_workflow_simulation_state()

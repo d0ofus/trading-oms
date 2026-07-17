@@ -28,6 +28,8 @@ safety validation, preview DSL compilation, and deliberate local workflow-defini
 create/update controls with optimistic version checks. A deliberate simulation-only run-start
 control now binds one unchanged saved version to the fixed local replay, rechecks authorization and
 the emergency stop, and stops at manual approval. It adds no broker transport.
+Saved-workflow run requests, approval-wait records, node statuses, and journal manifests now persist
+locally across backend restart with exact retry idempotency and fail-closed integrity checks.
 
 ## Phase 6: Alerts
 

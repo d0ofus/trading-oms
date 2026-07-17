@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -121,6 +122,32 @@ class SimulationRunRecord:
             "replay_input_reference": self.replay_input_reference,
             "journal_references": list(self.journal_references),
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> SimulationRunRecord:
+        expected_keys = {
+            "schema_version",
+            "run_id",
+            "status",
+            "created_at",
+            "updated_at",
+            "replay_input_reference",
+            "journal_references",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise SimulationRunError("simulation run record fields are invalid")
+        journal_references = raw_record["journal_references"]
+        if not isinstance(journal_references, list):
+            raise SimulationRunError("journal_references must be a list")
+        return cls(
+            schema_version=raw_record["schema_version"],
+            run_id=raw_record["run_id"],
+            status=raw_record["status"],
+            created_at=raw_record["created_at"],
+            updated_at=raw_record["updated_at"],
+            replay_input_reference=raw_record["replay_input_reference"],
+            journal_references=tuple(journal_references),
+        )
 
 
 class SimulationRunBook:
