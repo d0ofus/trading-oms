@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from trading_oms_backend.audit_export import AuditExportError, build_audit_export_bundle
 from trading_oms_backend.config import get_settings
@@ -45,6 +45,7 @@ from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionStore,
 )
 from trading_oms_backend.workflow_simulation_runs import (
+    WorkflowSimulationRunConflictError,
     WorkflowSimulationRunError,
     WorkflowSimulationRunner,
     WorkflowSimulationRunRequest,
@@ -74,6 +75,9 @@ class WorkflowDefinitionBody(BaseModel):
 
 
 class WorkflowSimulationRunBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    expected_workflow_version: int = Field(gt=0)
     run_id: str
     requested_at: str
     evaluated_at: str
@@ -349,6 +353,8 @@ def start_workflow_simulation_run(
             request,
             requested_by=identity.operator_id,
         )
+    except WorkflowSimulationRunConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except WorkflowSimulationRunError as exc:
         if "emergency stop is active" in str(exc):
             raise HTTPException(status_code=423, detail=str(exc)) from exc
@@ -685,6 +691,7 @@ def _workflow_simulation_run_request(
 ) -> WorkflowSimulationRunRequest:
     return WorkflowSimulationRunRequest(
         schema_version=run.schema_version,
+        expected_workflow_version=run.expected_workflow_version,
         run_id=run.run_id,
         requested_at=run.requested_at,
         evaluated_at=run.evaluated_at,

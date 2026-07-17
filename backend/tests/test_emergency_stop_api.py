@@ -285,6 +285,7 @@ def _workflow_body(**overrides: Any) -> dict[str, Any]:
 
 def _run_body(**overrides: Any) -> dict[str, Any]:
     values: dict[str, Any] = {
+        "expected_workflow_version": 1,
         "run_id": "workflow-run-001",
         "requested_at": "2026-07-08T13:29:55Z",
         "evaluated_at": "2026-07-08T13:45:10Z",

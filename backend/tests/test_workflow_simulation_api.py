@@ -67,6 +67,69 @@ def test_workflow_simulation_api_is_idempotent_for_same_run_payload(
     assert second.json() == first.json()
 
 
+def test_workflow_simulation_api_rejects_stale_workflow_version_with_conflict(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    updated = client.put(
+        "/api/workflows/workflow-001",
+        json=_workflow_body(
+            display_name="Opening breakout simulation version two",
+            requested_at="2026-07-08T00:01:00Z",
+            expected_version=1,
+        ),
+    )
+
+    response = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(expected_workflow_version=1),
+    )
+    listed = client.get("/api/workflows/workflow-001/simulation-runs")
+
+    assert updated.status_code == 200
+    assert response.status_code == 409
+    assert listed.status_code == 200
+    assert listed.json() == []
+
+
+def test_workflow_simulation_api_requires_strict_expected_workflow_version(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+
+    missing = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json={
+            key: value for key, value in _run_body().items() if key != "expected_workflow_version"
+        },
+    )
+    loose = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(expected_workflow_version="1"),
+    )
+    extra = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json={**_run_body(), "unexpected": "field"},
+    )
+    unapproved_replay = client.post(
+        "/api/workflows/workflow-001/simulation-runs",
+        json=_run_body(replay_input_reference="fixtures/replay/other.jsonl"),
+    )
+
+    assert missing.status_code == 422
+    assert loose.status_code == 422
+    assert extra.status_code == 422
+    assert unapproved_replay.status_code == 400
+
+
 def test_workflow_simulation_api_lists_and_loads_run_inspection_records(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -237,6 +300,7 @@ def _workflow_body(**overrides: Any) -> dict[str, Any]:
 
 def _run_body(**overrides: Any) -> dict[str, Any]:
     values: dict[str, Any] = {
+        "expected_workflow_version": 1,
         "run_id": "workflow-run-001",
         "requested_at": "2026-07-08T13:29:55Z",
         "evaluated_at": "2026-07-08T13:45:10Z",

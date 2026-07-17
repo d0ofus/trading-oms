@@ -29,8 +29,16 @@ class WorkflowSimulationRunError(ValueError):
     """Raised when a saved visual workflow cannot run safely in simulation."""
 
 
+class WorkflowSimulationRunConflictError(WorkflowSimulationRunError):
+    """Raised when a run start targets a stale saved workflow version."""
+
+
+LOCAL_SIMULATION_REPLAY_REFERENCE = "fixtures/replay/aapl-session.jsonl"
+
+
 @dataclass(frozen=True)
 class WorkflowSimulationRunRequest:
+    expected_workflow_version: int
     run_id: str
     requested_at: str
     evaluated_at: str
@@ -40,10 +48,19 @@ class WorkflowSimulationRunRequest:
 
     def __post_init__(self) -> None:
         _validate_schema_version(self.schema_version)
+        _positive_integer(self.expected_workflow_version, "expected_workflow_version")
         _validated_identifier(self.run_id, "run_id")
-        _parse_timestamp(self.requested_at, "requested_at")
-        _parse_timestamp(self.evaluated_at, "evaluated_at")
-        _parse_timestamp(self.approval_expires_at, "approval_expires_at")
+        requested_at = _parse_timestamp(self.requested_at, "requested_at")
+        evaluated_at = _parse_timestamp(self.evaluated_at, "evaluated_at")
+        approval_expires_at = _parse_timestamp(self.approval_expires_at, "approval_expires_at")
+        if evaluated_at < requested_at:
+            raise WorkflowSimulationRunError("evaluated_at must not be before requested_at")
+        if approval_expires_at <= evaluated_at:
+            raise WorkflowSimulationRunError("approval_expires_at must be after evaluated_at")
+        if self.replay_input_reference != LOCAL_SIMULATION_REPLAY_REFERENCE:
+            raise WorkflowSimulationRunError(
+                "replay_input_reference must be the approved local simulation replay"
+            )
         SimulationRunCreateRequest(
             run_id=self.run_id,
             requested_at=self.requested_at,
@@ -54,6 +71,7 @@ class WorkflowSimulationRunRequest:
     def to_payload(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
+            "expected_workflow_version": self.expected_workflow_version,
             "run_id": self.run_id,
             "requested_at": self.requested_at,
             "evaluated_at": self.evaluated_at,
@@ -194,7 +212,10 @@ class WorkflowSimulationRunner:
                 raise WorkflowSimulationRunError("conflicting run_id")
             return self._results[request.run_id]
 
-        workflow = self._load_valid_workflow(workflow_id)
+        workflow = self._load_valid_workflow(
+            workflow_id,
+            expected_version=request.expected_workflow_version,
+        )
         orchestrator = ReplayToApprovalOrchestrator(
             self._journal,
             emergency_stop_service=self._emergency_stop_service,
@@ -247,12 +268,16 @@ class WorkflowSimulationRunner:
             raise WorkflowSimulationRunError("unknown workflow simulation run")
         return record
 
-    def _load_valid_workflow(self, workflow_id: str):
+    def _load_valid_workflow(self, workflow_id: str, *, expected_version: int):
         try:
             workflow = self._store.get_workflow(workflow_id)
             parse_workflow_dsl_document(workflow.document)
         except (WorkflowDefinitionError, ValueError) as exc:
             raise WorkflowSimulationRunError(str(exc)) from exc
+        if workflow.version != expected_version:
+            raise WorkflowSimulationRunConflictError(
+                "expected_workflow_version does not match current workflow version"
+            )
         return workflow
 
     def _journal_node_statuses(
@@ -350,6 +375,7 @@ def _orchestration_config(request: WorkflowSimulationRunRequest) -> ReplayToAppr
         approval_expires_at=request.approval_expires_at,
         broker_state_known=True,
         existing_risk_request_ids=frozenset(),
+        risk_time_domain="replay",
     )
 
 
@@ -454,6 +480,12 @@ def _parse_timestamp(value: str, field_name: str) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise WorkflowSimulationRunError(f"{field_name} must include a timezone")
     return parsed
+
+
+def _positive_integer(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise WorkflowSimulationRunError(f"{field_name} must be a positive integer")
+    return value
 
 
 def _validated_journal_reference(reference: str) -> None:

@@ -30,6 +30,7 @@ export type WorkflowDefinitionApiView = {
 
 export type WorkflowSimulationRunRequest = {
   schema_version?: 1;
+  expected_workflow_version: number;
   run_id: string;
   requested_at: string;
   evaluated_at: string;

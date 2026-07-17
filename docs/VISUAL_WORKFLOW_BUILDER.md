@@ -5,7 +5,7 @@ React Flow graph and local workflow APIs, and the non-broker editor candidates a
 editing followed by validated workflow-definition persistence.
 
 The builder still does not add live trading, broker integration, order submission, real
-market-data ingestion, workflow execution, arbitrary expressions, custom scripts, code execution,
+market-data ingestion, automatic execution, arbitrary expressions, custom scripts, code execution,
 file import/export, credentials, tokens, account identifiers, or secrets.
 
 ## Purpose
@@ -13,10 +13,13 @@ file import/export, credentials, tokens, account identifiers, or secrets.
 The visual builder is an editing and inspection surface for a typed simulation workflow and the
 existing replay-only Strategy DSL controls. Operators can arrange the safe simulation node
 catalog, connect or remove workflow edges, see continuous graph validation, inspect generated
-JSON-compatible DSL, and deliberately create or update a backend-validated local definition.
+JSON-compatible DSL, deliberately create or update a backend-validated local definition, and start
+that exact unchanged saved version against the fixed deterministic local replay.
 
-The editor never starts a workflow, submits or transmits an order, connects to a broker, imports
-code, or bypasses risk, manual approval, fake-broker, alert, or audit nodes.
+Editing and persistence never start a workflow. The separate run-start panel requires a two-step
+operator confirmation and the backend still enforces authorization, emergency stop, saved-version
+validation, risk, journaling, and manual approval wait. Nothing submits or transmits an order,
+connects to a broker, imports code, or bypasses a required safety node.
 
 ## Visual Flow
 
@@ -86,6 +89,29 @@ The UI renders explicit loading, empty, loading-definition, saving, success, val
 version-conflict, and unavailable states. API exception text and response payload details are not
 rendered.
 
+## Deliberate Simulation Run Start
+
+The run-start panel uses the existing endpoint only:
+
+- `POST /api/workflows/{workflow_id}/simulation-runs`
+
+Start eligibility requires a loaded saved definition, a matching selected workflow, no unsaved
+editor changes, successful graph compilation, a positive saved version, loaded safety state, local
+admin authorization, and an inactive emergency stop. The request contains the saved
+`expected_workflow_version`, one generated run ID, one timestamp set, and only
+`fixtures/replay/aapl-session.jsonl`. A stale version returns HTTP 409 before run orchestration or
+run journaling. Lifecycle and approval times use the deliberate attempt's wall clock; market-data
+freshness uses the fixed replay profile's deterministic clock. Direct API requests for any other
+replay reference are rejected.
+
+The operator first chooses review, then sees workflow ID, saved version, replay reference, and
+`SIMULATION ONLY`, and must check a confirmation before start is enabled. There is no automatic
+start or retry. An unavailable attempt retains the exact request for a deliberate idempotent retry.
+On success the UI reloads API-backed run history and selects the exact new
+`waiting_for_approval` record. Validation, authorization, emergency-stop, conflict, and
+unavailable failures preserve both the draft and saved definition and never display backend
+exception details.
+
 ## Safe Controls
 
 The Strategy DSL panel still exposes only:
@@ -102,9 +128,9 @@ The generated Strategy DSL always uses:
 - `mode: replay`
 - `parameters.price_source: close`
 
-The workflow library exposes only saved-definition selection, load, new, metadata, discard
-confirmation, create, and update controls. It has no run, delete, broker, order, credential,
-account, arbitrary JSON, import/export, script, or live-mode control.
+The workflow library exposes saved-definition selection, load, new, metadata, discard confirmation,
+create, update, and the separate confirmed fixed-replay simulation start. It has no delete, broker,
+order, credential, account, arbitrary JSON, import/export, script, or live-mode control.
 
 ## Safety Posture
 
@@ -116,7 +142,9 @@ The UI explicitly displays:
 - `No credential fields`
 
 Persistence stores simulation definitions only. It does not execute nodes, contact a broker,
-deliver external alerts, or establish paper-session or live-readiness evidence.
+deliver external alerts, or establish paper-session or live-readiness evidence. Confirmed run start
+uses only the deterministic local pipeline and stops at manual approval; downstream fake-broker,
+position, and alert nodes remain blocked.
 
 ## Current Limitations
 
@@ -125,7 +153,7 @@ deliver external alerts, or establish paper-session or live-readiness evidence.
   existing nodes.
 - No connection ports with custom data schemas beyond the single `workflow` edge type.
 - Node positions are page-local and reset to deterministic catalog positions when loading.
-- No workflow run-start control in this slice.
+- Simulation-run records remain process-local and do not survive a backend restart.
 - No file import or export.
 - No custom strategy types, arbitrary expressions, scripts, or code execution.
 - Local workflow storage is suitable for this bounded self-hosted development surface; production

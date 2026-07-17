@@ -35,6 +35,13 @@ Approval-ticket creation is blocked when risk blocks, including:
 Duplicate order-intent proposal IDs fail safely. The simulation run is marked failed and no second
 proposal is journaled.
 
+Saved visual workflow runs use a fixed validated replay profile. Their lifecycle and approval
+timestamps use the deliberate request's wall clock, while proposal and risk freshness use the
+replay profile's deterministic evaluation clock. This keeps stale-data checks meaningful inside
+replay time without treating an old fixture as fresh wall-clock market data. Other orchestration
+callers continue to use their supplied evaluation timestamp, so stale-data tests and blocks remain
+unchanged.
+
 ## Journal Coverage
 
 The orchestrator relies on existing domain modules to journal accepted state changes:
@@ -53,7 +60,8 @@ No `fake_broker.order.transitioned` events are emitted in this slice.
 
 - Orchestration is in-memory only.
 - Replay inputs are passed as local `MarketDataReplayEvent` records.
-- No HTTP API exists for starting simulation runs yet.
+- Saved workflow simulation runs have a separately authorized HTTP start API; this core
+  orchestrator itself remains transport-agnostic.
 - Approval decisions are not applied in this slice.
 - Fake broker execution, fills, positions, and protection alerts are deferred to later Gate B
   slices.

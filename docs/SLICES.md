@@ -2739,3 +2739,62 @@ Acceptance criteria:
   responsive/component rendering remains test-covered.
 - [x] No workflow execution, broker transport, secret/account field, deployment, rollout,
   production, or live-trading capability is added.
+
+---
+
+## Non-broker candidate - saved workflow simulation run-start UI
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; simulation-only saved-definition run UX
+
+branch: `candidate-slice-saved-workflow-simulation-run-start-ui`
+
+Goal:
+Allow a local admin to deliberately start only the loaded, unchanged, valid saved workflow against
+the one approved deterministic local replay, then select the exact manual-approval-wait run in the
+API-backed inspector.
+
+Scope:
+- loaded/saved/clean/valid/versioned eligibility with authorization and emergency-stop posture;
+- two-step `SIMULATION ONLY` confirmation showing workflow ID, saved version, and replay reference;
+- one retry-stable run ID and timestamp set per deliberate attempt, with no automatic retry;
+- required `expected_workflow_version`, strict request shape, and pre-orchestration stale conflict;
+- fixed replay-reference allowlist and replay-domain market-data freshness clock;
+- generic idle, confirmation, starting, success, validation, authorization, emergency-stop,
+  conflict, and unavailable states;
+- successful API-backed inspector refresh and exact run selection.
+
+Completed:
+- [x] The ExecPlan was the first file edit.
+- [x] New, dirty, invalid, stale, loading, conflicting, unavailable, unauthorized, and
+  emergency-stopped definitions fail closed before start.
+- [x] A stale saved version returns HTTP 409 before run orchestration or run journaling.
+- [x] Only `fixtures/replay/aapl-session.jsonl` is accepted, and its deterministic clock keeps
+  replay freshness checks independent from wall-clock lifecycle time.
+- [x] Exact explicit retry is idempotent; there is no automatic start or retry.
+- [x] Success requires a strictly validated `waiting_for_approval` response and fresh inspector
+  evidence; downstream fake-broker, position, and alert nodes remain blocked.
+- [x] Failures preserve the draft and saved definition and render no backend exception details.
+
+Non-goals:
+- approval decisions, automatic approval, fake-broker shortcuts, automatic execution, or autosave;
+- arbitrary replay paths, URLs, file browsing, imports, scripts, expressions, or custom code;
+- Candidate 063, IBKR dependencies, broker contact, credentials, account identifiers, deployment,
+  rollout, production operation, or live trading.
+
+Acceptance criteria:
+- [x] Focused backend/frontend tests, lint, type checking, and production build pass.
+- [x] Full repository verification passes with 610 backend and 122 frontend tests.
+- [x] Localhost checks produce manual approval wait for a current-time run, reject an unapproved
+  replay with 400, reject a stale version with 409, and block active emergency stop with 423.
+- [x] Runtime remains `app_mode=paper`, `live_trading_enabled=false`, and broker connectivity
+  `not_configured`.
+- [x] No in-app browser instance was available after required discovery and troubleshooting;
+  component and responsive-layout tests plus localhost API checks provide the recorded fallback.
+- [x] No broker transport, secret/account field, approval bypass, deployment, rollout, production,
+  or live-trading capability is added.
+
+Recommended following slice:
+- durable local persistence and restart recovery for saved workflow simulation runs, node statuses,
+  and journal references before operator history is treated as durable evidence.

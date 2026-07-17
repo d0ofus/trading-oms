@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import Literal
 
 from trading_oms_backend.approval_tickets import (
     ApprovalDecisionRecord,
@@ -78,6 +79,7 @@ class ReplayToApprovalConfig:
     approval_expires_at: str
     broker_state_known: bool
     existing_risk_request_ids: frozenset[str]
+    risk_time_domain: Literal["request", "replay"] = "request"
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -102,6 +104,8 @@ class ReplayToApprovalConfig:
             raise SimulationOrchestrationError("quantity must be a positive integer")
         _validated_timestamp(self.evaluated_at, "evaluated_at")
         _validated_timestamp(self.approval_expires_at, "approval_expires_at")
+        if self.risk_time_domain not in {"request", "replay"}:
+            raise SimulationOrchestrationError("risk_time_domain must be request or replay")
         if not isinstance(self.broker_state_known, bool):
             raise SimulationOrchestrationError("broker_state_known must be a boolean")
         if not isinstance(self.existing_risk_request_ids, frozenset):
@@ -385,7 +389,7 @@ class ReplayToApprovalOrchestrator:
                     quantity=config.quantity,
                     order_type="market",
                     reference_price=signal.breakout_bar_high,
-                    proposed_at=config.evaluated_at,
+                    proposed_at=_risk_evaluated_at(config, signal),
                     protective_order_plan=OrderIntentProtectivePlan(
                         kind="stop_loss",
                         stop_price=signal.first_bar_high,
@@ -419,7 +423,7 @@ class ReplayToApprovalOrchestrator:
                 quantity=proposal.quantity,
                 reference_price=proposal.reference_price,
                 market_data_timestamp=signal.trigger_bar_end_timestamp,
-                evaluated_at=config.evaluated_at,
+                evaluated_at=_risk_evaluated_at(config, signal),
                 broker_state_known=config.broker_state_known,
                 protective_order=protective_order,
                 protective_exception_approved=proposal.protective_exception_reference is not None,
@@ -807,6 +811,16 @@ def _latest_journal_reference(journal: JsonlEventJournal, event_type: str) -> st
         if record.event_type == event_type:
             return f"journal_sequence:{record.sequence}"
     raise SimulationOrchestrationError(f"journal event does not exist: {event_type}")
+
+
+def _risk_evaluated_at(
+    config: ReplayToApprovalConfig,
+    signal: ProductBreakoutSignal,
+) -> str:
+    if config.risk_time_domain == "request":
+        return config.evaluated_at
+    replay_bar_end = datetime.fromisoformat(signal.trigger_bar_end_timestamp.replace("Z", "+00:00"))
+    return (replay_bar_end + timedelta(seconds=10)).isoformat().replace("+00:00", "Z")
 
 
 def _validated_identifier(value: str, field_name: str) -> str:
