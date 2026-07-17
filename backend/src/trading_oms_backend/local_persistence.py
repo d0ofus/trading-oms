@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterable, Iterator, Mapping
@@ -83,6 +84,36 @@ CREATE INDEX IF NOT EXISTS idx_journal_index_ticket_id
 CREATE INDEX IF NOT EXISTS idx_journal_index_severity
   ON journal_index (severity);
 """
+
+MIGRATION_2_SQL = """
+CREATE TABLE IF NOT EXISTS workflow_simulation_run_evidence (
+  run_id TEXT PRIMARY KEY,
+  workflow_id TEXT NOT NULL,
+  expected_workflow_version INTEGER NOT NULL,
+  request_sha256 TEXT NOT NULL,
+  request_json TEXT NOT NULL,
+  evidence_state TEXT NOT NULL,
+  record_json TEXT,
+  journal_manifest_json TEXT,
+  journal_manifest_sha256 TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_simulation_run_evidence_workflow
+  ON workflow_simulation_run_evidence (workflow_id, updated_at, run_id);
+"""
+
+WORKFLOW_SIMULATION_REQUEST_KEYS = {
+    "schema_version",
+    "workflow_id",
+    "expected_workflow_version",
+    "run_id",
+    "requested_at",
+    "evaluated_at",
+    "approval_expires_at",
+    "replay_input_reference",
+}
 
 SECRET_KEY_TOKENS = {
     "api_key",
@@ -191,15 +222,23 @@ class LocalSqlitePersistenceStore:
                 """,
                 (1, MIGRATION_APPLIED_AT),
             )
+            connection.executescript(MIGRATION_2_SQL)
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+                VALUES (?, ?)
+                """,
+                (2, MIGRATION_APPLIED_AT),
+            )
 
     def schema_version(self) -> int:
         self.initialize()
         with self._connect() as connection:
             row = connection.execute("SELECT max(version) FROM schema_migrations").fetchone()
         version = None if row is None else row[0]
-        if version != 1:
-            raise LocalPersistenceError("local persistence schema_version must be 1")
-        return 1
+        if version != 2:
+            raise LocalPersistenceError("local persistence schema_version must be 2")
+        return 2
 
     def put_workflow_definition(self, record: WorkflowDefinitionRecord) -> None:
         if not isinstance(record, WorkflowDefinitionRecord):
@@ -274,6 +313,177 @@ class LocalSqlitePersistenceStore:
         return tuple(
             _json_dict(row["payload_json"], "workflow simulation run payload") for row in rows
         )
+
+    def reserve_workflow_simulation_run(
+        self,
+        request_payload: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], bool]:
+        request = _normalized_payload(
+            request_payload,
+            "workflow simulation run request",
+        )
+        _validate_workflow_simulation_request(request)
+        request_json = _stable_payload_json(request, "workflow simulation run request")
+        request_sha256 = _sha256(request_json)
+        run_id = request["run_id"]
+        workflow_id = request["workflow_id"]
+        expected_workflow_version = request["expected_workflow_version"]
+        created_at = request["requested_at"]
+        updated_at = request["evaluated_at"]
+
+        self.initialize()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT *
+                FROM workflow_simulation_run_evidence
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            ).fetchone()
+            reservation_created = row is None
+            if reservation_created:
+                connection.execute(
+                    """
+                    INSERT INTO workflow_simulation_run_evidence (
+                      run_id, workflow_id, expected_workflow_version,
+                      request_sha256, request_json, evidence_state,
+                      record_json, journal_manifest_json, journal_manifest_sha256,
+                      created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, 'pending', NULL, NULL, NULL, ?, ?)
+                    """,
+                    (
+                        run_id,
+                        workflow_id,
+                        expected_workflow_version,
+                        request_sha256,
+                        request_json,
+                        created_at,
+                        updated_at,
+                    ),
+                )
+                row = connection.execute(
+                    """
+                    SELECT *
+                    FROM workflow_simulation_run_evidence
+                    WHERE run_id = ?
+                    """,
+                    (run_id,),
+                ).fetchone()
+            evidence = _workflow_simulation_evidence_from_row(row)
+            if evidence["request_sha256"] != request_sha256 or evidence["request"] != request:
+                raise LocalPersistenceError("conflicting workflow simulation run_id")
+            return evidence, reservation_created
+
+    def finalize_workflow_simulation_run(
+        self,
+        run_id: str,
+        record: WorkflowSimulationRunRecord,
+        journal_records: tuple[JournalRecord, ...],
+    ) -> dict[str, Any]:
+        _validated_identifier(run_id, "run_id")
+        if not isinstance(record, WorkflowSimulationRunRecord):
+            raise LocalPersistenceError("record must be WorkflowSimulationRunRecord")
+        if record.run_id != run_id:
+            raise LocalPersistenceError("record run_id must match reserved run_id")
+        if not isinstance(journal_records, tuple) or not journal_records:
+            raise LocalPersistenceError("journal_records must be a non-empty tuple")
+        for journal_record in journal_records:
+            if not isinstance(journal_record, JournalRecord):
+                raise LocalPersistenceError("journal_records must contain JournalRecord values")
+
+        record_json = _stable_payload_json(
+            record.to_json_dict(),
+            "workflow simulation run record",
+        )
+        manifest = [journal_record.to_json_dict() for journal_record in journal_records]
+        manifest_json = _stable_json_value(manifest, "workflow simulation journal manifest")
+        manifest_sha256 = _sha256(manifest_json)
+
+        self.initialize()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT *
+                FROM workflow_simulation_run_evidence
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise LocalPersistenceError("unknown workflow simulation run reservation")
+            evidence = _workflow_simulation_evidence_from_row(row)
+            if evidence["evidence_state"] != "pending":
+                raise LocalPersistenceError("workflow simulation run evidence is already finalized")
+            request = evidence["request"]
+            if record.workflow_id != request["workflow_id"]:
+                raise LocalPersistenceError("record workflow_id must match reserved workflow_id")
+            connection.execute(
+                """
+                UPDATE workflow_simulation_run_evidence
+                SET evidence_state = 'committed',
+                    record_json = ?,
+                    journal_manifest_json = ?,
+                    journal_manifest_sha256 = ?,
+                    updated_at = ?
+                WHERE run_id = ? AND evidence_state = 'pending'
+                """,
+                (
+                    record_json,
+                    manifest_json,
+                    manifest_sha256,
+                    record.updated_at,
+                    run_id,
+                ),
+            )
+            finalized = connection.execute(
+                """
+                SELECT *
+                FROM workflow_simulation_run_evidence
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            ).fetchone()
+            return _workflow_simulation_evidence_from_row(finalized)
+
+    def get_workflow_simulation_run_evidence(
+        self,
+        run_id: str,
+    ) -> dict[str, Any] | None:
+        _validated_identifier(run_id, "run_id")
+        self.initialize()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT *
+                FROM workflow_simulation_run_evidence
+                WHERE run_id = ?
+                """,
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _workflow_simulation_evidence_from_row(row)
+
+    def list_workflow_simulation_run_evidence(
+        self,
+        workflow_id: str,
+    ) -> tuple[dict[str, Any], ...]:
+        _validated_identifier(workflow_id, "workflow_id")
+        self.initialize()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM workflow_simulation_run_evidence
+                WHERE workflow_id = ?
+                ORDER BY updated_at, run_id
+                """,
+                (workflow_id,),
+            ).fetchall()
+        return tuple(_workflow_simulation_evidence_from_row(row) for row in rows)
 
     def put_operations_read_model(
         self,
@@ -470,6 +680,20 @@ def _stable_payload_json(payload: Mapping[str, Any], payload_name: str) -> str:
     )
 
 
+def _stable_json_value(value: Any, value_name: str) -> str:
+    try:
+        normalized = json.loads(json.dumps(value, allow_nan=False))
+    except (TypeError, ValueError) as exc:
+        raise LocalPersistenceError(f"{value_name} must be JSON-serializable") from exc
+    _reject_unsafe_content(normalized, ())
+    return json.dumps(
+        normalized,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
 def _normalized_payload(payload: Mapping[str, Any], payload_name: str) -> dict[str, Any]:
     try:
         normalized = json.loads(json.dumps(payload, allow_nan=False))
@@ -490,6 +714,109 @@ def _json_dict(raw_json: str, payload_name: str) -> dict[str, Any]:
         raise LocalPersistenceError(f"{payload_name} must be a JSON object")
     _reject_unsafe_content(payload, ())
     return payload
+
+
+def _json_value(raw_json: str, value_name: str) -> Any:
+    try:
+        value = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise LocalPersistenceError(f"{value_name} must contain valid JSON") from exc
+    _reject_unsafe_content(value, ())
+    return value
+
+
+def _workflow_simulation_evidence_from_row(row: sqlite3.Row | None) -> dict[str, Any]:
+    if row is None:
+        raise LocalPersistenceError("workflow simulation evidence row is missing")
+    request = _json_dict(row["request_json"], "workflow simulation run request")
+    _validate_workflow_simulation_request(request)
+    request_json = _stable_payload_json(request, "workflow simulation run request")
+    if row["request_sha256"] != _sha256(request_json):
+        raise LocalPersistenceError("workflow simulation request digest is invalid")
+    if (
+        row["run_id"] != request["run_id"]
+        or row["workflow_id"] != request["workflow_id"]
+        or row["expected_workflow_version"] != request["expected_workflow_version"]
+    ):
+        raise LocalPersistenceError("workflow simulation request attribution is inconsistent")
+    created_at = _parse_timestamp(row["created_at"], "created_at")
+    updated_at = _parse_timestamp(row["updated_at"], "updated_at")
+    if updated_at < created_at:
+        raise LocalPersistenceError("workflow simulation evidence timestamps are inconsistent")
+
+    state = row["evidence_state"]
+    if state not in {"pending", "committed"}:
+        raise LocalPersistenceError("workflow simulation evidence_state is invalid")
+    optional_values = (
+        row["record_json"],
+        row["journal_manifest_json"],
+        row["journal_manifest_sha256"],
+    )
+    if state == "pending" and any(value is not None for value in optional_values):
+        raise LocalPersistenceError("pending workflow simulation evidence is inconsistent")
+    if state == "committed" and any(value is None for value in optional_values):
+        raise LocalPersistenceError("committed workflow simulation evidence is incomplete")
+
+    record = None
+    manifest = None
+    manifest_sha256 = row["journal_manifest_sha256"]
+    if state == "committed":
+        record = _json_dict(row["record_json"], "workflow simulation run record")
+        manifest = _json_value(
+            row["journal_manifest_json"],
+            "workflow simulation journal manifest",
+        )
+        if not isinstance(manifest, list) or not manifest:
+            raise LocalPersistenceError(
+                "workflow simulation journal manifest must be a non-empty list"
+            )
+        if not all(isinstance(item, dict) for item in manifest):
+            raise LocalPersistenceError(
+                "workflow simulation journal manifest must contain JSON objects"
+            )
+        manifest_json = _stable_json_value(
+            manifest,
+            "workflow simulation journal manifest",
+        )
+        if manifest_sha256 != _sha256(manifest_json):
+            raise LocalPersistenceError("workflow simulation journal manifest digest is invalid")
+
+    return {
+        "run_id": row["run_id"],
+        "workflow_id": row["workflow_id"],
+        "expected_workflow_version": row["expected_workflow_version"],
+        "request_sha256": row["request_sha256"],
+        "request": request,
+        "evidence_state": state,
+        "record": record,
+        "journal_manifest": manifest,
+        "journal_manifest_sha256": manifest_sha256,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _validate_workflow_simulation_request(request: Mapping[str, Any]) -> None:
+    if set(request) != WORKFLOW_SIMULATION_REQUEST_KEYS:
+        raise LocalPersistenceError("workflow simulation run request fields are invalid")
+    if request["schema_version"] != 1 or isinstance(request["schema_version"], bool):
+        raise LocalPersistenceError("workflow simulation run request schema_version must be 1")
+    _validated_identifier(request["workflow_id"], "workflow_id")
+    _positive_integer(request["expected_workflow_version"], "expected_workflow_version")
+    _validated_identifier(request["run_id"], "run_id")
+    requested_at = _parse_timestamp(request["requested_at"], "requested_at")
+    evaluated_at = _parse_timestamp(request["evaluated_at"], "evaluated_at")
+    approval_expires_at = _parse_timestamp(
+        request["approval_expires_at"],
+        "approval_expires_at",
+    )
+    if evaluated_at < requested_at or approval_expires_at <= evaluated_at:
+        raise LocalPersistenceError("workflow simulation run request timestamps are invalid")
+    _validated_identifier(request["replay_input_reference"], "replay_input_reference")
+
+
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _reject_unsafe_content(value: Any, path: tuple[str, ...]) -> None:

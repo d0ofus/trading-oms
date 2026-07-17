@@ -153,7 +153,8 @@ position, and alert nodes remain blocked.
   existing nodes.
 - No connection ports with custom data schemas beyond the single `workflow` edge type.
 - Node positions are page-local and reset to deterministic catalog positions when loading.
-- Simulation-run records remain process-local and do not survive a backend restart.
+- Saved-workflow simulation-run records and their journal manifests survive backend restart in the
+  bounded local state directory. Invalid durable evidence fails closed and is not partially shown.
 - No file import or export.
 - No custom strategy types, arbitrary expressions, scripts, or code execution.
 - Local workflow storage is suitable for this bounded self-hosted development surface; production

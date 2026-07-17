@@ -2798,3 +2798,59 @@ Acceptance criteria:
 Recommended following slice:
 - durable local persistence and restart recovery for saved workflow simulation runs, node statuses,
   and journal references before operator history is treated as durable evidence.
+
+---
+
+## Non-broker candidate - durable saved-workflow simulation-run persistence
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; simulation evidence durability only
+
+branch: `candidate-slice-durable-workflow-simulation-run-persistence`
+
+Goal:
+Persist the exact accepted saved-workflow simulation request and its complete approval-wait evidence
+locally so list/get, exact retry, and the read-only inspector recover safely after backend restart.
+
+Scope:
+- additive local SQLite schema-v2 migration;
+- atomic exact-request reservation with explicit `pending` and `committed` evidence states;
+- persisted workflow/version attribution, run record, approval reference, node statuses, and
+  canonical journal manifest with SHA-256 bindings;
+- strict typed reconstruction and JSONL source-of-truth verification on recovered reads;
+- exact retry across restart without rerun or duplicate journal events;
+- conflicting identity, partial writes, malformed records, bad digests, missing references,
+  corrupt JSONL, and contradictory evidence fail closed;
+- stable local state paths plus non-destructive service reconstruction;
+- in-process duplicate-attempt and journal-write coordination;
+- generic API/UI unavailable behavior without paths, SQL details, or private values.
+
+Completed:
+- [x] The ExecPlan was the first file edit.
+- [x] Schema version 2 migrates additively and retains the legacy schema-v1 tables.
+- [x] New runs reserve the exact canonical request before journal append and finalize only after the
+  complete typed record and contiguous manifest exist.
+- [x] Reconstructed list/get and exact retry return the same validated record without journal
+  duplication; conflicting payloads fail closed.
+- [x] Pending, partial, malformed, missing, corrupt, digest-invalid, and contradictory evidence is
+  never presented as a successful run.
+- [x] Authorization, emergency stop, workflow validation/versioning, fixed replay allowlist,
+  replay-time risk checks, manual approval wait, and append-only journaling remain authoritative.
+
+Non-goals:
+- pending-evidence repair, deletion, automatic retry, or automatic recovery;
+- approval controls, automatic approval, OMS/fake-broker shortcuts, or downstream execution;
+- remote databases, deployment, backup/restore, multi-host writers, or production rollout;
+- Candidate 063, IBKR dependencies, broker contact, credentials, account identifiers, or live
+  trading.
+
+Acceptance criteria:
+- [x] Failing-first migration, restart, retry, conflict, ordering, concurrency, partial, corruption,
+  missing-reference, contradictory-evidence, and generic-API tests pass.
+- [x] Full backend tests, formatting, linting, compilation, and resilience checks pass.
+- [x] Frontend checks, production build, and full repository verification pass.
+- [x] Localhost create/start/list, real backend restart, recovered get/list, exact retry, conflict,
+  corruption failure, UI availability, and component-test evidence are recorded. No browser was
+  available for a visual screenshot.
+- [ ] The branch is committed, pushed, represented by an open PR against main, and green in CI.

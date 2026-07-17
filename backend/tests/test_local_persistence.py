@@ -47,14 +47,115 @@ def test_local_persistence_initializes_schema_idempotently(
     store.initialize()
     store.initialize()
 
-    assert store.schema_version() == 1
+    assert store.schema_version() == 2
     assert _table_names(local_database_path) == {
         "journal_index",
         "read_model_snapshots",
         "schema_migrations",
         "workflow_definitions",
+        "workflow_simulation_run_evidence",
         "workflow_simulation_runs",
     }
+
+
+def test_local_persistence_migrates_schema_one_without_discarding_legacy_data(
+    local_database_path: Path,
+) -> None:
+    connection = sqlite3.connect(local_database_path)
+    try:
+        connection.executescript(
+            """
+            CREATE TABLE schema_migrations (
+              version INTEGER PRIMARY KEY,
+              applied_at TEXT NOT NULL
+            );
+            INSERT INTO schema_migrations (version, applied_at)
+            VALUES (1, '1970-01-01T00:00:00Z');
+            CREATE TABLE workflow_simulation_runs (
+              run_id TEXT PRIMARY KEY,
+              workflow_id TEXT NOT NULL,
+              status TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              approval_ticket_id TEXT,
+              payload_json TEXT NOT NULL
+            );
+            INSERT INTO workflow_simulation_runs (
+              run_id, workflow_id, status, updated_at, approval_ticket_id, payload_json
+            ) VALUES (
+              'legacy-run-001', 'workflow-001', 'completed',
+              '2026-07-08T13:45:10Z', NULL, '{"schema_version":1}'
+            );
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    store = LocalSqlitePersistenceStore(local_database_path)
+    store.initialize()
+
+    assert store.schema_version() == 2
+    assert "workflow_simulation_run_evidence" in _table_names(local_database_path)
+    connection = sqlite3.connect(local_database_path)
+    try:
+        legacy_count = connection.execute(
+            "SELECT count(*) FROM workflow_simulation_runs WHERE run_id = 'legacy-run-001'"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    assert legacy_count == 1
+
+
+def test_local_persistence_reserves_and_atomically_finalizes_exact_run_evidence(
+    local_database_path: Path,
+) -> None:
+    store = LocalSqlitePersistenceStore(local_database_path)
+    request_payload = _workflow_simulation_request_payload()
+    run = _workflow_simulation_run_record()
+    journal_records = tuple(
+        JournalRecord(
+            sequence=sequence,
+            event_type="workflow_simulation.evidence",
+            timestamp="2026-07-08T13:45:10Z",
+            payload={
+                "schema_version": 1,
+                "run_id": "workflow-run-001",
+                "sequence_marker": sequence,
+            },
+        )
+        for sequence in range(1, 11)
+    )
+
+    pending, pending_created = store.reserve_workflow_simulation_run(request_payload)
+    exact_pending, exact_pending_created = store.reserve_workflow_simulation_run(request_payload)
+
+    assert exact_pending == pending
+    assert pending_created is True
+    assert exact_pending_created is False
+    assert pending["evidence_state"] == "pending"
+    assert pending["request"] == request_payload
+    assert pending["record"] is None
+    assert pending["journal_manifest"] is None
+    with pytest.raises(LocalPersistenceError, match="conflicting workflow simulation run_id"):
+        store.reserve_workflow_simulation_run(
+            {**request_payload, "evaluated_at": "2026-07-08T13:46:00Z"}
+        )
+
+    committed = store.finalize_workflow_simulation_run(
+        "workflow-run-001",
+        run,
+        journal_records,
+    )
+
+    assert committed["evidence_state"] == "committed"
+    assert committed["record"] == run.to_json_dict()
+    assert committed["journal_manifest"] == [record.to_json_dict() for record in journal_records]
+    assert isinstance(committed["request_sha256"], str)
+    assert len(committed["request_sha256"]) == 64
+    assert isinstance(committed["journal_manifest_sha256"], str)
+    assert len(committed["journal_manifest_sha256"]) == 64
+    assert store.get_workflow_simulation_run_evidence("workflow-run-001") == committed
+    assert store.list_workflow_simulation_run_evidence("workflow-001") == (committed,)
 
 
 def test_local_persistence_stores_safe_domain_snapshots(local_database_path: Path) -> None:
@@ -149,7 +250,7 @@ def test_local_persistence_init_command_creates_database(local_database_path: Pa
     assert persistence_main(["init", "--database", str(database_path)]) == 0
 
     store = LocalSqlitePersistenceStore(database_path)
-    assert store.schema_version() == 1
+    assert store.schema_version() == 2
 
 
 def _table_names(database_path: Path) -> set[str]:
@@ -202,6 +303,19 @@ def _workflow_simulation_run_record() -> WorkflowSimulationRunRecord:
         ),
         journal_references=("journal_sequence:10",),
     )
+
+
+def _workflow_simulation_request_payload() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "workflow_id": "workflow-001",
+        "expected_workflow_version": 1,
+        "run_id": "workflow-run-001",
+        "requested_at": "2026-07-08T13:29:55Z",
+        "evaluated_at": "2026-07-08T13:45:10Z",
+        "approval_expires_at": "2026-07-08T13:50:10Z",
+        "replay_input_reference": "fixtures/replay/aapl-session.jsonl",
+    }
 
 
 def _workflow_dsl() -> dict[str, object]:

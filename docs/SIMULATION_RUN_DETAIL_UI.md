@@ -36,14 +36,18 @@ blocked exactly as returned by the backend.
 - The view does not expose credential fields or live-trading controls.
 - API failures discard partial data and render a generic unavailable state without exception text.
 - Empty and failed responses never fall back to a fabricated successful run.
+- Reconstructed runs are shown only after the backend verifies the typed SQLite record and every
+  bound journal-manifest entry against the append-only JSONL source.
 - A successful saved-workflow start must be present in a fresh API read before the inspector selects
   it; a failed refresh remains unavailable and retains the exact idempotent request for explicit
   retry.
 
 ## Current Limitations
 
-- Workflow simulation run records are process-local in the current backend runner and do not survive
-  a backend restart.
+- Local workflow simulation history survives backend reconstruction and process restart, but it is
+  not a production database, backup, or multi-host history service.
+- Pending, missing, corrupt, incomplete, or contradictory evidence makes the affected workflow
+  history unavailable; the inspector never offers repair or partial display.
 - The inspector does not compare runs or aggregate run metrics.
 - Workflow creation and run start remain separate controls; this inspector provides no mutation
   control.

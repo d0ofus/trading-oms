@@ -64,7 +64,11 @@ The returned run record stores journal references as `journal_sequence:<sequence
 
 ## Current Limitations
 
-- Run records are in-memory only.
-- No simulation run API endpoint exists yet.
-- No strategy, risk, approval, OMS, fake broker, position, alert, or UI orchestration is performed
-  in this slice.
+- The original standalone `SimulationRunBook` remains an in-memory domain component.
+- Saved-workflow simulation runs use a separate durable adapter: the exact request, run record,
+  approval reference, node statuses, and journal manifest are stored in local SQLite and strictly
+  reconstructed after restart.
+- Saved-workflow run APIs stop at manual approval wait. This durability work does not add approval,
+  fake-broker, OMS, position, alert, broker, or live execution controls.
+- Interrupted `pending` evidence intentionally requires operator investigation; automatic recovery
+  or deletion is not implemented.

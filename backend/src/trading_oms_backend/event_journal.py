@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+import threading
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -99,8 +101,14 @@ class JournalRecord:
 
 
 class JsonlEventJournal:
+    _path_locks: dict[str, threading.RLock] = {}
+    _path_locks_guard = threading.Lock()
+
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
+        resolved_path = str(self.path.resolve())
+        with self._path_locks_guard:
+            self._lock = self._path_locks.setdefault(resolved_path, threading.RLock())
 
     def append(
         self,
@@ -109,34 +117,44 @@ class JsonlEventJournal:
         *,
         timestamp: str | None = None,
     ) -> JournalRecord:
-        existing_records = self.read_all()
-        sequence = existing_records[-1].sequence + 1 if existing_records else 1
-        record = JournalRecord(
-            sequence=sequence,
-            event_type=event_type,
-            timestamp=timestamp or _utc_timestamp(),
-            payload=payload,
-        )
+        with self._lock:
+            existing_records = self.read_all()
+            sequence = existing_records[-1].sequence + 1 if existing_records else 1
+            record = JournalRecord(
+                sequence=sequence,
+                event_type=event_type,
+                timestamp=timestamp or _utc_timestamp(),
+                payload=payload,
+            )
 
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8", newline="\n") as journal_file:
-            journal_file.write(record.to_json_line())
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8", newline="\n") as journal_file:
+                journal_file.write(record.to_json_line())
 
-        return record
+            return record
+
+    @contextmanager
+    def write_session(self) -> Iterator[None]:
+        """Serialize one logical append sequence for this journal path in this process."""
+        with self._lock:
+            yield
 
     def read_all(self) -> list[JournalRecord]:
-        if not self.path.exists():
-            return []
+        with self._lock:
+            if not self.path.exists():
+                return []
 
-        records: list[JournalRecord] = []
-        with self.path.open("r", encoding="utf-8") as journal_file:
-            for line_number, line in enumerate(journal_file, start=1):
-                if not line.strip():
-                    raise JournalValidationError(f"journal line {line_number} must not be blank")
-                records.append(self._read_line(line, line_number))
+            records: list[JournalRecord] = []
+            with self.path.open("r", encoding="utf-8") as journal_file:
+                for line_number, line in enumerate(journal_file, start=1):
+                    if not line.strip():
+                        raise JournalValidationError(
+                            f"journal line {line_number} must not be blank"
+                        )
+                    records.append(self._read_line(line, line_number))
 
-        self._validate_sequence_order(records)
-        return records
+            self._validate_sequence_order(records)
+            return records
 
     def _read_line(self, line: str, line_number: int) -> JournalRecord:
         try:

@@ -16,7 +16,9 @@ evidence described in `docs/SLICES.md`.
 The non-broker simulation-run-inspector candidate closes one remaining operator-trust gap: the UI no
 longer shows a hard-coded completed fake-broker run. It loads actual saved workflow simulation runs,
 shows backend-recorded node and journal evidence, and renders explicit empty/error states. Current
-workflow-run retention is process-local and remains a future durability gap.
+workflow-run retention is now local and restart-safe: committed records are reconstructed from
+SQLite only after their canonical manifest matches the append-only JSONL source. Pending, corrupt,
+missing, or contradictory evidence fails closed.
 
 The interactive visual-workflow-editor candidate closes the fixed-preview gap for local graph
 authoring. Operators can add, select, move, and remove typed simulation nodes, connect and remove
@@ -78,7 +80,7 @@ simulation run.
 | Event journal and audit log | Journal exists. | Add read APIs, audit explorer, filters, export, and event indexing. |
 | Alerts | Local/no-op alert domain exists. | Wire alerts to protection and run events; keep delivery local until a later approved adapter. |
 | UI shell | Read-only shell exists. | Connect shell to backend read APIs and add workflow-specific views. |
-| Visual workflow builder | Interactive typed graph editing, validation, local versioned persistence, deliberate simulation-only run start, and API-backed run inspection exist. | Persist simulation-run evidence durably across backend restart before relying on it for operator history. |
+| Visual workflow builder | Interactive typed graph editing, validation, local versioned persistence, deliberate simulation-only run start, restart-safe evidence, and API-backed inspection exist. | Add richer typed workflow parameters and later paper-only execution only through separately approved safety gates. |
 | IBKR paper adapter | Local adapter boundary exists without transport. | Add paper-only transport only after a separate explicit human approval and review. |
 | Production readiness | Checklist evaluator, deployment plan, local auth/roles, and local emergency stop exist. | Add observability, backup/restore, incident response, evidence dashboard, rollout checklist, and external review evidence. |
 
