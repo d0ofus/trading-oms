@@ -2853,4 +2853,5 @@ Acceptance criteria:
 - [x] Localhost create/start/list, real backend restart, recovered get/list, exact retry, conflict,
   corruption failure, UI availability, and component-test evidence are recorded. No browser was
   available for a visual screenshot.
-- [ ] The branch is committed, pushed, represented by an open PR against main, and green in CI.
+- [x] The branch is committed and pushed, and PR #49 is open against `main` with exact-head CI
+  required and no merge authorized by this slice.

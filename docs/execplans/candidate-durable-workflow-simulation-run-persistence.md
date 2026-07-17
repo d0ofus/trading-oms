@@ -206,8 +206,9 @@ saved workflow reached manual approval wait, survived an actual backend process 
 list/get, returned an exact retry without changing the 18-line journal, rejected a conflicting retry
 with HTTP 400, and returned generic HTTP 503 for deliberately corrupt evidence before restoration.
 Backend and frontend returned HTTP 200 on localhost. Browser runtime discovery and the required
-troubleshooting pass found no available browser, so no visual screenshot claim is made. Commit,
-push, PR creation, and exact-head CI remain the final delivery steps.
+troubleshooting pass found no available browser, so no visual screenshot claim is made. The bounded
+branch is pushed and PR #49 is open against `main`; exact-head CI is required after every update and
+the PR remains unmerged pending separate human approval.
 
 ## 13. Risks and assumptions
 
