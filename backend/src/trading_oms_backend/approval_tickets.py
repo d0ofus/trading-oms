@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -216,6 +217,68 @@ class ApprovalTicket:
             "create_request": self.create_request,
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_ticket: Mapping[str, Any]) -> ApprovalTicket:
+        expected_keys = {
+            "schema_version",
+            "ticket_id",
+            "order_id",
+            "client_order_id",
+            "symbol",
+            "side",
+            "quantity",
+            "risk_intent",
+            "risk_decision_id",
+            "oms_transition_reference",
+            "status",
+            "created_at",
+            "expires_at",
+            "decision_id",
+            "decided_at",
+            "actor",
+            "decision_reference",
+            "reason",
+            "create_request",
+        }
+        if not isinstance(raw_ticket, Mapping) or set(raw_ticket) != expected_keys:
+            raise ApprovalTicketError("approval ticket fields are invalid")
+        create_request = raw_ticket["create_request"]
+        if not isinstance(create_request, dict):
+            raise ApprovalTicketError("create_request must be a JSON object")
+        parsed_create_request = ApprovalTicketCreateRequest(**create_request)
+        ticket = cls(
+            schema_version=raw_ticket["schema_version"],
+            ticket_id=raw_ticket["ticket_id"],
+            order_id=raw_ticket["order_id"],
+            client_order_id=raw_ticket["client_order_id"],
+            symbol=raw_ticket["symbol"],
+            side=raw_ticket["side"],
+            quantity=raw_ticket["quantity"],
+            risk_intent=raw_ticket["risk_intent"],
+            risk_decision_id=raw_ticket["risk_decision_id"],
+            oms_transition_reference=raw_ticket["oms_transition_reference"],
+            status=raw_ticket["status"],
+            created_at=raw_ticket["created_at"],
+            expires_at=raw_ticket["expires_at"],
+            decision_id=raw_ticket["decision_id"],
+            decided_at=raw_ticket["decided_at"],
+            actor=raw_ticket["actor"],
+            decision_reference=raw_ticket["decision_reference"],
+            reason=raw_ticket["reason"],
+            create_request=create_request,
+        )
+        if (
+            parsed_create_request.ticket_id != ticket.ticket_id
+            or parsed_create_request.order_id != ticket.order_id
+            or parsed_create_request.client_order_id != ticket.client_order_id
+            or parsed_create_request.risk_decision_id != ticket.risk_decision_id
+            or parsed_create_request.oms_transition_reference != ticket.oms_transition_reference
+            or parsed_create_request.created_at != ticket.created_at
+            or parsed_create_request.expires_at != ticket.expires_at
+        ):
+            raise ApprovalTicketError("approval ticket create_request attribution is inconsistent")
+        return ticket
+
     def _validate_pending_decision_fields(self) -> None:
         if any(
             value is not None
@@ -294,6 +357,52 @@ class ApprovalDecisionRecord:
             "ticket": self.ticket.to_json_dict(),
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> ApprovalDecisionRecord:
+        expected_keys = {
+            "schema_version",
+            "decision_id",
+            "ticket_id",
+            "previous_status",
+            "new_status",
+            "decided_at",
+            "actor",
+            "decision_reference",
+            "reason",
+            "request",
+            "ticket",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise ApprovalTicketError("approval decision record fields are invalid")
+        request = raw_record["request"]
+        ticket = raw_record["ticket"]
+        if not isinstance(request, dict) or not isinstance(ticket, Mapping):
+            raise ApprovalTicketError("approval decision record payloads are invalid")
+        parsed_request = ApprovalDecisionRequest(**request)
+        parsed_ticket = ApprovalTicket.from_json_dict(ticket)
+        record = cls(
+            schema_version=raw_record["schema_version"],
+            decision_id=raw_record["decision_id"],
+            ticket_id=raw_record["ticket_id"],
+            previous_status=raw_record["previous_status"],
+            new_status=raw_record["new_status"],
+            decided_at=raw_record["decided_at"],
+            actor=raw_record["actor"],
+            decision_reference=raw_record["decision_reference"],
+            reason=raw_record["reason"],
+            request=request,
+            ticket=parsed_ticket,
+        )
+        if (
+            parsed_request.decision_id != record.decision_id
+            or parsed_request.ticket_id != record.ticket_id
+            or parsed_request.decision != record.new_status
+            or parsed_ticket.ticket_id != record.ticket_id
+            or parsed_ticket.status != record.new_status
+        ):
+            raise ApprovalTicketError("approval decision record attribution is inconsistent")
+        return record
+
 
 class ApprovalTicketBook:
     def __init__(self, journal: JsonlEventJournal) -> None:
@@ -344,6 +453,19 @@ class ApprovalTicketBook:
         self._tickets[request.ticket_id] = ticket
         return ticket
 
+    def restore_pending_ticket(self, ticket: ApprovalTicket) -> None:
+        if not isinstance(ticket, ApprovalTicket):
+            raise ApprovalTicketError("ticket must be an ApprovalTicket")
+        if ticket.status != "pending":
+            raise ApprovalTicketError("only pending tickets can be restored")
+        if ticket.ticket_id in self._tickets:
+            if self._tickets[ticket.ticket_id] != ticket:
+                raise ApprovalTicketError("conflicting restored ticket")
+            return
+        self._create_requests[ticket.ticket_id] = ticket.create_request
+        self._create_tickets[ticket.ticket_id] = ticket
+        self._tickets[ticket.ticket_id] = ticket
+
     def apply_decision(self, request: ApprovalDecisionRequest) -> ApprovalDecisionRecord:
         if not isinstance(request, ApprovalDecisionRequest):
             raise ApprovalTicketError("request must be an ApprovalDecisionRequest")
@@ -354,12 +476,7 @@ class ApprovalTicketBook:
                 raise ApprovalTicketError("conflicting decision_id")
             return self._decision_records[request.decision_id]
 
-        if request.ticket_id not in self._tickets:
-            raise ApprovalTicketError("unknown ticket_id")
-        ticket = self._tickets[request.ticket_id]
-        if ticket.status != "pending":
-            raise ApprovalTicketError("ticket is not pending")
-        self._validate_decision_timing(request, ticket)
+        ticket = self.validate_decision(request)
 
         decided_ticket = self._decided_ticket(ticket, request)
         record = ApprovalDecisionRecord(
@@ -383,6 +500,17 @@ class ApprovalTicketBook:
         self._decision_requests[request.decision_id] = request_payload
         self._decision_records[request.decision_id] = record
         return record
+
+    def validate_decision(self, request: ApprovalDecisionRequest) -> ApprovalTicket:
+        if not isinstance(request, ApprovalDecisionRequest):
+            raise ApprovalTicketError("request must be an ApprovalDecisionRequest")
+        if request.ticket_id not in self._tickets:
+            raise ApprovalTicketError("unknown ticket_id")
+        ticket = self._tickets[request.ticket_id]
+        if ticket.status != "pending":
+            raise ApprovalTicketError("ticket is not pending")
+        self._validate_decision_timing(request, ticket)
+        return ticket
 
     def current_ticket(self, ticket_id: str) -> ApprovalTicket:
         ticket_id = _validated_identifier(ticket_id, "ticket_id")

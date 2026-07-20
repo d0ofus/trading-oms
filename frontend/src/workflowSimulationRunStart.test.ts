@@ -202,6 +202,7 @@ const validRun: WorkflowSimulationRunApiView = {
     },
   ],
   journal_references: ["journal_sequence:2"],
+  approval_decision: null,
 };
 
 function workflowClient(overrides: Partial<WorkflowApiClient>): WorkflowApiClient {

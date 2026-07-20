@@ -1,8 +1,8 @@
 # Local Persistence
 
 Slice 040 added a local SQLite persistence foundation for simulation and inspection data. The
-durable saved-workflow simulation-run candidate adds schema version 2 and wires the running API to
-that foundation for restart-safe run evidence.
+durable saved-workflow simulation-run candidate added schema version 2, and durable manual
+decisions add schema version 3.
 
 It is a local-only persistence layer. It does not add production database deployment, broker
 transport, IBKR connectivity, live trading, real alert delivery, credentials, account IDs, or order
@@ -18,8 +18,8 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
 ```
 
 The command is deterministic and idempotent. It creates the schema if needed and records migration
-version `2`. Existing version-1 databases migrate additively and retain their legacy tables and
-records.
+version `3`. Existing version-1 and version-2 databases migrate additively and retain their legacy
+tables and records.
 
 ## Tables
 
@@ -38,7 +38,9 @@ for audit history and does not replace the JSONL event journal.
 `workflow_simulation_run_evidence` is the authoritative lookup and idempotency record for saved
 workflow simulation runs. It stores the canonical accepted request and digest, workflow/version
 attribution, `pending` or `committed` state, typed run record, approval-ticket reference, node
-statuses, canonical journal manifest, and manifest digest.
+statuses, canonical journal manifest, and manifest digest. Schema version 3 adds nullable
+decision identity, request digest, request JSON, evidence state, typed decision record, and update
+timestamp columns plus a unique partial decision-ID index.
 
 ## Write And Recovery Contract
 
@@ -59,6 +61,13 @@ append-only JSONL source by sequence and canonical content. Missing, malformed, 
 non-contiguous, digest-invalid, or contradictory evidence returns only a generic unavailable API
 state. Exact committed retries return the existing record without another orchestration or journal
 append. A different payload using the same run ID is rejected.
+
+Manual decisions follow the same reserve/finalize boundary. Domain, attribution, expiry,
+authorization, and emergency-stop validation complete before SQLite reserves the exact decision as
+`pending`. The approval-domain decision and changed node-status records are then appended, and
+SQLite atomically commits the typed decision, updated run, expanded manifest, and digest. A pending
+or corrupt decision makes the run unavailable; it is never displayed as approved or retried
+automatically.
 
 ## Safety Boundary
 
@@ -82,6 +91,9 @@ The running local API keeps saved workflow definitions, workflow simulation JSON
 evidence under `.tmp/trading-oms-local-state`. Saved workflow run list/get and the UI inspector
 recover after backend reconstruction or process restart. The JSONL journal remains the audit source
 of truth; the SQLite manifest is an integrity binding and lookup record, not a replacement journal.
+
+Committed saved-workflow approval/rejection evidence recovers through the same list/get APIs.
+Approval remains `approved_not_executed`; persistence does not route or execute it.
 
 This is bounded local development storage. It is not a production database, backup/restore design,
 multi-host writer, deployment approval, broker-session record, or paper/live trading history.

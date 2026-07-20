@@ -7,6 +7,7 @@ import {
   type WorkflowDefinitionApiView,
   type WorkflowDefinitionSaveRequest,
   type WorkflowDefinitionUpdateRequest,
+  type WorkflowSimulationDecisionRequest,
   type WorkflowSimulationRunApiView,
   type WorkflowSimulationRunRequest,
 } from "./workflowApiClient";
@@ -115,6 +116,17 @@ const simulationRun: WorkflowSimulationRunApiView = {
   journal_references: ["journal_sequence:10"],
 };
 
+const decisionRequest: WorkflowSimulationDecisionRequest = {
+  schema_version: 1,
+  expected_workflow_version: 1,
+  approval_ticket_id: "workflow-run-001-approval-ticket",
+  decision_id: "workflow-run-001-approve-decision",
+  decided_at: "2026-07-08T13:46:00Z",
+  actor: "approver-operator-001",
+  decision_reference: "workflow-run-001-approve-manual-review",
+  reason: "operator_reviewed_simulation_evidence",
+};
+
 describe("workflow API client", () => {
   it("uses safe workflow persistence endpoints with explicit methods", async () => {
     const calls: { input: string; init?: RequestInit }[] = [];
@@ -179,6 +191,37 @@ describe("workflow API client", () => {
     await expect(client.getSimulationRun("workflow-001", "workflow-run-001")).resolves.toEqual(
       simulationRun,
     );
+  });
+
+  it("uses only the explicitly selected local operator role for decisions", async () => {
+    const calls: RequestInit[] = [];
+    const client = createWorkflowApiClient({
+      headers: {
+        "x-operator-id": "approver-operator-001",
+        "x-operator-roles": "approver",
+      },
+      fetchImpl: async (_input, init) => {
+        calls.push(init);
+        return jsonResponse(simulationRun);
+      },
+    });
+
+    await client.approveSimulationRun("workflow-001", "workflow-run-001", decisionRequest);
+    await client.rejectSimulationRun("workflow-001", "workflow-run-001", {
+      ...decisionRequest,
+      decision_id: "workflow-run-001-reject-decision",
+      decision_reference: "workflow-run-001-reject-manual-review",
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(
+      calls.every(
+        (call) =>
+          new Headers(call.headers).get("x-operator-id") ===
+            "approver-operator-001" &&
+          new Headers(call.headers).get("x-operator-roles") === "approver",
+      ),
+    ).toBe(true);
   });
 
   it("does not expose run, broker, credential, route, or live endpoints", () => {

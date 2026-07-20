@@ -280,12 +280,14 @@ function validateWorkflowSimulationRunResponse(
     "simulation_run",
     "node_statuses",
     "journal_references",
+    "approval_decision",
   ]);
   if (
     record.schema_version !== 1 ||
     record.workflow_id !== attempt.workflowId ||
     record.run_id !== attempt.request.run_id ||
-    record.status !== "waiting_for_approval"
+    record.status !== "waiting_for_approval" ||
+    record.approval_decision !== null
   ) {
     throw new Error("simulation response attribution is invalid");
   }
@@ -322,6 +324,7 @@ function validateWorkflowSimulationRunResponse(
     simulation_run: simulationRun,
     node_statuses: nodeStatuses,
     journal_references: validateJournalReferences(record.journal_references),
+    approval_decision: null,
   };
 }
 

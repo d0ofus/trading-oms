@@ -79,6 +79,47 @@ a {
   gap: 8px;
 }
 
+.operator-role-controls {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.operator-role-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(88px, 1fr));
+  border: 1px solid #aeb8b0;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.operator-role-switch button {
+  min-height: 36px;
+  border: 0;
+  border-right: 1px solid #aeb8b0;
+  background: #ffffff;
+  color: #35413a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 7px 12px;
+}
+
+.operator-role-switch button:last-child {
+  border-right: 0;
+}
+
+.operator-role-switch button[aria-pressed="true"] {
+  background: #315f72;
+  color: #ffffff;
+}
+
+.operator-role-switch button:focus-visible {
+  outline: 2px solid #7da9bb;
+  outline-offset: -3px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -984,7 +1025,8 @@ dd {
   color: #7c2f29;
 }
 
-.workflow-run-start {
+.workflow-run-start,
+.workflow-approval-panel {
   display: grid;
   grid-column: 1 / -1;
   gap: 14px;
@@ -995,19 +1037,23 @@ dd {
   padding: 16px;
 }
 
-.workflow-run-start .section-heading {
+.workflow-run-start .section-heading,
+.workflow-approval-panel .section-heading {
   align-items: start;
   gap: 12px;
 }
 
 .workflow-run-start .section-heading h2,
 .workflow-run-start .section-heading p,
+.workflow-approval-panel .section-heading h3,
+.workflow-approval-panel .section-heading p,
 .workflow-run-start-ready p,
 .workflow-run-start-feedback p {
   margin: 0;
 }
 
-.workflow-run-start .section-heading h2 {
+.workflow-run-start .section-heading h2,
+.workflow-approval-panel .section-heading h3 {
   font-size: 1rem;
 }
 
@@ -1034,7 +1080,8 @@ dd {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.workflow-run-start button {
+.workflow-run-start button,
+.workflow-approval-panel button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1052,14 +1099,25 @@ dd {
 }
 
 .workflow-run-start button:hover:not(:disabled),
-.workflow-run-start button:focus-visible {
+.workflow-run-start button:focus-visible,
+.workflow-approval-panel button:hover:not(:disabled),
+.workflow-approval-panel button:focus-visible {
   outline: 2px solid #bfdae7;
   outline-offset: 1px;
 }
 
-.workflow-run-start button:disabled {
+.workflow-run-start button:disabled,
+.workflow-approval-panel button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+.workflow-approval-panel textarea {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  margin-top: 7px;
+  resize: vertical;
 }
 
 .workflow-run-start-facts {

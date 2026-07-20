@@ -46,6 +46,7 @@ from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionStore,
 )
 from trading_oms_backend.workflow_simulation_runs import (
+    WorkflowSimulationDecisionRequest,
     WorkflowSimulationRunConflictError,
     WorkflowSimulationRunError,
     WorkflowSimulationRunner,
@@ -85,6 +86,19 @@ class WorkflowSimulationRunBody(BaseModel):
     evaluated_at: str
     approval_expires_at: str
     replay_input_reference: str
+    schema_version: int = 1
+
+
+class WorkflowSimulationDecisionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    expected_workflow_version: int = Field(gt=0)
+    approval_ticket_id: str
+    decision_id: str
+    decided_at: str
+    actor: str
+    decision_reference: str
+    reason: str
     schema_version: int = 1
 
 
@@ -401,6 +415,50 @@ def get_workflow_simulation_run(request: Request, workflow_id: str, run_id: str)
     return record.to_json_dict()
 
 
+@app.post("/api/workflows/{workflow_id}/simulation-runs/{run_id}/approve")
+def approve_workflow_simulation_run(
+    request: Request,
+    workflow_id: str,
+    run_id: str,
+    decision: WorkflowSimulationDecisionBody,
+) -> dict[str, Any]:
+    identity = _authorize_request(
+        request,
+        permission=APPROVE_SIMULATION_PERMISSION,
+        resource=f"workflow_simulation_run.{workflow_id}.{run_id}",
+        action="approve",
+    )
+    return _apply_workflow_simulation_decision(
+        workflow_id,
+        run_id,
+        "approved",
+        decision,
+        identity,
+    )
+
+
+@app.post("/api/workflows/{workflow_id}/simulation-runs/{run_id}/reject")
+def reject_workflow_simulation_run(
+    request: Request,
+    workflow_id: str,
+    run_id: str,
+    decision: WorkflowSimulationDecisionBody,
+) -> dict[str, Any]:
+    identity = _authorize_request(
+        request,
+        permission=APPROVE_SIMULATION_PERMISSION,
+        resource=f"workflow_simulation_run.{workflow_id}.{run_id}",
+        action="reject",
+    )
+    return _apply_workflow_simulation_decision(
+        workflow_id,
+        run_id,
+        "rejected",
+        decision,
+        identity,
+    )
+
+
 @app.put("/api/workflows/{workflow_id}")
 def update_workflow(
     request: Request,
@@ -632,6 +690,47 @@ def _apply_simulation_approval_decision(
             record = service.reject(ticket_id, decision_input)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
+def _apply_workflow_simulation_decision(
+    workflow_id: str,
+    run_id: str,
+    action: str,
+    decision: WorkflowSimulationDecisionBody,
+    identity: OperatorIdentity,
+) -> dict[str, Any]:
+    if decision.actor != identity.operator_id:
+        raise HTTPException(
+            status_code=400,
+            detail="actor must match authenticated operator",
+        )
+    try:
+        record = get_workflow_simulation_runner().apply_decision(
+            workflow_id,
+            run_id,
+            WorkflowSimulationDecisionRequest(
+                schema_version=decision.schema_version,
+                expected_workflow_version=decision.expected_workflow_version,
+                approval_ticket_id=decision.approval_ticket_id,
+                decision_id=decision.decision_id,
+                decision=action,
+                decided_at=decision.decided_at,
+                actor=decision.actor,
+                decision_reference=decision.decision_reference,
+                reason=decision.reason,
+            ),
+            decided_by=identity.operator_id,
+        )
+    except WorkflowSimulationRunConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except WorkflowSimulationRunUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except WorkflowSimulationRunError as exc:
+        if "emergency stop is active" in str(exc):
+            raise HTTPException(status_code=423, detail=str(exc)) from exc
+        status_code = 404 if "unknown workflow simulation run" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     return record.to_json_dict()
 
 

@@ -52,6 +52,85 @@ def test_workflow_simulation_api_runs_saved_workflow_to_approval_wait(
     ]
 
 
+def test_workflow_simulation_api_approves_persisted_run_and_recovers_after_restart(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+
+    approved = client.post(
+        "/api/workflows/workflow-001/simulation-runs/workflow-run-001/approve",
+        headers=_approver_headers(),
+        json=_decision_body("approve"),
+    )
+    journal_count = len(app_module.get_workflow_simulation_runner().journal_records())
+    reconstruct_workflow_services()
+    recovered = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    retried = client.post(
+        "/api/workflows/workflow-001/simulation-runs/workflow-run-001/approve",
+        headers=_approver_headers(),
+        json=_decision_body("approve"),
+    )
+
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "approved_not_executed"
+    assert approved.json()["approval_decision"]["new_status"] == "approved"
+    assert recovered.json() == approved.json()
+    assert retried.json() == approved.json()
+    assert len(app_module.get_workflow_simulation_runner().journal_records()) == journal_count
+
+
+def test_workflow_simulation_api_requires_separate_approver_and_matching_actor(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+    path = "/api/workflows/workflow-001/simulation-runs/workflow-run-001/approve"
+
+    admin = client.post(path, json=_decision_body("approve"))
+    mismatched_actor = client.post(
+        path,
+        headers=_approver_headers(),
+        json=_decision_body("approve", actor="other-operator"),
+    )
+
+    assert admin.status_code == 403
+    assert mismatched_actor.status_code == 400
+    loaded = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    assert loaded.json()["status"] == "waiting_for_approval"
+
+
+def test_workflow_simulation_decision_api_rejects_unknown_run(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/workflows/workflow-001/simulation-runs/missing-run/approve",
+        headers=_approver_headers(),
+        json=_decision_body(
+            "approve",
+            approval_ticket_id="missing-run-approval-ticket",
+            decision_id="missing-run-approve-decision",
+            decision_reference="missing-run-approve-manual-review",
+        ),
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "unknown workflow simulation run"}
+
+
 def test_workflow_simulation_api_is_idempotent_for_same_run_payload(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -336,6 +415,8 @@ def test_app_module_allows_only_known_simulation_mutation_routes() -> None:
         "/api/emergency-stop/deactivate",
         "/api/workflows",
         "/api/workflows/{workflow_id}/simulation-runs",
+        "/api/workflows/{workflow_id}/simulation-runs/{run_id}/approve",
+        "/api/workflows/{workflow_id}/simulation-runs/{run_id}/reject",
     }
     assert put_routes == {"/api/workflows/{workflow_id}"}
 
@@ -381,6 +462,28 @@ def _run_body(**overrides: Any) -> dict[str, Any]:
     }
     values.update(overrides)
     return values
+
+
+def _decision_body(action: str, **overrides: Any) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "schema_version": 1,
+        "expected_workflow_version": 1,
+        "approval_ticket_id": "workflow-run-001-approval-ticket",
+        "decision_id": f"workflow-run-001-{action}-decision",
+        "decided_at": "2026-07-08T13:46:00Z",
+        "actor": "approver-operator-001",
+        "decision_reference": f"workflow-run-001-{action}-manual-review",
+        "reason": "operator_reviewed_simulation_evidence",
+    }
+    values.update(overrides)
+    return values
+
+
+def _approver_headers() -> dict[str, str]:
+    return {
+        "x-operator-id": "approver-operator-001",
+        "x-operator-roles": "approver",
+    }
 
 
 def _valid_workflow_dsl() -> dict[str, object]:

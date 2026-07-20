@@ -309,6 +309,10 @@ describe("read API client", () => {
   it("uses GET only for every read endpoint", async () => {
     const calls: { input: string; init?: RequestInit }[] = [];
     const client = createReadApiClient({
+      headers: {
+        "x-operator-id": "approver-operator-001",
+        "x-operator-roles": "approver",
+      },
       fetchImpl: async (input, init) => {
         calls.push({ input: String(input), init });
         return jsonResponse(responseByEndpoint[String(input)]);
@@ -332,6 +336,14 @@ describe("read API client", () => {
 
     expect(calls.map((call) => call.input)).toEqual(Object.values(READ_API_ENDPOINTS));
     expect(calls.every((call) => call.init?.method === "GET")).toBe(true);
+    expect(
+      calls.every(
+        (call) =>
+          new Headers(call.init?.headers).get("x-operator-id") ===
+            "approver-operator-001" &&
+          new Headers(call.init?.headers).get("x-operator-roles") === "approver",
+      ),
+    ).toBe(true);
   });
 
   it("loads an aggregate operations snapshot from read endpoints", async () => {

@@ -38,6 +38,31 @@ export type WorkflowSimulationRunRequest = {
   replay_input_reference: string;
 };
 
+export type WorkflowSimulationDecisionRequest = {
+  schema_version: 1;
+  expected_workflow_version: number;
+  approval_ticket_id: string;
+  decision_id: string;
+  decided_at: string;
+  actor: string;
+  decision_reference: string;
+  reason: string;
+};
+
+export type WorkflowSimulationApprovalDecisionApiView = {
+  schema_version: 1;
+  decision_id: string;
+  ticket_id: string;
+  previous_status: "pending";
+  new_status: "approved" | "rejected";
+  decided_at: string;
+  actor: string;
+  decision_reference: string;
+  reason: string;
+  request: Record<string, unknown>;
+  ticket: Record<string, unknown>;
+};
+
 export type WorkflowNodeRunStatusApiView = {
   schema_version: 1;
   node_id: string;
@@ -51,10 +76,11 @@ export type WorkflowSimulationRunApiView = {
   schema_version: 1;
   workflow_id: string;
   run_id: string;
-  status: "waiting_for_approval" | "completed";
+  status: "waiting_for_approval" | "approved_not_executed" | "rejected" | "completed";
   created_at: string;
   updated_at: string;
   approval_ticket_id: string | null;
+  approval_decision?: WorkflowSimulationApprovalDecisionApiView | null;
   simulation_run: {
     schema_version: 1;
     run_id: string;
@@ -87,11 +113,22 @@ export type WorkflowApiClient = {
     workflowId: string,
     runId: string,
   ) => Promise<WorkflowSimulationRunApiView>;
+  approveSimulationRun: (
+    workflowId: string,
+    runId: string,
+    request: WorkflowSimulationDecisionRequest,
+  ) => Promise<WorkflowSimulationRunApiView>;
+  rejectSimulationRun: (
+    workflowId: string,
+    runId: string,
+    request: WorkflowSimulationDecisionRequest,
+  ) => Promise<WorkflowSimulationRunApiView>;
 };
 
 type WorkflowApiClientOptions = {
   baseUrl?: string;
   fetchImpl?: WorkflowApiFetch;
+  headers?: Record<string, string>;
 };
 
 export function createWorkflowApiClient(
@@ -108,12 +145,16 @@ export function createWorkflowApiClient(
         fetchImpl,
         buildUrl(baseUrl, WORKFLOW_API_ENDPOINTS.workflows),
         "GET",
+        undefined,
+        options.headers,
       ),
     getWorkflow: (workflowId) =>
       requestJson<WorkflowDefinitionApiView>(
         fetchImpl,
         buildUrl(baseUrl, workflowPath(workflowId)),
         "GET",
+        undefined,
+        options.headers,
       ),
     createWorkflow: (request) =>
       requestJson<WorkflowDefinitionApiView>(
@@ -121,6 +162,7 @@ export function createWorkflowApiClient(
         buildUrl(baseUrl, WORKFLOW_API_ENDPOINTS.workflows),
         "POST",
         request,
+        options.headers,
       ),
     updateWorkflow: (workflowId, request) =>
       requestJson<WorkflowDefinitionApiView>(
@@ -128,6 +170,7 @@ export function createWorkflowApiClient(
         buildUrl(baseUrl, workflowPath(workflowId)),
         "PUT",
         request,
+        options.headers,
       ),
     startSimulationRun: (workflowId, request) =>
       requestJson<WorkflowSimulationRunApiView>(
@@ -135,12 +178,15 @@ export function createWorkflowApiClient(
         buildUrl(baseUrl, `${workflowPath(workflowId)}/simulation-runs`),
         "POST",
         request,
+        options.headers,
       ),
     listSimulationRuns: (workflowId) =>
       requestJson<WorkflowSimulationRunApiView[]>(
         fetchImpl,
         buildUrl(baseUrl, `${workflowPath(workflowId)}/simulation-runs`),
         "GET",
+        undefined,
+        options.headers,
       ),
     getSimulationRun: (workflowId, runId) =>
       requestJson<WorkflowSimulationRunApiView>(
@@ -150,6 +196,30 @@ export function createWorkflowApiClient(
           `${workflowPath(workflowId)}/simulation-runs/${encodeURIComponent(runId)}`,
         ),
         "GET",
+        undefined,
+        options.headers,
+      ),
+    approveSimulationRun: (workflowId, runId, request) =>
+      requestJson<WorkflowSimulationRunApiView>(
+        fetchImpl,
+        buildUrl(
+          baseUrl,
+          `${workflowPath(workflowId)}/simulation-runs/${encodeURIComponent(runId)}/approve`,
+        ),
+        "POST",
+        request,
+        options.headers,
+      ),
+    rejectSimulationRun: (workflowId, runId, request) =>
+      requestJson<WorkflowSimulationRunApiView>(
+        fetchImpl,
+        buildUrl(
+          baseUrl,
+          `${workflowPath(workflowId)}/simulation-runs/${encodeURIComponent(runId)}/reject`,
+        ),
+        "POST",
+        request,
+        options.headers,
       ),
   };
 }
@@ -159,15 +229,17 @@ async function requestJson<Payload>(
   url: string,
   method: "GET" | "POST" | "PUT",
   body?: unknown,
+  extraHeaders: Record<string, string> = {},
 ): Promise<Payload> {
   const response = await fetchImpl(url, {
     method,
     headers:
       body === undefined
-        ? { Accept: "application/json" }
+        ? { Accept: "application/json", ...extraHeaders }
         : {
             Accept: "application/json",
             "Content-Type": "application/json",
+            ...extraHeaders,
           },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
