@@ -288,6 +288,8 @@ def test_app_module_limits_workflow_mutations_to_save_and_update_routes() -> Non
         "/api/emergency-stop/deactivate",
         "/api/workflows",
         "/api/workflows/{workflow_id}/simulation-runs",
+        "/api/workflows/{workflow_id}/simulation-runs/{run_id}/approve",
+        "/api/workflows/{workflow_id}/simulation-runs/{run_id}/reject",
     }
     assert put_routes == {"/api/workflows/{workflow_id}"}
 

@@ -46,3 +46,9 @@ Fields:
 The saved-workflow simulation runner now verifies committed SQLite manifests against this JSONL
 source on every recovered read. SQLite does not replace, repair, truncate, or silently complete the
 journal.
+
+Accepted saved-workflow decisions append one `approval.ticket.decided` record and new
+`workflow_simulation.node_status` records for the approval and downstream blocked nodes. Their
+strictly increasing source sequences extend the run manifest; unrelated journal records may appear
+between run creation and a later manual decision. No accepted approval appends a post-approval OMS,
+fake-broker, fill, position, external-alert, broker, or live-order event in this bounded slice.

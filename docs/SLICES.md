@@ -2855,3 +2855,65 @@ Acceptance criteria:
   available for a visual screenshot.
 - [x] The branch is committed and pushed, and PR #49 is open against `main` with exact-head CI
   required and no merge authorized by this slice.
+
+---
+
+## Non-broker candidate - durable saved-workflow simulation approval
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; persisted simulation decision only
+
+branch: `candidate-slice-durable-workflow-simulation-approval`
+
+Goal:
+Allow a separately authorized approver to deliberately approve or reject the exact pending ticket
+for one persisted saved-workflow simulation run, with restart-safe decision and journal evidence.
+
+Scope:
+- additive local SQLite schema-v3 decision evidence;
+- workflow/run-scoped approve and reject endpoints with saved-version and ticket binding;
+- strict reconstruction of the persisted ticket and its run, order-intent, risk, OMS, and order
+  attribution;
+- explicit `pending` and `committed` decision evidence states with digest binding;
+- exact committed retry after restart without duplicate decision or node-status events;
+- deliberate `SIMULATION ONLY` review and confirmation UI for an authorized approver;
+- explicit local-development Admin/Approver session switching with consistent request headers;
+- approval ending at `approved_not_executed` and rejection blocking downstream simulation nodes.
+
+Completed:
+- [x] The ExecPlan was the first branch edit.
+- [x] Approval and rejection require the dedicated approver permission and actor binding.
+- [x] Active emergency stop blocks approval while rejection remains available.
+- [x] Expired, stale, mismatched, conflicting, interrupted, malformed, digest-invalid, and
+  contradictory evidence fails closed.
+- [x] Accepted decisions and changed node statuses are append-only journal records and part of the
+  run's durable manifest.
+- [x] OMS post-approval advancement, fake-broker execution, fills, positions, and alert delivery
+  remain absent.
+
+Non-goals:
+- automatic approval, retry, repair, recovery, or execution;
+- OMS or fake-broker continuation after approval;
+- IBKR dependencies, broker contact, credentials, account identifiers, deployment, rollout,
+  production operation, or live trading;
+- Candidate 063 implementation or relaxation of its external-review gates.
+
+Acceptance criteria:
+- [x] Focused backend tests cover durability, restart, exact retry, conflict, concurrency, expiry,
+  emergency stop, pending evidence, and corruption.
+- [x] Focused frontend tests cover eligibility, confirmation, response attribution, safety copy,
+  and absent execution affordances.
+- [x] Full repository verification passes with 640 backend and 135 frontend tests; frontend lint,
+  type checking, and production build also pass.
+- [x] Localhost start/approve/reject, role-separation, backend restart, recovered get, exact retry,
+  and single decision-event evidence pass through the Vite proxy. Browser discovery returned no
+  available browser instance, so no visual-inspection claim is made.
+- [ ] The branch is committed and pushed, and an unmerged exact-head-green PR exists against
+  `main`.
+
+Recommended following slice:
+- a separately approved, simulation-only continuation that consumes only durable
+  `approved_not_executed` evidence and advances the existing OMS/fake-broker path with durable
+  fill, position, protection, alert, and journal evidence;
+- Candidate 063, IBKR transport, deployment, production rollout, and live trading remain deferred.

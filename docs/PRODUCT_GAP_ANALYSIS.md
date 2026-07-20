@@ -35,6 +35,11 @@ fixed local replay fixture. The request carries the expected definition version,
 authorization, emergency-stop, conflict, validation, or availability errors, and stops at manual
 approval. The successful run is selected in the API-backed inspector.
 
+The durable saved-workflow approval candidate closes the next operator-control gap. A separately
+authorized approver can deliberately approve or reject the exact persisted pending ticket, and the
+decision, updated node statuses, and source-journal bindings recover after restart. Approval is
+explicitly `approved_not_executed`; no OMS continuation or fake-broker action is added.
+
 Candidate 063 connector implementation is deferred. No IBKR dependency, broker contact, order
 transport, credentials, account identifiers, deployment, rollout, production operation, or live
 trading is authorized by this update.
@@ -73,7 +78,7 @@ simulation run.
 | Local bar building | Bar builder exists. | Wire bars into product strategy and run records. |
 | Product strategy evaluation | A close-above-SMA replay strategy exists. | Implement the first requirements strategy: first 5-minute bar breakout plus 1.5x cumulative volume filter. |
 | Risk checks | Risk engine exists. | Wire all order-intent proposals through risk before approval. |
-| Manual approval tickets | Approval domain exists. | Add API/UI approval inbox and orchestration into simulation state. |
+| Manual approval tickets | Generic approval inbox plus durable saved-workflow approval/rejection exist. | Keep approval separate from a future explicitly reviewed execution command. |
 | Fake broker execution | Fake broker exists. | Execute approved simulation orders through fake broker and OMS. |
 | OMS state tracking | OMS state machine exists. | Persist/read OMS views and orchestrate state transitions from approvals/fills. |
 | Positions | Not implemented as a product view. | Add simulated position tracking, protection monitoring, and critical alerts. |

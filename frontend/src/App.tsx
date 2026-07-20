@@ -56,6 +56,7 @@ import {
 } from "./strategyBuilder";
 import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
 import { WorkflowPersistencePanel } from "./WorkflowPersistencePanel";
+import { WorkflowSimulationApprovalPanel } from "./WorkflowSimulationApprovalPanel";
 import { WorkflowSimulationRunStartPanel } from "./WorkflowSimulationRunStartPanel";
 import {
   compileVisualWorkflowDsl,
@@ -88,6 +89,13 @@ import {
   type WorkflowPersistenceOperationState,
 } from "./workflowPersistence";
 import {
+  executeWorkflowSimulationDecision,
+  prepareWorkflowSimulationDecision,
+  workflowSimulationDecisionEligibility as evaluateWorkflowSimulationDecisionEligibility,
+  type WorkflowSimulationDecisionAction,
+  type WorkflowSimulationDecisionState,
+} from "./workflowSimulationApproval";
+import {
   executeWorkflowSimulationRunStart,
   prepareWorkflowSimulationRunStart,
   workflowSimulationRunEligibility,
@@ -96,6 +104,7 @@ import {
 } from "./workflowSimulationRunStart";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
+type LocalOperatorRole = "admin" | "approver";
 
 type SummaryPanel = {
   title: string;
@@ -219,13 +228,43 @@ export function App({
     initialWorkflowRunInspectionState ?? initialWorkflowRunInspectionLoadState,
   );
   const [selectedWorkflowRunKey, setSelectedWorkflowRunKey] = useState<string | null>(null);
+  const [workflowSimulationDecision, setWorkflowSimulationDecision] =
+    useState<WorkflowSimulationDecisionState>({ status: "idle" });
+  const [workflowSimulationDecisionConfirmed, setWorkflowSimulationDecisionConfirmed] =
+    useState(false);
+  const [workflowSimulationDecisionReason, setWorkflowSimulationDecisionReason] = useState(
+    "operator_reviewed_simulation_evidence",
+  );
+  const [localOperatorRole, setLocalOperatorRole] = useState<LocalOperatorRole>("admin");
+  const localOperatorHeaders = useMemo(
+    () => ({
+      "x-operator-id":
+        localOperatorRole === "admin"
+          ? "human-operator-001"
+          : "approver-operator-001",
+      "x-operator-roles": localOperatorRole,
+    }),
+    [localOperatorRole],
+  );
+  const operationsReadClient = useMemo(
+    () =>
+      readApiClient ??
+      createReadApiClient({
+        headers: localOperatorHeaders,
+      }),
+    [localOperatorHeaders, readApiClient],
+  );
   const approvalClient = useMemo(
     () => simulationApprovalApiClient ?? createSimulationApprovalApiClient(),
     [simulationApprovalApiClient],
   );
   const workflowClient = useMemo(
-    () => workflowApiClient ?? createWorkflowApiClient(),
-    [workflowApiClient],
+    () =>
+      workflowApiClient ??
+      createWorkflowApiClient({
+        headers: localOperatorHeaders,
+      }),
+    [localOperatorHeaders, workflowApiClient],
   );
   const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
   const workflowDslCompileResult = useMemo(
@@ -295,6 +334,16 @@ export function App({
       null,
     [selectedWorkflowRunKey, workflowRunInspection.items],
   );
+  const workflowSimulationDecisionContext = {
+    canApproveSimulation: snapshot.operatorSession.can_approve_simulation,
+    emergencyStopActive: snapshot.emergencyStop.active,
+    actor: snapshot.operatorSession.operator_id,
+  };
+  const workflowSimulationDecisionEligibility =
+    evaluateWorkflowSimulationDecisionEligibility(
+      selectedWorkflowRun,
+      workflowSimulationDecisionContext,
+    );
 
   useEffect(() => {
     if (!shouldLoadFromBackend) {
@@ -304,7 +353,7 @@ export function App({
     let isCurrent = true;
     setReadState(initialReadApiState);
 
-    loadOperationsSnapshot(readApiClient ?? createReadApiClient()).then((state) => {
+    loadOperationsSnapshot(operationsReadClient).then((state) => {
       if (isCurrent) {
         setReadState(state);
       }
@@ -313,7 +362,7 @@ export function App({
     return () => {
       isCurrent = false;
     };
-  }, [readApiClient, shouldLoadFromBackend]);
+  }, [operationsReadClient, shouldLoadFromBackend]);
 
   useEffect(() => {
     if (!shouldLoadWorkflowRuns) {
@@ -431,6 +480,68 @@ export function App({
       return;
     }
     void applyWorkflowSimulationRunStart(workflowSimulationRunStart.attempt);
+  };
+
+  const resetWorkflowSimulationDecision = () => {
+    setWorkflowSimulationDecision({ status: "idle" });
+    setWorkflowSimulationDecisionConfirmed(false);
+  };
+
+  const selectLocalOperatorRole = (role: LocalOperatorRole) => {
+    if (role === localOperatorRole) {
+      return;
+    }
+    resetWorkflowSimulationRunStart();
+    resetWorkflowSimulationDecision();
+    setLocalOperatorRole(role);
+    setReadState(initialReadApiState);
+  };
+
+  const reviewWorkflowSimulationDecision = (
+    action: WorkflowSimulationDecisionAction,
+  ) => {
+    setWorkflowSimulationDecisionConfirmed(false);
+    setWorkflowSimulationDecision(
+      prepareWorkflowSimulationDecision(
+        selectedWorkflowRun,
+        action,
+        workflowSimulationDecisionContext,
+        workflowSimulationDecisionReason,
+      ),
+    );
+  };
+
+  const confirmWorkflowSimulationDecision = async () => {
+    if (
+      workflowSimulationDecision.status !== "confirming" ||
+      !workflowSimulationDecisionConfirmed
+    ) {
+      return;
+    }
+    const attempt = workflowSimulationDecision.attempt;
+    setWorkflowSimulationDecision({ status: "deciding", attempt });
+    const result = await executeWorkflowSimulationDecision(workflowClient, attempt);
+    if (result.status !== "success") {
+      setWorkflowSimulationDecision(result);
+      return;
+    }
+    const refreshed = await loadWorkflowRunInspection(workflowClient);
+    setWorkflowRunInspection(refreshed);
+    const selectedKey = `${attempt.workflowId}::${attempt.runId}`;
+    if (
+      refreshed.status !== "loaded" ||
+      !refreshed.items.some((item) => item.key === selectedKey)
+    ) {
+      setWorkflowSimulationDecision({
+        status: "unavailable",
+        message: "Decision was recorded but durable inspection refresh is unavailable",
+        attempt,
+      });
+      return;
+    }
+    setSelectedWorkflowRunKey(selectedKey);
+    setWorkflowSimulationDecisionConfirmed(false);
+    setWorkflowSimulationDecision(result);
   };
 
   const selectWorkflowDefinition = (workflowId: string | null) => {
@@ -854,7 +965,10 @@ export function App({
                     <span>Inspect run</span>
                     <select
                       name="workflowSimulationRun"
-                      onChange={(event) => setSelectedWorkflowRunKey(event.target.value)}
+                      onChange={(event) => {
+                        setSelectedWorkflowRunKey(event.target.value);
+                        resetWorkflowSimulationDecision();
+                      }}
                       value={selectedWorkflowRun.key}
                     >
                       {workflowRunInspection.items.map((item) => (
@@ -897,6 +1011,22 @@ export function App({
                     )}
                   />
                 </dl>
+
+                <WorkflowSimulationApprovalPanel
+                  confirmed={workflowSimulationDecisionConfirmed}
+                  eligibility={workflowSimulationDecisionEligibility}
+                  onCancel={resetWorkflowSimulationDecision}
+                  onConfirm={() => void confirmWorkflowSimulationDecision()}
+                  onConfirmationChange={setWorkflowSimulationDecisionConfirmed}
+                  onReasonChange={(reason) => {
+                    setWorkflowSimulationDecisionReason(reason);
+                    resetWorkflowSimulationDecision();
+                  }}
+                  onReview={reviewWorkflowSimulationDecision}
+                  reason={workflowSimulationDecisionReason}
+                  selected={selectedWorkflowRun}
+                  state={workflowSimulationDecision}
+                />
 
                 <div className="run-history" aria-label="Saved workflow simulation run history">
                   {workflowRunInspection.items.map((item) => (
@@ -1300,10 +1430,32 @@ export function App({
                 <p className="eyebrow">Operator access</p>
                 <h2>Local development operator</h2>
               </div>
-              <div className="status-strip" aria-label="Operator access posture">
-                <StatusPill tone="good" label="Local auth foundation" />
-                <StatusPill tone="neutral" label="No credential controls" />
-                <StatusPill tone="neutral" label="No external identity provider" />
+              <div className="operator-role-controls">
+                <div
+                  className="operator-role-switch"
+                  aria-label="Local operator role"
+                  role="group"
+                >
+                  <button
+                    aria-pressed={localOperatorRole === "admin"}
+                    onClick={() => selectLocalOperatorRole("admin")}
+                    type="button"
+                  >
+                    Admin
+                  </button>
+                  <button
+                    aria-pressed={localOperatorRole === "approver"}
+                    onClick={() => selectLocalOperatorRole("approver")}
+                    type="button"
+                  >
+                    Approver
+                  </button>
+                </div>
+                <div className="status-strip" aria-label="Operator access posture">
+                  <StatusPill tone="good" label="Local auth foundation" />
+                  <StatusPill tone="neutral" label="No credential controls" />
+                  <StatusPill tone="neutral" label="No external identity provider" />
+                </div>
               </div>
             </div>
             <OperatorAccessPanel view={snapshot.operatorSession} />

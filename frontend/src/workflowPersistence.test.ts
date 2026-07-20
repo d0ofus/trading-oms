@@ -257,6 +257,12 @@ function workflowClient(options: {
     getSimulationRun: async () => {
       throw new Error("not used");
     },
+    approveSimulationRun: async () => {
+      throw new Error("not used");
+    },
+    rejectSimulationRun: async () => {
+      throw new Error("not used");
+    },
   };
 }
 

@@ -121,7 +121,8 @@ describe("App", () => {
   });
 
   it("renders the safety posture visibly", () => {
-    const text = renderedText(<App initialReadState={loadedReadState} />);
+    const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
     expect(text).toContain("Simulation mode");
     expect(text).toContain("Live trading disabled");
@@ -136,6 +137,10 @@ describe("App", () => {
     expect(text).toContain("view operations");
     expect(text).toContain("Approve simulation");
     expect(text).toContain("administer system");
+    expect(text).toContain("Admin");
+    expect(text).toContain("Approver");
+    expect(html).toContain('aria-label="Local operator role"');
+    expect(html).toContain('aria-pressed="true"');
   });
 
   it("renders fail-closed provenance across API-backed operator views", () => {

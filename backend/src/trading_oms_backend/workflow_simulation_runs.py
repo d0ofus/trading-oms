@@ -3,10 +3,17 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Protocol
 
+from trading_oms_backend.approval_tickets import (
+    ApprovalDecisionRecord,
+    ApprovalDecisionRequest,
+    ApprovalTicket,
+    ApprovalTicketBook,
+    ApprovalTicketError,
+)
 from trading_oms_backend.bar_builder import Bar
 from trading_oms_backend.emergency_stop import EmergencyStopError, EmergencyStopService
 from trading_oms_backend.event_journal import JournalRecord, JsonlEventJournal
@@ -86,6 +93,61 @@ class WorkflowSimulationRunRequest:
 
 
 @dataclass(frozen=True)
+class WorkflowSimulationDecisionRequest:
+    expected_workflow_version: int
+    approval_ticket_id: str
+    decision_id: str
+    decision: str
+    decided_at: str
+    actor: str
+    decision_reference: str
+    reason: str
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        _positive_integer(self.expected_workflow_version, "expected_workflow_version")
+        _validated_identifier(self.approval_ticket_id, "approval_ticket_id")
+        _validated_identifier(self.decision_id, "decision_id")
+        if self.decision not in {"approved", "rejected"}:
+            raise WorkflowSimulationRunError("decision must be approved or rejected")
+        _parse_timestamp(self.decided_at, "decided_at")
+        _validated_identifier(self.actor, "actor")
+        _validated_identifier(self.decision_reference, "decision_reference")
+        _validated_text(self.reason, "reason")
+
+    def to_payload(self, workflow_id: str, run_id: str) -> dict[str, Any]:
+        _validated_identifier(workflow_id, "workflow_id")
+        _validated_identifier(run_id, "run_id")
+        payload = {
+            "schema_version": self.schema_version,
+            "workflow_id": workflow_id,
+            "expected_workflow_version": self.expected_workflow_version,
+            "run_id": run_id,
+            "approval_ticket_id": self.approval_ticket_id,
+            "decision_id": self.decision_id,
+            "decision": self.decision,
+            "decided_at": self.decided_at,
+            "actor": self.actor,
+            "decision_reference": self.decision_reference,
+            "reason": self.reason,
+        }
+        _assert_json_serializable(payload, "workflow simulation decision request")
+        return payload
+
+    def to_approval_request(self) -> ApprovalDecisionRequest:
+        return ApprovalDecisionRequest(
+            decision_id=self.decision_id,
+            ticket_id=self.approval_ticket_id,
+            decision=self.decision,
+            decided_at=self.decided_at,
+            actor=self.actor,
+            decision_reference=self.decision_reference,
+            reason=self.reason,
+        )
+
+
+@dataclass(frozen=True)
 class WorkflowNodeRunStatus:
     node_id: str
     node_type: str
@@ -146,6 +208,7 @@ class WorkflowSimulationRunRecord:
     node_statuses: tuple[WorkflowNodeRunStatus, ...]
     journal_references: tuple[str, ...]
     approval_ticket_id: str | None
+    approval_decision: ApprovalDecisionRecord | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -177,6 +240,22 @@ class WorkflowSimulationRunRecord:
             _validated_identifier(self.approval_ticket_id, "approval_ticket_id")
         if self.status == "waiting_for_approval" and self.approval_ticket_id is None:
             raise WorkflowSimulationRunError("waiting_for_approval requires approval_ticket_id")
+        if self.status == "waiting_for_approval" and self.approval_decision is not None:
+            raise WorkflowSimulationRunError(
+                "waiting_for_approval must not contain an approval decision"
+            )
+        if self.status in {"approved_not_executed", "rejected"}:
+            if not isinstance(self.approval_decision, ApprovalDecisionRecord):
+                raise WorkflowSimulationRunError("decided workflow run requires approval_decision")
+            expected_decision = "approved" if self.status == "approved_not_executed" else "rejected"
+            if (
+                self.approval_decision.new_status != expected_decision
+                or self.approval_decision.ticket_id != self.approval_ticket_id
+                or self.approval_decision.decided_at != self.updated_at
+            ):
+                raise WorkflowSimulationRunError("workflow run approval decision is inconsistent")
+        elif self.approval_decision is not None:
+            raise WorkflowSimulationRunError("workflow run status does not allow approval_decision")
         _assert_json_serializable(self.to_json_dict(), "workflow simulation run record")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -188,6 +267,9 @@ class WorkflowSimulationRunRecord:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "approval_ticket_id": self.approval_ticket_id,
+            "approval_decision": (
+                None if self.approval_decision is None else self.approval_decision.to_json_dict()
+            ),
             "simulation_run": self.simulation_run.to_json_dict(),
             "node_statuses": [node.to_json_dict() for node in self.node_statuses],
             "journal_references": list(self.journal_references),
@@ -203,11 +285,16 @@ class WorkflowSimulationRunRecord:
             "created_at",
             "updated_at",
             "approval_ticket_id",
+            "approval_decision",
             "simulation_run",
             "node_statuses",
             "journal_references",
         }
-        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+        legacy_keys = expected_keys - {"approval_decision"}
+        if not isinstance(raw_record, Mapping):
+            raise WorkflowSimulationRunError("workflow simulation run record fields are invalid")
+        raw_keys = set(raw_record)
+        if raw_keys != expected_keys and raw_keys != legacy_keys:
             raise WorkflowSimulationRunError("workflow simulation run record fields are invalid")
         simulation_run = raw_record["simulation_run"]
         node_statuses = raw_record["node_statuses"]
@@ -218,6 +305,9 @@ class WorkflowSimulationRunRecord:
             raise WorkflowSimulationRunError("node_statuses must be a list")
         if not isinstance(journal_references, list):
             raise WorkflowSimulationRunError("journal_references must be a list")
+        approval_decision = raw_record.get("approval_decision")
+        if approval_decision is not None and not isinstance(approval_decision, Mapping):
+            raise WorkflowSimulationRunError("approval_decision must be an object or null")
         return cls(
             schema_version=raw_record["schema_version"],
             workflow_id=raw_record["workflow_id"],
@@ -226,6 +316,11 @@ class WorkflowSimulationRunRecord:
             created_at=raw_record["created_at"],
             updated_at=raw_record["updated_at"],
             approval_ticket_id=raw_record["approval_ticket_id"],
+            approval_decision=(
+                None
+                if approval_decision is None
+                else ApprovalDecisionRecord.from_json_dict(approval_decision)
+            ),
             simulation_run=SimulationRunRecord.from_json_dict(simulation_run),
             node_statuses=tuple(
                 WorkflowNodeRunStatus.from_json_dict(node_status) for node_status in node_statuses
@@ -257,6 +352,19 @@ class WorkflowSimulationRunPersistence(Protocol):
         workflow_id: str,
     ) -> tuple[dict[str, Any], ...]: ...
 
+    def reserve_workflow_simulation_decision(
+        self,
+        request_payload: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], bool]: ...
+
+    def finalize_workflow_simulation_decision(
+        self,
+        run_id: str,
+        record: WorkflowSimulationRunRecord,
+        decision_record: ApprovalDecisionRecord,
+        journal_records: tuple[JournalRecord, ...],
+    ) -> dict[str, Any]: ...
+
 
 class WorkflowSimulationRunner:
     def __init__(
@@ -281,6 +389,8 @@ class WorkflowSimulationRunner:
             "finalize_workflow_simulation_run",
             "get_workflow_simulation_run_evidence",
             "list_workflow_simulation_run_evidence",
+            "reserve_workflow_simulation_decision",
+            "finalize_workflow_simulation_decision",
         )
         if not all(
             callable(getattr(persistence_store, method, None)) for method in persistence_methods
@@ -385,6 +495,115 @@ class WorkflowSimulationRunner:
     def journal_records(self) -> tuple[JournalRecord, ...]:
         return tuple(self._journal.read_all())
 
+    def apply_decision(
+        self,
+        workflow_id: str,
+        run_id: str,
+        request: WorkflowSimulationDecisionRequest,
+        *,
+        decided_by: str,
+    ) -> WorkflowSimulationRunRecord:
+        _validated_identifier(workflow_id, "workflow_id")
+        _validated_identifier(run_id, "run_id")
+        if not isinstance(request, WorkflowSimulationDecisionRequest):
+            raise WorkflowSimulationRunError("request must be WorkflowSimulationDecisionRequest")
+        _validated_identifier(decided_by, "decided_by")
+        if request.actor != decided_by:
+            raise WorkflowSimulationRunError("actor must match authenticated operator")
+        with self._lock:
+            return self._apply_decision_locked(
+                workflow_id,
+                run_id,
+                request,
+                decided_by=decided_by,
+            )
+
+    def _apply_decision_locked(
+        self,
+        workflow_id: str,
+        run_id: str,
+        request: WorkflowSimulationDecisionRequest,
+        *,
+        decided_by: str,
+    ) -> WorkflowSimulationRunRecord:
+        evidence = self._load_evidence(run_id)
+        if evidence is None or evidence.get("workflow_id") != workflow_id:
+            raise WorkflowSimulationRunError("unknown workflow simulation run")
+        payload = request.to_payload(workflow_id, run_id)
+        decision_state = evidence.get("decision_evidence_state")
+        if decision_state is not None:
+            if evidence.get("decision_request") != payload:
+                raise WorkflowSimulationRunConflictError("conflicting decision")
+            return self._validated_record_from_evidence(evidence)
+
+        record = self._validated_record_from_evidence(evidence)
+        if record.status != "waiting_for_approval":
+            raise WorkflowSimulationRunConflictError("workflow simulation run is already decided")
+        if request.expected_workflow_version != evidence.get("expected_workflow_version"):
+            raise WorkflowSimulationRunConflictError(
+                "expected_workflow_version does not match persisted workflow version"
+            )
+        if request.approval_ticket_id != record.approval_ticket_id:
+            raise WorkflowSimulationRunConflictError(
+                "approval_ticket_id does not match persisted workflow run"
+            )
+        ticket = _pending_ticket_from_evidence(evidence, record)
+        _validate_ticket_attribution(ticket, run_id, evidence)
+        approval_request = request.to_approval_request()
+        ticket_book = ApprovalTicketBook(self._journal)
+        ticket_book.restore_pending_ticket(ticket)
+        try:
+            ticket_book.validate_decision(approval_request)
+        except ApprovalTicketError as exc:
+            raise WorkflowSimulationRunError(str(exc)) from exc
+
+        if request.decision == "approved" and self._emergency_stop_service is not None:
+            try:
+                self._emergency_stop_service.ensure_risk_increasing_allowed(
+                    resource=f"workflow_simulation_run.{workflow_id}.{run_id}",
+                    action="approve",
+                    checked_at=request.decided_at,
+                    actor=decided_by,
+                )
+            except EmergencyStopError as exc:
+                raise WorkflowSimulationRunError(str(exc)) from exc
+
+        reservation, created = self._reserve_decision(payload)
+        if not created:
+            return self._record_for_exact_decision(reservation, payload)
+
+        with self._journal.write_session():
+            records_before = self._read_journal_for_evidence()
+            try:
+                decision_record = ticket_book.apply_decision(approval_request)
+            except ApprovalTicketError as exc:
+                raise WorkflowSimulationRunError(str(exc)) from exc
+            node_statuses = self._journal_decision_node_statuses(
+                record,
+                request,
+            )
+            updated = replace(
+                record,
+                status=("approved_not_executed" if request.decision == "approved" else "rejected"),
+                updated_at=request.decided_at,
+                approval_decision=decision_record,
+                node_statuses=node_statuses,
+                journal_references=tuple(node.journal_reference for node in node_statuses),
+            )
+            records_after = self._read_journal_for_evidence()
+            new_records = tuple(records_after[len(records_before) :])
+            prior_manifest = tuple(
+                JournalRecord.from_json_dict(item) for item in _required_manifest(evidence)
+            )
+            expanded_manifest = (*prior_manifest, *new_records)
+
+        finalized = self._finalize_decision(
+            updated,
+            decision_record,
+            expanded_manifest,
+        )
+        return self._validated_record_from_evidence(finalized)
+
     def list_runs(self, workflow_id: str) -> tuple[WorkflowSimulationRunRecord, ...]:
         _validated_identifier(workflow_id, "workflow_id")
         with self._lock:
@@ -426,6 +645,21 @@ class WorkflowSimulationRunner:
                     return existing, False
             raise _evidence_unavailable() from exc
 
+    def _reserve_decision(
+        self,
+        payload: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], bool]:
+        try:
+            return self._persistence_store.reserve_workflow_simulation_decision(payload)
+        except Exception as exc:
+            existing = self._load_evidence(str(payload["run_id"]))
+            if existing is not None:
+                if existing.get("decision_request") != dict(payload):
+                    raise WorkflowSimulationRunConflictError("conflicting decision") from exc
+                if existing.get("decision_evidence_state") == "committed":
+                    return existing, False
+            raise _evidence_unavailable() from exc
+
     def _finalize_evidence(
         self,
         record: WorkflowSimulationRunRecord,
@@ -440,6 +674,22 @@ class WorkflowSimulationRunner:
         except Exception as exc:
             raise _evidence_unavailable() from exc
 
+    def _finalize_decision(
+        self,
+        record: WorkflowSimulationRunRecord,
+        decision_record: ApprovalDecisionRecord,
+        journal_manifest: tuple[JournalRecord, ...],
+    ) -> dict[str, Any]:
+        try:
+            return self._persistence_store.finalize_workflow_simulation_decision(
+                record.run_id,
+                record,
+                decision_record,
+                journal_manifest,
+            )
+        except Exception as exc:
+            raise _evidence_unavailable() from exc
+
     def _record_for_exact_request(
         self,
         evidence: Mapping[str, Any],
@@ -447,6 +697,15 @@ class WorkflowSimulationRunner:
     ) -> WorkflowSimulationRunRecord:
         if evidence.get("request") != dict(payload):
             raise WorkflowSimulationRunError("conflicting run_id")
+        return self._validated_record_from_evidence(evidence)
+
+    def _record_for_exact_decision(
+        self,
+        evidence: Mapping[str, Any],
+        payload: Mapping[str, Any],
+    ) -> WorkflowSimulationRunRecord:
+        if evidence.get("decision_request") != dict(payload):
+            raise WorkflowSimulationRunConflictError("conflicting decision")
         return self._validated_record_from_evidence(evidence)
 
     def _read_journal_for_evidence(self) -> tuple[JournalRecord, ...]:
@@ -523,6 +782,38 @@ class WorkflowSimulationRunner:
             )
         return tuple(statuses)
 
+    def _journal_decision_node_statuses(
+        self,
+        record: WorkflowSimulationRunRecord,
+        request: WorkflowSimulationDecisionRequest,
+    ) -> tuple[WorkflowNodeRunStatus, ...]:
+        replacements: dict[str, WorkflowNodeRunStatus] = {}
+        decision_statuses = _decision_node_statuses(request.decision)
+        for node in record.node_statuses:
+            if node.node_type not in decision_statuses:
+                continue
+            status, detail = decision_statuses[node.node_type]
+            journal_record = self._journal.append(
+                "workflow_simulation.node_status",
+                {
+                    "schema_version": 1,
+                    "workflow_id": record.workflow_id,
+                    "run_id": record.run_id,
+                    "node_id": node.node_id,
+                    "node_type": node.node_type,
+                    "status": status,
+                    "detail": detail,
+                },
+                timestamp=request.decided_at,
+            )
+            replacements[node.node_id] = replace(
+                node,
+                status=status,
+                detail=detail,
+                journal_reference=_journal_reference(journal_record.sequence),
+            )
+        return tuple(replacements.get(node.node_id, node) for node in record.node_statuses)
+
 
 def _validated_persisted_evidence(
     evidence: Mapping[str, Any],
@@ -541,6 +832,12 @@ def _validated_persisted_evidence(
         "journal_manifest_sha256",
         "created_at",
         "updated_at",
+        "decision_id",
+        "decision_request_sha256",
+        "decision_request",
+        "decision_evidence_state",
+        "decision_record",
+        "decision_updated_at",
     }
     if not isinstance(evidence, Mapping) or set(evidence) != expected_evidence_keys:
         raise _evidence_unavailable()
@@ -585,9 +882,43 @@ def _validated_persisted_evidence(
         or record.run_id != request.run_id
         or record.workflow_id != workflow_id
         or record.created_at != request.requested_at
-        or record.updated_at != request.evaluated_at
         or record.simulation_run.replay_input_reference != request.replay_input_reference
     ):
+        raise _evidence_unavailable()
+
+    decision_state = evidence["decision_evidence_state"]
+    decision_payload = evidence["decision_request"]
+    persisted_decision_record = evidence["decision_record"]
+    if decision_state is None:
+        if (
+            decision_payload is not None
+            or persisted_decision_record is not None
+            or record.approval_decision is not None
+            or record.updated_at != request.evaluated_at
+        ):
+            raise _evidence_unavailable()
+    elif decision_state == "pending":
+        raise _evidence_unavailable()
+    elif decision_state == "committed":
+        if not isinstance(decision_payload, Mapping) or not isinstance(
+            persisted_decision_record,
+            Mapping,
+        ):
+            raise _evidence_unavailable()
+        decision_record = ApprovalDecisionRecord.from_json_dict(persisted_decision_record)
+        if (
+            record.approval_decision != decision_record
+            or record.updated_at != decision_record.decided_at
+            or decision_payload.get("decision_id") != decision_record.decision_id
+            or decision_payload.get("approval_ticket_id") != decision_record.ticket_id
+            or decision_payload.get("decision") != decision_record.new_status
+            or decision_payload.get("workflow_id") != workflow_id
+            or decision_payload.get("run_id") != request.run_id
+            or decision_payload.get("expected_workflow_version")
+            != request.expected_workflow_version
+        ):
+            raise _evidence_unavailable()
+    else:
         raise _evidence_unavailable()
 
     manifest_records = tuple(JournalRecord.from_json_dict(item) for item in manifest_payload)
@@ -601,7 +932,7 @@ def _validated_persisted_evidence(
     ):
         raise _evidence_unavailable()
     for previous, current in zip(manifest_records, manifest_records[1:], strict=False):
-        if current.sequence != previous.sequence + 1:
+        if current.sequence <= previous.sequence:
             raise _evidence_unavailable()
     source_by_sequence = {source.sequence: source for source in source_records}
     if len(source_by_sequence) != len(source_records):
@@ -664,6 +995,14 @@ def _validated_persisted_evidence(
     }
     if event_types.intersection(forbidden_event_types):
         raise _evidence_unavailable()
+    if decision_state == "committed":
+        decision_record = record.approval_decision
+        if decision_record is None or not any(
+            journal_record.event_type == "approval.ticket.decided"
+            and journal_record.payload == decision_record.to_json_dict()
+            for journal_record in manifest_records
+        ):
+            raise _evidence_unavailable()
     return record
 
 
@@ -675,6 +1014,107 @@ def _payload_contains_value(value: Any, expected: str) -> bool:
     if isinstance(value, list):
         return any(_payload_contains_value(item, expected) for item in value)
     return False
+
+
+def _required_manifest(evidence: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    manifest = evidence.get("journal_manifest")
+    if not isinstance(manifest, list) or not manifest:
+        raise _evidence_unavailable()
+    if not all(isinstance(item, Mapping) for item in manifest):
+        raise _evidence_unavailable()
+    return manifest
+
+
+def _pending_ticket_from_evidence(
+    evidence: Mapping[str, Any],
+    record: WorkflowSimulationRunRecord,
+) -> ApprovalTicket:
+    candidates = []
+    for raw_record in _required_manifest(evidence):
+        journal_record = JournalRecord.from_json_dict(raw_record)
+        if journal_record.event_type != "approval.ticket.created":
+            continue
+        if not isinstance(journal_record.payload, Mapping):
+            continue
+        if journal_record.payload.get("ticket_id") == record.approval_ticket_id:
+            candidates.append(journal_record.payload)
+    if len(candidates) != 1:
+        raise _evidence_unavailable()
+    try:
+        ticket = ApprovalTicket.from_json_dict(candidates[0])
+    except ApprovalTicketError as exc:
+        raise _evidence_unavailable() from exc
+    if ticket.status != "pending":
+        raise _evidence_unavailable()
+    return ticket
+
+
+def _validate_ticket_attribution(
+    ticket: ApprovalTicket,
+    run_id: str,
+    evidence: Mapping[str, Any],
+) -> None:
+    expected_values = {
+        "ticket_id": f"{run_id}-approval-ticket",
+        "order_id": f"{run_id}-order",
+        "client_order_id": f"{run_id}-client",
+        "risk_decision_id": f"{run_id}-risk",
+    }
+    if any(getattr(ticket, field) != expected for field, expected in expected_values.items()):
+        raise _evidence_unavailable()
+    records = tuple(JournalRecord.from_json_dict(item) for item in _required_manifest(evidence))
+    bindings = {
+        "order_intent.proposed": f"{run_id}-intent",
+        "risk.decision.evaluated": f"{run_id}-risk",
+        "approval.ticket.created": f"{run_id}-approval-ticket",
+    }
+    for event_type, identifier in bindings.items():
+        matches = [
+            record
+            for record in records
+            if record.event_type == event_type
+            and _payload_contains_value(record.payload, identifier)
+        ]
+        if len(matches) != 1:
+            raise _evidence_unavailable()
+    oms_records = [
+        record
+        for record in records
+        if record.event_type == "oms.order.transitioned"
+        and _payload_contains_value(record.payload, ticket.oms_transition_reference)
+    ]
+    if len(oms_records) != 1:
+        raise _evidence_unavailable()
+
+
+def _decision_node_statuses(decision: str) -> dict[str, tuple[str, str]]:
+    if decision == "approved":
+        return {
+            "approval_ticket": (
+                "approved_not_executed",
+                "Manual simulation approval recorded; execution remains separate",
+            ),
+            "fake_broker": (
+                "blocked_pending_explicit_execution",
+                "Fake broker remains blocked pending a separate execution slice",
+            ),
+            "position_update": (
+                "blocked_pending_explicit_execution",
+                "Position update remains blocked because no execution occurred",
+            ),
+            "alert": (
+                "blocked_pending_explicit_execution",
+                "Execution alert remains blocked because no execution occurred",
+            ),
+        }
+    if decision == "rejected":
+        return {
+            "approval_ticket": ("rejected", "Manual simulation rejection recorded"),
+            "fake_broker": ("blocked_rejected", "Fake broker is blocked by rejection"),
+            "position_update": ("blocked_rejected", "Position update is blocked by rejection"),
+            "alert": ("blocked_rejected", "Execution alert is blocked by rejection"),
+        }
+    raise WorkflowSimulationRunError("decision must be approved or rejected")
 
 
 def _evidence_unavailable() -> WorkflowSimulationRunUnavailableError:

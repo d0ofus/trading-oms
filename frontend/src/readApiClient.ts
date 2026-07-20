@@ -389,6 +389,7 @@ export type ReadApiClient = {
 type ReadApiClientOptions = {
   baseUrl?: string;
   fetchImpl?: ReadApiFetch;
+  headers?: Record<string, string>;
 };
 
 export const safeFallbackOperationsSnapshot: OperationsApiSnapshot = {
@@ -674,6 +675,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
       buildUrl(options.baseUrl ?? "", path),
       path,
       resource,
+      options.headers ?? {},
     );
 
   const client: ReadApiClient = {
@@ -812,10 +814,11 @@ async function requestEnvelope<Payload>(
   url: string,
   endpointPath: string,
   expectedResource: OperationsProvenanceResource,
+  requestHeaders: Record<string, string>,
 ): Promise<ReadApiEnvelope<Payload>> {
   const response = await fetchImpl(url, {
     method: "GET",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...requestHeaders },
   });
 
   if (!response.ok) {

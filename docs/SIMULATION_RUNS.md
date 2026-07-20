@@ -68,7 +68,10 @@ The returned run record stores journal references as `journal_sequence:<sequence
 - Saved-workflow simulation runs use a separate durable adapter: the exact request, run record,
   approval reference, node statuses, and journal manifest are stored in local SQLite and strictly
   reconstructed after restart.
-- Saved-workflow run APIs stop at manual approval wait. This durability work does not add approval,
-  fake-broker, OMS, position, alert, broker, or live execution controls.
+- Saved-workflow run APIs can now durably approve or reject the exact persisted pending ticket.
+  Approval stops at `approved_not_executed`; rejection changes downstream simulation nodes to
+  `blocked_rejected`.
+- No saved-workflow decision advances OMS after approval, calls the fake broker, creates a fill or
+  position, delivers an alert, contacts a broker, or enables live execution.
 - Interrupted `pending` evidence intentionally requires operator investigation; automatic recovery
-  or deletion is not implemented.
+  or deletion is not implemented for run creation or decision evidence.
