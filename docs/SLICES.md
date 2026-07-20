@@ -2909,8 +2909,8 @@ Acceptance criteria:
 - [x] Localhost start/approve/reject, role-separation, backend restart, recovered get, exact retry,
   and single decision-event evidence pass through the Vite proxy. Browser discovery returned no
   available browser instance, so no visual-inspection claim is made.
-- [ ] The branch is committed and pushed, and an unmerged exact-head-green PR exists against
-  `main`.
+- [x] The branch is committed and pushed, and PR #50 is open against `main`; exact-head green CI
+  remains required before this slice's delivery audit is complete.
 
 Recommended following slice:
 - a separately approved, simulation-only continuation that consumes only durable
