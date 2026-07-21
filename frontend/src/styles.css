@@ -1026,7 +1026,8 @@ dd {
 }
 
 .workflow-run-start,
-.workflow-approval-panel {
+.workflow-approval-panel,
+.workflow-execution-panel {
   display: grid;
   grid-column: 1 / -1;
   gap: 14px;
@@ -1038,7 +1039,8 @@ dd {
 }
 
 .workflow-run-start .section-heading,
-.workflow-approval-panel .section-heading {
+.workflow-approval-panel .section-heading,
+.workflow-execution-panel .section-heading {
   align-items: start;
   gap: 12px;
 }
@@ -1047,13 +1049,16 @@ dd {
 .workflow-run-start .section-heading p,
 .workflow-approval-panel .section-heading h3,
 .workflow-approval-panel .section-heading p,
+.workflow-execution-panel .section-heading h3,
+.workflow-execution-panel .section-heading p,
 .workflow-run-start-ready p,
 .workflow-run-start-feedback p {
   margin: 0;
 }
 
 .workflow-run-start .section-heading h2,
-.workflow-approval-panel .section-heading h3 {
+.workflow-approval-panel .section-heading h3,
+.workflow-execution-panel .section-heading h3 {
   font-size: 1rem;
 }
 
@@ -1081,7 +1086,8 @@ dd {
 }
 
 .workflow-run-start button,
-.workflow-approval-panel button {
+.workflow-approval-panel button,
+.workflow-execution-panel button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1101,13 +1107,16 @@ dd {
 .workflow-run-start button:hover:not(:disabled),
 .workflow-run-start button:focus-visible,
 .workflow-approval-panel button:hover:not(:disabled),
-.workflow-approval-panel button:focus-visible {
+.workflow-approval-panel button:focus-visible,
+.workflow-execution-panel button:hover:not(:disabled),
+.workflow-execution-panel button:focus-visible {
   outline: 2px solid #bfdae7;
   outline-offset: 1px;
 }
 
 .workflow-run-start button:disabled,
-.workflow-approval-panel button:disabled {
+.workflow-approval-panel button:disabled,
+.workflow-execution-panel button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
 }
@@ -1147,6 +1156,49 @@ dd {
   font-size: 0.82rem;
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+
+.workflow-execution-review {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.workflow-execution-review p {
+  margin: 0;
+}
+
+.workflow-execution-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.workflow-execution-facts > div {
+  min-width: 0;
+  border-left: 3px solid #4e7d73;
+  background: #ffffff;
+  padding: 9px 10px;
+}
+
+.workflow-execution-facts dt {
+  color: #60717b;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.workflow-execution-facts dd {
+  margin: 3px 0 0;
+  color: #22343e;
+  font-size: 0.78rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.committed-execution-facts {
+  margin-top: 10px;
 }
 
 .simulation-start-confirmation {
@@ -1808,7 +1860,8 @@ dd {
 
   .workflow-library-controls,
   .workflow-metadata-fields,
-  .workflow-run-start-facts {
+  .workflow-run-start-facts,
+  .workflow-execution-facts {
     grid-template-columns: 1fr;
   }
 

@@ -50,5 +50,13 @@ journal.
 Accepted saved-workflow decisions append one `approval.ticket.decided` record and new
 `workflow_simulation.node_status` records for the approval and downstream blocked nodes. Their
 strictly increasing source sequences extend the run manifest; unrelated journal records may appear
-between run creation and a later manual decision. No accepted approval appends a post-approval OMS,
-fake-broker, fill, position, external-alert, broker, or live-order event in this bounded slice.
+between run creation and a later manual decision. Approval itself never appends a post-approval OMS,
+fake-broker, fill, position, or alert event.
+
+A separate accepted saved-workflow execution extends the manifest with exact OMS, local fake-
+broker, fill, position, protection, local alert intent/no-op dispatch, node-status, and
+`workflow_simulation.execution_completed` records. Trusted blocked attempts append
+`workflow_simulation.execution_blocked`; an emergency-stop block uses its dedicated audit event.
+Exact retries do not append again. Interrupted or corrupt evidence is preserved and unavailable,
+not silently completed. No event represents external alert delivery, real broker contact, account
+routing, or a live order.

@@ -137,14 +137,14 @@ This returns `true` when the current order state is `UNKNOWN_REQUIRES_RECONCILIA
 - Unknown broker state is represented explicitly and blocks risk-increasing decisions.
 - No network, live broker, account routing, credential, or live order-submission path is added.
 
-## Current Limitations
+## Current Integration And Limitations
 
-- State is in memory only.
-- No database-backed OMS persistence yet.
-- Approval ticket recording exists separately in `docs/APPROVAL_TICKETS.md`, but the OMS does not
-  create, look up, or apply approval tickets yet.
-- No fake broker orchestration yet.
-- No position tracking yet.
-- No reconciliation workflow yet.
-- No partial-fill cancel accounting beyond explicit cumulative filled quantity validation.
+- The standalone state machine remains in memory. Saved-workflow execution reconstructs and
+  recomputes its exact persisted `CREATED` and `PENDING_APPROVAL` history, then captures the new
+  `APPROVED`, `SUBMITTED`, `ACKNOWLEDGED`, and `FILLED` records in durable run evidence.
+- Historical restoration never re-appends prior journal records and fails on malformed,
+  out-of-order, conflicting, or snapshot-inconsistent history.
+- The bounded saved-workflow path uses the local fake broker and simulated position domains only.
+- No real broker reconciliation workflow exists.
+- No partial-fill cancel accounting exists beyond explicit cumulative filled quantity validation.
 - Callers must not put secrets in request, reason, reference, or snapshot fields.

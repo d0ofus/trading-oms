@@ -81,7 +81,7 @@ function inspectionItem(
     key: `${workflow.workflow_id}::${run.run_id}`,
     workflowId: workflow.workflow_id,
     workflowName: workflow.display_name,
-    workflowVersion: workflow.version,
+    workflowVersion: run.expected_workflow_version,
     run,
   };
 }

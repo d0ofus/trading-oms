@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal, Protocol
@@ -175,6 +176,38 @@ class AlertIntent:
             "metadata": self.metadata,
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> AlertIntent:
+        expected_keys = {
+            "schema_version",
+            "alert_id",
+            "source_event_type",
+            "source_event_reference",
+            "severity",
+            "channel",
+            "created_at",
+            "title",
+            "message",
+            "metadata",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise AlertError("alert intent fields are invalid")
+        metadata = raw_record["metadata"]
+        if not isinstance(metadata, Mapping):
+            raise AlertError("alert intent metadata must be an object")
+        return cls(
+            schema_version=raw_record["schema_version"],
+            alert_id=raw_record["alert_id"],
+            source_event_type=raw_record["source_event_type"],
+            source_event_reference=raw_record["source_event_reference"],
+            severity=raw_record["severity"],
+            channel=raw_record["channel"],
+            created_at=raw_record["created_at"],
+            title=raw_record["title"],
+            message=raw_record["message"],
+            metadata=dict(metadata),
+        )
+
 
 @dataclass(frozen=True)
 class AlertDispatchRequest:
@@ -286,6 +319,42 @@ class AlertDispatchOutcome:
             "formatted_payload": self.formatted_payload,
             "alert": self.alert,
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> AlertDispatchOutcome:
+        expected_keys = {
+            "schema_version",
+            "dispatch_id",
+            "alert_id",
+            "severity",
+            "channel",
+            "status",
+            "dispatcher",
+            "dispatched_at",
+            "reason",
+            "formatted_payload",
+            "alert",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise AlertError("alert dispatch outcome fields are invalid")
+        formatted_payload = raw_record["formatted_payload"]
+        alert = raw_record["alert"]
+        if not isinstance(formatted_payload, Mapping) or not isinstance(alert, Mapping):
+            raise AlertError("alert dispatch nested fields are invalid")
+        typed_alert = AlertIntent.from_json_dict(alert)
+        return cls(
+            schema_version=raw_record["schema_version"],
+            dispatch_id=raw_record["dispatch_id"],
+            alert_id=raw_record["alert_id"],
+            severity=raw_record["severity"],
+            channel=raw_record["channel"],
+            status=raw_record["status"],
+            dispatcher=raw_record["dispatcher"],
+            dispatched_at=raw_record["dispatched_at"],
+            reason=raw_record["reason"],
+            formatted_payload=dict(formatted_payload),
+            alert=typed_alert.to_json_dict(),
+        )
 
 
 class AlertBook:

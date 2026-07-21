@@ -222,6 +222,28 @@ describe("App", () => {
     expect(`${loadingText} ${emptyText} ${errorText}`).not.toContain("Protection monitored");
   });
 
+  it("renders an explicit simulation-only execution review for committed approval evidence", () => {
+    const html = renderToStaticMarkup(
+      <App
+        initialReadState={executionReadyReadState}
+        initialWorkflowRunInspectionState={approvedWorkflowRunInspectionState}
+      />,
+    );
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Durable simulation execution");
+    expect(text).toContain("SIMULATION ONLY");
+    expect(text).toContain("workflow-run-backend-002-approved-decision");
+    expect(text).toContain("workflow-run-backend-002-risk");
+    expect(text).toContain("workflow-run-backend-002-intent");
+    expect(text).toContain("Persisted plan required by passed risk");
+    expect(text).toContain("Expected protection is present in the deterministic simulation");
+    expect(text).toContain("Review simulation execution");
+    for (const forbiddenAction of ["Connect IBKR", "Execute live order", "Send external alert"]) {
+      expect(text).not.toContain(forbiddenAction);
+    }
+  });
+
   it("renders read-only audit explorer filters and event detail", () => {
     const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -698,6 +720,54 @@ const loadedWorkflowRunInspectionState: WorkflowRunInspectionState = {
   errorMessage: null,
 };
 
+const executionReadyReadState: ReadApiLoadState = {
+  status: "loaded",
+  snapshot: {
+    ...backendSnapshot,
+    emergencyStop: {
+      ...backendSnapshot.emergencyStop,
+      active: false,
+      status: "inactive",
+      blocking_risk_increasing_actions: false,
+    },
+  },
+  errorMessage: null,
+};
+
+const approvedWorkflowRun = workflowRunItem(
+  "workflow-run-backend-002",
+  "2026-07-15T02:00:00Z",
+  70,
+);
+
+const approvedWorkflowRunInspectionState: WorkflowRunInspectionState = {
+  status: "loaded",
+  items: [
+    {
+      ...approvedWorkflowRun,
+      run: {
+        ...approvedWorkflowRun.run,
+        status: "approved_not_executed",
+        approval_decision: {
+          schema_version: 1,
+          decision_id: "workflow-run-backend-002-approved-decision",
+          ticket_id: "ticket-workflow-run-002",
+          previous_status: "pending",
+          new_status: "approved",
+          decided_at: "2026-07-15T02:01:00Z",
+          actor: "approver-operator-001",
+          decision_reference: "workflow-run-backend-002-manual-review",
+          reason: "operator_reviewed_simulation_evidence",
+          request: {},
+          ticket: {},
+        },
+        execution: null,
+      },
+    },
+  ],
+  errorMessage: null,
+};
+
 const emptyWorkflowRunInspectionState: WorkflowRunInspectionState = {
   status: "loaded",
   items: [],
@@ -719,6 +789,7 @@ function workflowRunItem(runId: string, updatedAt: string, journalSequence: numb
     run: {
       schema_version: 1 as const,
       workflow_id: "workflow-backend-001",
+      expected_workflow_version: 4,
       run_id: runId,
       status: "waiting_for_approval" as const,
       created_at: updatedAt,

@@ -57,6 +57,7 @@ import {
 import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
 import { WorkflowPersistencePanel } from "./WorkflowPersistencePanel";
 import { WorkflowSimulationApprovalPanel } from "./WorkflowSimulationApprovalPanel";
+import { WorkflowSimulationExecutionPanel } from "./WorkflowSimulationExecutionPanel";
 import { WorkflowSimulationRunStartPanel } from "./WorkflowSimulationRunStartPanel";
 import {
   compileVisualWorkflowDsl,
@@ -102,6 +103,13 @@ import {
   type WorkflowSimulationRunAttempt,
   type WorkflowSimulationRunStartState,
 } from "./workflowSimulationRunStart";
+import {
+  executeWorkflowSimulationExecution,
+  prepareWorkflowSimulationExecution,
+  workflowSimulationExecutionEligibility as evaluateWorkflowSimulationExecutionEligibility,
+  type WorkflowSimulationExecutionAttempt,
+  type WorkflowSimulationExecutionState,
+} from "./workflowSimulationExecution";
 
 type Tone = "neutral" | "good" | "warning" | "critical" | "info";
 type LocalOperatorRole = "admin" | "approver";
@@ -235,6 +243,12 @@ export function App({
   const [workflowSimulationDecisionReason, setWorkflowSimulationDecisionReason] = useState(
     "operator_reviewed_simulation_evidence",
   );
+  const [workflowSimulationExecution, setWorkflowSimulationExecution] =
+    useState<WorkflowSimulationExecutionState>({ status: "idle" });
+  const [workflowSimulationExecutionConfirmed, setWorkflowSimulationExecutionConfirmed] =
+    useState(false);
+  const [expectedSimulationProtectionPresent, setExpectedSimulationProtectionPresent] =
+    useState(true);
   const [localOperatorRole, setLocalOperatorRole] = useState<LocalOperatorRole>("admin");
   const localOperatorHeaders = useMemo(
     () => ({
@@ -343,6 +357,16 @@ export function App({
     evaluateWorkflowSimulationDecisionEligibility(
       selectedWorkflowRun,
       workflowSimulationDecisionContext,
+    );
+  const workflowSimulationExecutionContext = {
+    canAdministerSystem: snapshot.operatorSession.can_administer_system,
+    emergencyStopActive: snapshot.emergencyStop.active,
+    actor: snapshot.operatorSession.operator_id,
+  };
+  const workflowSimulationExecutionEligibility =
+    evaluateWorkflowSimulationExecutionEligibility(
+      selectedWorkflowRun,
+      workflowSimulationExecutionContext,
     );
 
   useEffect(() => {
@@ -487,12 +511,18 @@ export function App({
     setWorkflowSimulationDecisionConfirmed(false);
   };
 
+  const resetWorkflowSimulationExecution = () => {
+    setWorkflowSimulationExecution({ status: "idle" });
+    setWorkflowSimulationExecutionConfirmed(false);
+  };
+
   const selectLocalOperatorRole = (role: LocalOperatorRole) => {
     if (role === localOperatorRole) {
       return;
     }
     resetWorkflowSimulationRunStart();
     resetWorkflowSimulationDecision();
+    resetWorkflowSimulationExecution();
     setLocalOperatorRole(role);
     setReadState(initialReadApiState);
   };
@@ -542,10 +572,103 @@ export function App({
     setSelectedWorkflowRunKey(selectedKey);
     setWorkflowSimulationDecisionConfirmed(false);
     setWorkflowSimulationDecision(result);
+    resetWorkflowSimulationExecution();
+  };
+
+  const reviewWorkflowSimulationExecution = () => {
+    setWorkflowSimulationExecutionConfirmed(false);
+    setWorkflowSimulationExecution(
+      prepareWorkflowSimulationExecution(
+        selectedWorkflowRun,
+        workflowSimulationExecutionContext,
+        expectedSimulationProtectionPresent,
+      ),
+    );
+  };
+
+  const applyWorkflowSimulationExecution = async (
+    attempt: WorkflowSimulationExecutionAttempt,
+  ) => {
+    const currentEligibility = evaluateWorkflowSimulationExecutionEligibility(
+      selectedWorkflowRun,
+      workflowSimulationExecutionContext,
+    );
+    if (currentEligibility.status !== "eligible") {
+      setWorkflowSimulationExecution({
+        status:
+          currentEligibility.status === "recovered"
+            ? "conflict"
+            : currentEligibility.status,
+        message: currentEligibility.message,
+        attempt,
+      });
+      return;
+    }
+    if (
+      selectedWorkflowRun?.workflowId !== attempt.workflowId ||
+      selectedWorkflowRun.workflowVersion !== attempt.workflowVersion ||
+      selectedWorkflowRun.run.run_id !== attempt.runId ||
+      selectedWorkflowRun.run.approval_ticket_id !== attempt.request.approval_ticket_id ||
+      selectedWorkflowRun.run.approval_decision?.decision_id !==
+        attempt.request.approval_decision_id
+    ) {
+      setWorkflowSimulationExecution({
+        status: "conflict",
+        message: "Approved simulation evidence changed; reload before continuing",
+        attempt,
+      });
+      return;
+    }
+
+    setWorkflowSimulationExecution({ status: "executing", attempt });
+    const result = await executeWorkflowSimulationExecution(workflowClient, attempt);
+    if (result.status !== "success") {
+      setWorkflowSimulationExecution(result);
+      return;
+    }
+    const refreshed = await loadWorkflowRunInspection(workflowClient);
+    setWorkflowRunInspection(refreshed);
+    const selectedKey = `${attempt.workflowId}::${attempt.runId}`;
+    const refreshedItem =
+      refreshed.status === "loaded"
+        ? refreshed.items.find((item) => item.key === selectedKey)
+        : undefined;
+    if (!refreshedItem || JSON.stringify(refreshedItem.run) !== JSON.stringify(result.record)) {
+      setWorkflowSimulationExecution({
+        status: "unavailable",
+        message: "Execution response was received but durable evidence reload is unavailable",
+        attempt,
+      });
+      return;
+    }
+    setSelectedWorkflowRunKey(selectedKey);
+    setWorkflowSimulationExecutionConfirmed(false);
+    setWorkflowSimulationExecution(result);
+  };
+
+  const confirmWorkflowSimulationExecution = () => {
+    if (
+      workflowSimulationExecution.status !== "confirming" ||
+      !workflowSimulationExecutionConfirmed
+    ) {
+      return;
+    }
+    void applyWorkflowSimulationExecution(workflowSimulationExecution.attempt);
+  };
+
+  const retryWorkflowSimulationExecution = () => {
+    if (
+      workflowSimulationExecution.status !== "unavailable" ||
+      !workflowSimulationExecution.attempt
+    ) {
+      return;
+    }
+    void applyWorkflowSimulationExecution(workflowSimulationExecution.attempt);
   };
 
   const selectWorkflowDefinition = (workflowId: string | null) => {
     resetWorkflowSimulationRunStart();
+    resetWorkflowSimulationExecution();
     setSelectedWorkflowId(workflowId);
     setWorkflowPersistenceOperation({ status: "idle" });
   };
@@ -558,6 +681,7 @@ export function App({
       return;
     }
     resetWorkflowSimulationRunStart();
+    resetWorkflowSimulationExecution();
     setWorkflowPersistenceOperation({ status: "loading" });
     const result = await loadWorkflowDefinition(workflowClient, selectedWorkflowId);
     if (result.status === "unavailable") {
@@ -591,6 +715,7 @@ export function App({
       return;
     }
     resetWorkflowSimulationRunStart();
+    resetWorkflowSimulationExecution();
     const editorState = createInitialVisualWorkflowEditorState();
     setVisualWorkflowEditorState(editorState);
     setWorkflowMetadata(defaultWorkflowMetadata);
@@ -606,6 +731,7 @@ export function App({
 
   const applyWorkflowPersistence = async (intent: "create" | "update") => {
     resetWorkflowSimulationRunStart();
+    resetWorkflowSimulationExecution();
     const expectedVersion = intent === "update" ? loadedWorkflowRecord?.version ?? null : null;
     const attemptKey = `${intent}:${expectedVersion ?? "new"}:${currentWorkflowFingerprint}`;
     const requestedAt =
@@ -968,6 +1094,7 @@ export function App({
                       onChange={(event) => {
                         setSelectedWorkflowRunKey(event.target.value);
                         resetWorkflowSimulationDecision();
+                        resetWorkflowSimulationExecution();
                       }}
                       value={selectedWorkflowRun.key}
                     >
@@ -1026,6 +1153,23 @@ export function App({
                   reason={workflowSimulationDecisionReason}
                   selected={selectedWorkflowRun}
                   state={workflowSimulationDecision}
+                />
+
+                <WorkflowSimulationExecutionPanel
+                  confirmed={workflowSimulationExecutionConfirmed}
+                  eligibility={workflowSimulationExecutionEligibility}
+                  expectedProtectionPresent={expectedSimulationProtectionPresent}
+                  onCancel={resetWorkflowSimulationExecution}
+                  onConfirm={confirmWorkflowSimulationExecution}
+                  onConfirmationChange={setWorkflowSimulationExecutionConfirmed}
+                  onExpectedProtectionChange={(present) => {
+                    setExpectedSimulationProtectionPresent(present);
+                    resetWorkflowSimulationExecution();
+                  }}
+                  onRetry={retryWorkflowSimulationExecution}
+                  onReview={reviewWorkflowSimulationExecution}
+                  selected={selectedWorkflowRun}
+                  state={workflowSimulationExecution}
                 />
 
                 <div className="run-history" aria-label="Saved workflow simulation run history">

@@ -69,9 +69,14 @@ The returned run record stores journal references as `journal_sequence:<sequence
   approval reference, node statuses, and journal manifest are stored in local SQLite and strictly
   reconstructed after restart.
 - Saved-workflow run APIs can now durably approve or reject the exact persisted pending ticket.
-  Approval stops at `approved_not_executed`; rejection changes downstream simulation nodes to
-  `blocked_rejected`.
-- No saved-workflow decision advances OMS after approval, calls the fake broker, creates a fill or
-  position, delivers an alert, contacts a broker, or enables live execution.
+  Approval itself stops at `approved_not_executed`; rejection changes downstream simulation nodes
+  to `blocked_rejected` and permanently blocks execution.
+- A separate Admin-only command can consume exact committed `approved_not_executed` evidence and
+  durably run the existing OMS/fake-broker simulation path. Completed records include deterministic
+  OMS transitions, fake fill, position, protection, local/no-op alert, node-status, and journal
+  evidence. The run remains bound to its persisted saved version even if the editable definition
+  later changes.
 - Interrupted `pending` evidence intentionally requires operator investigation; automatic recovery
-  or deletion is not implemented for run creation or decision evidence.
+  or deletion is not implemented for run creation, decision, or execution evidence.
+- No saved-workflow path contacts a broker, sends an external alert, submits a real order, or
+  enables live execution.

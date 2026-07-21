@@ -2917,3 +2917,68 @@ Recommended following slice:
   `approved_not_executed` evidence and advances the existing OMS/fake-broker path with durable
   fill, position, protection, alert, and journal evidence;
 - Candidate 063, IBKR transport, deployment, production rollout, and live trading remain deferred.
+
+---
+
+## Non-broker candidate - durable approved saved-workflow simulation execution
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; explicit simulation execution only
+
+branch: `candidate-slice-durable-approved-workflow-simulation-execution`
+
+Goal:
+Allow a separately authorized local Admin to deliberately consume one exact committed
+`approved_not_executed` saved-workflow run and durably advance it through the existing local OMS,
+fake broker, simulated position, protection, local alert, and append-only journal path.
+
+Scope:
+- additive local SQLite schema-v4 execution reservation and committed evidence;
+- exact persisted workflow-version, run, ticket, decision, order-intent, risk, and OMS attribution;
+- Admin-only workflow/run-scoped execute endpoint with actor binding and Approver separation;
+- emergency-stop, approval-expiry, protection-plan, and known simulated-broker-state gates;
+- deterministic OMS `APPROVED` through `FILLED`, local fake acknowledgement/fill, position,
+  protection observation, and local/no-op alert evidence;
+- exact committed retry and restart recovery without duplicate side effects or journal records;
+- deliberate two-stage `SIMULATION ONLY` inspector action with exact consumed safety facts.
+
+Completed:
+- [x] The ExecPlan was the first branch edit and was maintained through verification.
+- [x] Approval remains non-executing; only a separate Admin action can execute.
+- [x] Rejected, expired, stale, mismatched, unknown-state, emergency-stopped, interrupted,
+  malformed, digest-invalid, source-mismatched, and contradictory evidence fails closed.
+- [x] Execution is reserved before OMS/fake-broker side effects; exact retries recover idempotently
+  after restart, while conflicting and simultaneous requests are rejected without duplication.
+- [x] Missing expected protection creates a critical local/no-op alert and a durable block on
+  further risk-increasing actions.
+- [x] The selected-run UI shows review, confirmation, executing, completion, protection block,
+  conflict, unavailable, and recovered states and reloads backend evidence after success.
+
+Non-goals:
+- automatic execution, automatic retry, automatic repair, or deletion of interrupted evidence;
+- IBKR SDK, socket, probe, contract lookup, host/port, account, credential, or broker transport;
+- external alert delivery, deployment, production rollout, readiness-gate relaxation, or live
+  trading;
+- Candidate 063 implementation or any relaxation of its separate approval and review gates.
+
+Acceptance criteria:
+- [x] Full Windows verification passes with 663 backend and 150 frontend tests, Ruff formatting and
+  lint, TypeScript type checking, frontend lint, repository security checks, and resilience tests.
+- [x] The production frontend build passes; the existing Vite chunk-size warning remains advisory.
+- [x] Through the real Vite proxy, Admin approval is denied, Approver execution is denied, approval
+  ends at `approved_not_executed`, active emergency stop blocks execution, and Admin execution
+  produces the exact deterministic OMS/fake-fill/position/protection/local-alert result.
+- [x] After a real backend restart, recovered get and exact retry return identical committed
+  evidence and append zero journal lines.
+- [x] Browser discovery and its required troubleshooting retry found no available browser instance,
+  so no screenshot or visual-inspection claim is made; rendering and safety states remain covered
+  by 150 frontend tests.
+- [x] No broker transport, account/secret field, external alert, deployment, production, or live-
+  trading capability is introduced.
+
+Recommended following slice:
+- project durable saved-run execution evidence into the existing orders, positions, alerts, and
+  audit read APIs so the broader operations shell reflects real local simulation results rather
+  than separate representative read-model data;
+- keep Candidate 063, IBKR transport, deployment, production rollout, and live trading deferred.

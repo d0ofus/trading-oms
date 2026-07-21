@@ -31,7 +31,9 @@ the emergency stop, and stops at manual approval. It adds no broker transport.
 Saved-workflow run requests, approval-wait records, node statuses, and journal manifests now persist
 locally across backend restart with exact retry idempotency and fail-closed integrity checks.
 Separately authorized operators can now durably approve or reject the exact persisted ticket.
-Approval stops at `approved_not_executed`; execution remains a separate unimplemented gate.
+Approval itself stops at `approved_not_executed`. A separately authorized Admin can now consume
+that exact committed evidence through a deliberate simulation-only command, producing durable OMS,
+fake-fill, position, protection, local-alert, and journal evidence. No broker transport is added.
 
 ## Phase 6: Alerts
 

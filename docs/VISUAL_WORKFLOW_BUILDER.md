@@ -134,6 +134,22 @@ it reloads the API-backed operator session and sends the same selected identity 
 workflow, and decision requests. Admin can save and start but cannot decide; Approver can inspect
 and decide but cannot administer or start. Production rejects this local-header auth model.
 
+## Durable Approved Simulation Execution
+
+For a selected durable `approved_not_executed` run, the inspector exposes a separate Admin-only
+`SIMULATION ONLY` review action. It shows the run's persisted saved version and exact approval,
+order-intent, risk, OMS order, and protection facts. The operator reviews first and then checks a
+second confirmation before one explicit execution request is sent.
+
+The request uses the run's persisted version, not the current editable workflow version. Success
+reloads the inspector and shows durable deterministic OMS, fake-fill, position, protection, local-
+alert, and journal evidence. Conflict, emergency-stop, unavailable, critical protection, and
+restart-recovery states remain explicit. Approval never triggers execution automatically, and an
+Approver cannot use the Admin execution action.
+
+No builder node or control can select a broker, account, host, port, credential, external alert,
+live mode, production rollout, or arbitrary execution outcome.
+
 ## Safe Controls
 
 The Strategy DSL panel still exposes only:
@@ -177,8 +193,8 @@ position, and alert nodes remain blocked.
 - Node positions are page-local and reset to deterministic catalog positions when loading.
 - Saved-workflow simulation-run records and their journal manifests survive backend restart in the
   bounded local state directory. Invalid durable evidence fails closed and is not partially shown.
-- Saved-workflow approval/rejection evidence also survives restart. Approval remains deliberately
-  separated from any future execution command.
+- Saved-workflow approval/rejection and explicit simulation-execution evidence survive restart.
+  Approval remains deliberately separate and non-executing.
 - No file import or export.
 - No custom strategy types, arbitrary expressions, scripts, or code execution.
 - Local workflow storage is suitable for this bounded self-hosted development surface; production

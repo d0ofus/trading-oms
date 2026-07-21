@@ -197,6 +197,7 @@ def _workflow_definition_record() -> WorkflowDefinitionRecord:
 def _workflow_simulation_run_record() -> WorkflowSimulationRunRecord:
     return WorkflowSimulationRunRecord(
         workflow_id="workflow-001",
+        expected_workflow_version=1,
         run_id="workflow-run-001",
         status="waiting_for_approval",
         created_at="2026-07-08T13:30:00Z",

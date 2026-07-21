@@ -90,6 +90,8 @@ Existing route checks:
 - read endpoints require `view_operations`;
 - simulation approval approve/reject endpoints require `approve_simulation`;
 - workflow definition create/update and saved workflow simulation start require `administer_system`;
+- explicit saved-workflow simulation execution requires `administer_system`; `approve_simulation`
+  alone cannot execute, and the body actor must match the authenticated Admin;
 - emergency stop activation/deactivation endpoints require `administer_system`;
 - approval and emergency stop mutation body `actor` values must match the authenticated operator
   id.

@@ -13,6 +13,8 @@ flatten positions, liquidate positions, transmit orders, or enable live trading.
 - While active, risk-increasing simulation and paper-mode work is blocked before approval
   execution, saved workflow simulation run start, OMS advancement, fake broker transitions, fills,
   position updates, or alert work can advance.
+- The explicit saved-workflow simulation execution command checks the stop before durable
+  execution reservation. A blocked attempt appends the dedicated emergency-stop audit event.
 - Rejecting a pending simulation approval ticket remains allowed because rejection does not
   increase risk.
 - Every blocked risk-increasing attempt is journaled.

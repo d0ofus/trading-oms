@@ -3,8 +3,9 @@
 Slice 028 added generic simulation-only approval decision endpoints. The durable saved-workflow
 approval candidate adds separate workflow/run-scoped endpoints for persisted approval-wait runs.
 
-This slice does not add broker order transmission, real account actions, OMS advancement after
-approval, fake broker execution, IBKR transport, order submission, or live trading.
+Approval remains non-executing. A later, separate Admin-only simulation command may consume a
+committed approval; it does not change the approval endpoint's behavior and cannot contact a real
+broker.
 
 ## Endpoints
 
@@ -45,8 +46,8 @@ saved-workflow run record. Approval produces `approved_not_executed`; rejection 
 
 - Endpoints apply decisions to simulation approval tickets only.
 - Approval does not submit, route, transmit, cancel, or modify any order.
-- Approval does not advance OMS state in this slice.
-- Approval does not call the fake broker in this slice.
+- Approval does not advance OMS state or call the fake broker. Execution requires a distinct
+  `/execute` request by an authenticated Admin after approval is durably committed.
 - Persisted decisions require the dedicated `approve_simulation` permission, and the body actor
   must match the authenticated operator.
 - The local UI requires an explicit switch from Admin to Approver review. It sends one consistent
@@ -67,5 +68,6 @@ saved-workflow run record. Approval produces `approved_not_executed`; rejection 
 - The generic demo-ticket service remains in-memory and separate from saved-workflow runs.
 - The frontend approval inbox still calls the generic endpoints. The saved-run inspector uses only
   the workflow/run-scoped endpoints.
-- Persisted approval is durable but intentionally does not execute. A later execution slice would
-  require separate review and must consume only committed approved evidence.
+- Persisted approval is durable but intentionally does not execute. The separate saved-workflow
+  execution endpoint consumes only exact committed approved evidence and preserves Admin/Approver
+  role separation.

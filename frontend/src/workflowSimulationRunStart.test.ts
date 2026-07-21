@@ -177,6 +177,7 @@ function confirmingAttempt() {
 const validRun: WorkflowSimulationRunApiView = {
   schema_version: 1,
   workflow_id: "workflow-001",
+  expected_workflow_version: 3,
   run_id: "workflow-run-fixed-id-001",
   status: "waiting_for_approval",
   created_at: "2026-07-16T06:30:00.000Z",
@@ -203,6 +204,7 @@ const validRun: WorkflowSimulationRunApiView = {
   ],
   journal_references: ["journal_sequence:2"],
   approval_decision: null,
+  execution: null,
 };
 
 function workflowClient(overrides: Partial<WorkflowApiClient>): WorkflowApiClient {
