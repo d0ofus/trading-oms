@@ -49,6 +49,23 @@ export type WorkflowSimulationDecisionRequest = {
   reason: string;
 };
 
+export type WorkflowSimulationExecutionRequest = {
+  schema_version: 1;
+  expected_workflow_version: number;
+  approval_ticket_id: string;
+  approval_decision_id: string;
+  order_intent_id: string;
+  risk_decision_id: string;
+  order_id: string;
+  execution_id: string;
+  executed_at: string;
+  actor: string;
+  execution_reference: string;
+  reason: string;
+  broker_state_known: boolean;
+  expected_protection_present: boolean;
+};
+
 export type WorkflowSimulationApprovalDecisionApiView = {
   schema_version: 1;
   decision_id: string;
@@ -72,15 +89,71 @@ export type WorkflowNodeRunStatusApiView = {
   journal_reference: string;
 };
 
+export type WorkflowSimulationExecutionApiView = {
+  schema_version: 1;
+  workflow_id: string;
+  expected_workflow_version: number;
+  run_id: string;
+  approval_ticket_id: string;
+  approval_decision_id: string;
+  order_intent_id: string;
+  risk_decision_id: string;
+  order_id: string;
+  execution_id: string;
+  executed_at: string;
+  actor: string;
+  execution_reference: string;
+  reason: string;
+  broker_state_known: true;
+  expected_protection_present: boolean;
+  protection_status: "expected_protection_present" | "missing_expected_protection";
+  risk_increasing_actions_blocked: boolean;
+  oms_transitions: Array<{ new_state: string; [key: string]: unknown }>;
+  broker_transitions: Array<{ state: string; [key: string]: unknown }>;
+  position: {
+    schema_version: 1;
+    position_id: string;
+    symbol: string;
+    quantity: number;
+    average_price: number;
+    protection_status: "expected_protection_present" | "missing_expected_protection";
+    expected_protection_kind: string;
+    updated_at: string;
+    source_fill_reference: string;
+    journal_references: string[];
+  };
+  alert_intents: Array<{
+    alert_id: string;
+    channel: string;
+    severity: string;
+    [key: string]: unknown;
+  }>;
+  alert_dispatches: Array<{
+    alert_id: string;
+    channel: string;
+    status: string;
+    dispatcher: string;
+    [key: string]: unknown;
+  }>;
+  journal_references: string[];
+};
+
 export type WorkflowSimulationRunApiView = {
   schema_version: 1;
   workflow_id: string;
+  expected_workflow_version: number;
   run_id: string;
-  status: "waiting_for_approval" | "approved_not_executed" | "rejected" | "completed";
+  status:
+    | "waiting_for_approval"
+    | "approved_not_executed"
+    | "rejected"
+    | "executed"
+    | "executed_protection_missing";
   created_at: string;
   updated_at: string;
   approval_ticket_id: string | null;
   approval_decision?: WorkflowSimulationApprovalDecisionApiView | null;
+  execution?: WorkflowSimulationExecutionApiView | null;
   simulation_run: {
     schema_version: 1;
     run_id: string;
@@ -122,6 +195,11 @@ export type WorkflowApiClient = {
     workflowId: string,
     runId: string,
     request: WorkflowSimulationDecisionRequest,
+  ) => Promise<WorkflowSimulationRunApiView>;
+  executeSimulationRun: (
+    workflowId: string,
+    runId: string,
+    request: WorkflowSimulationExecutionRequest,
   ) => Promise<WorkflowSimulationRunApiView>;
 };
 
@@ -216,6 +294,17 @@ export function createWorkflowApiClient(
         buildUrl(
           baseUrl,
           `${workflowPath(workflowId)}/simulation-runs/${encodeURIComponent(runId)}/reject`,
+        ),
+        "POST",
+        request,
+        options.headers,
+      ),
+    executeSimulationRun: (workflowId, runId, request) =>
+      requestJson<WorkflowSimulationRunApiView>(
+        fetchImpl,
+        buildUrl(
+          baseUrl,
+          `${workflowPath(workflowId)}/simulation-runs/${encodeURIComponent(runId)}/execute`,
         ),
         "POST",
         request,

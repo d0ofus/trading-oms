@@ -47,7 +47,7 @@ def test_local_persistence_initializes_schema_idempotently(
     store.initialize()
     store.initialize()
 
-    assert store.schema_version() == 3
+    assert store.schema_version() == 4
     assert _table_names(local_database_path) == {
         "journal_index",
         "read_model_snapshots",
@@ -94,7 +94,7 @@ def test_local_persistence_migrates_schema_one_without_discarding_legacy_data(
     store = LocalSqlitePersistenceStore(local_database_path)
     store.initialize()
 
-    assert store.schema_version() == 3
+    assert store.schema_version() == 4
     assert "workflow_simulation_run_evidence" in _table_names(local_database_path)
     connection = sqlite3.connect(local_database_path)
     try:
@@ -250,7 +250,7 @@ def test_local_persistence_init_command_creates_database(local_database_path: Pa
     assert persistence_main(["init", "--database", str(database_path)]) == 0
 
     store = LocalSqlitePersistenceStore(database_path)
-    assert store.schema_version() == 3
+    assert store.schema_version() == 4
 
 
 def _table_names(database_path: Path) -> set[str]:
@@ -279,6 +279,7 @@ def _workflow_definition_record() -> WorkflowDefinitionRecord:
 def _workflow_simulation_run_record() -> WorkflowSimulationRunRecord:
     return WorkflowSimulationRunRecord(
         workflow_id="workflow-001",
+        expected_workflow_version=1,
         run_id="workflow-run-001",
         status="waiting_for_approval",
         created_at="2026-07-08T13:30:00Z",

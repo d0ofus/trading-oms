@@ -1,8 +1,8 @@
 # Local Persistence
 
 Slice 040 added a local SQLite persistence foundation for simulation and inspection data. The
-durable saved-workflow simulation-run candidate added schema version 2, and durable manual
-decisions add schema version 3.
+durable saved-workflow simulation-run candidate added schema version 2, durable manual decisions
+added schema version 3, and durable approved simulation execution adds schema version 4.
 
 It is a local-only persistence layer. It does not add production database deployment, broker
 transport, IBKR connectivity, live trading, real alert delivery, credentials, account IDs, or order
@@ -18,8 +18,8 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
 ```
 
 The command is deterministic and idempotent. It creates the schema if needed and records migration
-version `3`. Existing version-1 and version-2 databases migrate additively and retain their legacy
-tables and records.
+version `4`. Existing version-1, version-2, and version-3 databases migrate additively and retain
+their legacy tables and records.
 
 ## Tables
 
@@ -41,6 +41,12 @@ attribution, `pending` or `committed` state, typed run record, approval-ticket r
 statuses, canonical journal manifest, and manifest digest. Schema version 3 adds nullable
 decision identity, request digest, request JSON, evidence state, typed decision record, and update
 timestamp columns plus a unique partial decision-ID index.
+
+Schema version 4 adds nullable execution identity, request digest, canonical request JSON,
+`pending` or `committed` execution state, typed execution record, and update timestamp columns plus
+a unique partial execution-ID index. Rows without execution require all execution columns to be
+null. Pending rows contain the exact reserved command and no result. Committed rows contain a
+strict execution record whose identities and manifest events match the persisted run.
 
 ## Write And Recovery Contract
 
@@ -69,6 +75,14 @@ SQLite atomically commits the typed decision, updated run, expanded manifest, an
 or corrupt decision makes the run unavailable; it is never displayed as approved or retried
 automatically.
 
+Explicit saved-workflow execution follows that boundary a third time. The service validates the
+complete committed run and approval, role/actor, emergency stop, expiry, saved version, identity
+tuple, OMS history, risk result, protection plan, and simulated broker-state observation before
+reserving the canonical execution request. It then uses only the existing OMS and fake broker,
+captures deterministic fill/position/protection/local-alert evidence, and finalizes one typed
+execution result. Exact committed retries recover without side effects; pending or corrupt
+execution evidence fails closed before retry logic.
+
 ## Safety Boundary
 
 Before writing JSON payloads, the persistence store rejects:
@@ -92,8 +106,9 @@ evidence under `.tmp/trading-oms-local-state`. Saved workflow run list/get and t
 recover after backend reconstruction or process restart. The JSONL journal remains the audit source
 of truth; the SQLite manifest is an integrity binding and lookup record, not a replacement journal.
 
-Committed saved-workflow approval/rejection evidence recovers through the same list/get APIs.
-Approval remains `approved_not_executed`; persistence does not route or execute it.
+Committed saved-workflow approval/rejection and explicit execution evidence recover through the
+same list/get APIs. Approval alone remains `approved_not_executed`; only the separate Admin command
+can execute, and persistence never routes to a real broker.
 
 This is bounded local development storage. It is not a production database, backup/restore design,
 multi-host writer, deployment approval, broker-session record, or paper/live trading history.

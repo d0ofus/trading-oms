@@ -15,7 +15,10 @@ from trading_oms_backend.approval_tickets import ApprovalDecisionRecord
 from trading_oms_backend.event_journal import JournalRecord
 from trading_oms_backend.read_models import OperationsReadModel
 from trading_oms_backend.workflow_definitions import WorkflowDefinitionRecord
-from trading_oms_backend.workflow_simulation_runs import WorkflowSimulationRunRecord
+from trading_oms_backend.workflow_simulation_runs import (
+    WorkflowSimulationExecutionRecord,
+    WorkflowSimulationRunRecord,
+)
 
 
 class LocalPersistenceError(ValueError):
@@ -117,6 +120,25 @@ WORKFLOW_SIMULATION_DECISION_KEYS = {
     "actor",
     "decision_reference",
     "reason",
+}
+
+WORKFLOW_SIMULATION_EXECUTION_KEYS = {
+    "schema_version",
+    "workflow_id",
+    "expected_workflow_version",
+    "run_id",
+    "approval_ticket_id",
+    "approval_decision_id",
+    "order_intent_id",
+    "risk_decision_id",
+    "order_id",
+    "execution_id",
+    "executed_at",
+    "actor",
+    "execution_reference",
+    "reason",
+    "broker_state_known",
+    "expected_protection_present",
 }
 
 WORKFLOW_SIMULATION_REQUEST_KEYS = {
@@ -246,15 +268,16 @@ class LocalSqlitePersistenceStore:
                 (2, MIGRATION_APPLIED_AT),
             )
             _ensure_migration_3(connection)
+            _ensure_migration_4(connection)
 
     def schema_version(self) -> int:
         self.initialize()
         with self._connect() as connection:
             row = connection.execute("SELECT max(version) FROM schema_migrations").fetchone()
         version = None if row is None else row[0]
-        if version != 3:
-            raise LocalPersistenceError("local persistence schema_version must be 3")
-        return 3
+        if version != 4:
+            raise LocalPersistenceError("local persistence schema_version must be 4")
+        return 4
 
     def put_workflow_definition(self, record: WorkflowDefinitionRecord) -> None:
         if not isinstance(record, WorkflowDefinitionRecord):
@@ -640,6 +663,160 @@ class LocalSqlitePersistenceStore:
             ).fetchone()
             return _workflow_simulation_evidence_from_row(finalized)
 
+    def reserve_workflow_simulation_execution(
+        self,
+        request_payload: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], bool]:
+        request = _normalized_payload(
+            request_payload,
+            "workflow simulation execution request",
+        )
+        _validate_workflow_simulation_execution_request(request)
+        request_json = _stable_payload_json(request, "workflow simulation execution request")
+        request_sha256 = _sha256(request_json)
+        run_id = request["run_id"]
+
+        self.initialize()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM workflow_simulation_run_evidence WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                raise LocalPersistenceError("unknown workflow simulation run")
+            evidence = _workflow_simulation_evidence_from_row(row)
+            if (
+                evidence["evidence_state"] != "committed"
+                or evidence["decision_evidence_state"] != "committed"
+            ):
+                raise LocalPersistenceError("workflow simulation approval evidence is unavailable")
+            if (
+                evidence["workflow_id"] != request["workflow_id"]
+                or evidence["expected_workflow_version"] != request["expected_workflow_version"]
+                or evidence["decision_id"] != request["approval_decision_id"]
+            ):
+                raise LocalPersistenceError(
+                    "workflow simulation execution attribution is inconsistent"
+                )
+
+            reservation_created = evidence["execution_evidence_state"] is None
+            if reservation_created:
+                try:
+                    connection.execute(
+                        """
+                        UPDATE workflow_simulation_run_evidence
+                        SET execution_id = ?,
+                            execution_request_sha256 = ?,
+                            execution_request_json = ?,
+                            execution_evidence_state = 'pending',
+                            execution_record_json = NULL,
+                            execution_updated_at = ?
+                        WHERE run_id = ? AND execution_evidence_state IS NULL
+                        """,
+                        (
+                            request["execution_id"],
+                            request_sha256,
+                            request_json,
+                            request["executed_at"],
+                            run_id,
+                        ),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise LocalPersistenceError(
+                        "conflicting workflow simulation execution_id"
+                    ) from exc
+                row = connection.execute(
+                    "SELECT * FROM workflow_simulation_run_evidence WHERE run_id = ?",
+                    (run_id,),
+                ).fetchone()
+                evidence = _workflow_simulation_evidence_from_row(row)
+            if (
+                evidence["execution_request_sha256"] != request_sha256
+                or evidence["execution_request"] != request
+            ):
+                raise LocalPersistenceError("conflicting workflow simulation execution")
+            return evidence, reservation_created
+
+    def finalize_workflow_simulation_execution(
+        self,
+        run_id: str,
+        record: WorkflowSimulationRunRecord,
+        execution_record: WorkflowSimulationExecutionRecord,
+        journal_records: tuple[JournalRecord, ...],
+    ) -> dict[str, Any]:
+        _validated_identifier(run_id, "run_id")
+        if not isinstance(record, WorkflowSimulationRunRecord) or record.run_id != run_id:
+            raise LocalPersistenceError("updated workflow simulation record is invalid")
+        if not isinstance(execution_record, WorkflowSimulationExecutionRecord):
+            raise LocalPersistenceError(
+                "execution_record must be WorkflowSimulationExecutionRecord"
+            )
+        if record.execution != execution_record:
+            raise LocalPersistenceError("record execution must match execution_record")
+        if not isinstance(journal_records, tuple) or not journal_records:
+            raise LocalPersistenceError("journal_records must be a non-empty tuple")
+        if not all(isinstance(item, JournalRecord) for item in journal_records):
+            raise LocalPersistenceError("journal_records must contain JournalRecord values")
+
+        record_json = _stable_payload_json(record.to_json_dict(), "workflow simulation run record")
+        execution_record_json = _stable_payload_json(
+            execution_record.to_json_dict(),
+            "workflow simulation execution record",
+        )
+        manifest = [journal_record.to_json_dict() for journal_record in journal_records]
+        manifest_json = _stable_json_value(manifest, "workflow simulation journal manifest")
+        manifest_sha256 = _sha256(manifest_json)
+
+        self.initialize()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM workflow_simulation_run_evidence WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            evidence = _workflow_simulation_evidence_from_row(row)
+            request = evidence["execution_request"]
+            if evidence["execution_evidence_state"] != "pending" or not isinstance(request, dict):
+                raise LocalPersistenceError("workflow simulation execution is not pending")
+            expected_bindings = {
+                "execution_id": execution_record.execution_id,
+                "approval_ticket_id": execution_record.approval_ticket_id,
+                "approval_decision_id": execution_record.approval_decision_id,
+                "order_intent_id": execution_record.order_intent_id,
+                "risk_decision_id": execution_record.risk_decision_id,
+                "order_id": execution_record.order_id,
+            }
+            if any(request[key] != value for key, value in expected_bindings.items()):
+                raise LocalPersistenceError("workflow simulation execution record is inconsistent")
+            connection.execute(
+                """
+                UPDATE workflow_simulation_run_evidence
+                SET record_json = ?,
+                    journal_manifest_json = ?,
+                    journal_manifest_sha256 = ?,
+                    updated_at = ?,
+                    execution_evidence_state = 'committed',
+                    execution_record_json = ?,
+                    execution_updated_at = ?
+                WHERE run_id = ? AND execution_evidence_state = 'pending'
+                """,
+                (
+                    record_json,
+                    manifest_json,
+                    manifest_sha256,
+                    record.updated_at,
+                    execution_record_json,
+                    execution_record.executed_at,
+                    run_id,
+                ),
+            )
+            finalized = connection.execute(
+                "SELECT * FROM workflow_simulation_run_evidence WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            return _workflow_simulation_evidence_from_row(finalized)
+
     def put_operations_read_model(
         self,
         snapshot_id: str,
@@ -916,6 +1093,42 @@ def _ensure_migration_3(connection: sqlite3.Connection) -> None:
     )
 
 
+def _ensure_migration_4(connection: sqlite3.Connection) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(
+            "PRAGMA table_info(workflow_simulation_run_evidence)"
+        ).fetchall()
+    }
+    additions = {
+        "execution_id": "TEXT",
+        "execution_request_sha256": "TEXT",
+        "execution_request_json": "TEXT",
+        "execution_evidence_state": "TEXT",
+        "execution_record_json": "TEXT",
+        "execution_updated_at": "TEXT",
+    }
+    for column, data_type in additions.items():
+        if column not in columns:
+            connection.execute(
+                f"ALTER TABLE workflow_simulation_run_evidence ADD COLUMN {column} {data_type}"
+            )
+    connection.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_workflow_simulation_execution_id
+        ON workflow_simulation_run_evidence (execution_id)
+        WHERE execution_id IS NOT NULL
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+        VALUES (?, ?)
+        """,
+        (4, MIGRATION_APPLIED_AT),
+    )
+
+
 def _workflow_simulation_evidence_from_row(row: sqlite3.Row | None) -> dict[str, Any]:
     if row is None:
         raise LocalPersistenceError("workflow simulation evidence row is missing")
@@ -1028,6 +1241,65 @@ def _workflow_simulation_evidence_from_row(row: sqlite3.Row | None) -> dict[str,
                 "workflow simulation decision record",
             )
 
+    execution_state = row["execution_evidence_state"]
+    execution_values = (
+        row["execution_id"],
+        row["execution_request_sha256"],
+        row["execution_request_json"],
+        execution_state,
+        row["execution_record_json"],
+        row["execution_updated_at"],
+    )
+    if execution_state is None:
+        if any(value is not None for value in execution_values):
+            raise LocalPersistenceError("workflow simulation execution evidence is inconsistent")
+        execution_request = None
+        execution_record = None
+    else:
+        if execution_state not in {"pending", "committed"}:
+            raise LocalPersistenceError("workflow simulation execution evidence_state is invalid")
+        if decision_state != "committed":
+            raise LocalPersistenceError("workflow simulation execution requires committed approval")
+        required_values = (
+            row["execution_id"],
+            row["execution_request_sha256"],
+            row["execution_request_json"],
+            row["execution_updated_at"],
+        )
+        if any(value is None for value in required_values):
+            raise LocalPersistenceError("workflow simulation execution evidence is incomplete")
+        execution_request = _json_dict(
+            row["execution_request_json"],
+            "workflow simulation execution request",
+        )
+        _validate_workflow_simulation_execution_request(execution_request)
+        execution_request_json = _stable_payload_json(
+            execution_request,
+            "workflow simulation execution request",
+        )
+        if row["execution_request_sha256"] != _sha256(execution_request_json):
+            raise LocalPersistenceError("workflow simulation execution request digest is invalid")
+        if (
+            row["execution_id"] != execution_request["execution_id"]
+            or row["run_id"] != execution_request["run_id"]
+            or row["workflow_id"] != execution_request["workflow_id"]
+            or row["expected_workflow_version"] != execution_request["expected_workflow_version"]
+            or row["decision_id"] != execution_request["approval_decision_id"]
+        ):
+            raise LocalPersistenceError("workflow simulation execution attribution is inconsistent")
+        _parse_timestamp(row["execution_updated_at"], "execution_updated_at")
+        if execution_state == "pending":
+            if row["execution_record_json"] is not None:
+                raise LocalPersistenceError("pending workflow simulation execution is inconsistent")
+            execution_record = None
+        else:
+            if row["execution_record_json"] is None:
+                raise LocalPersistenceError("committed workflow simulation execution is incomplete")
+            execution_record = _json_dict(
+                row["execution_record_json"],
+                "workflow simulation execution record",
+            )
+
     return {
         "run_id": row["run_id"],
         "workflow_id": row["workflow_id"],
@@ -1046,6 +1318,12 @@ def _workflow_simulation_evidence_from_row(row: sqlite3.Row | None) -> dict[str,
         "decision_evidence_state": decision_state,
         "decision_record": decision_record,
         "decision_updated_at": row["decision_updated_at"],
+        "execution_id": row["execution_id"],
+        "execution_request_sha256": row["execution_request_sha256"],
+        "execution_request": execution_request,
+        "execution_evidence_state": execution_state,
+        "execution_record": execution_record,
+        "execution_updated_at": row["execution_updated_at"],
     }
 
 
@@ -1084,6 +1362,33 @@ def _validate_workflow_simulation_decision_request(request: Mapping[str, Any]) -
     _validated_identifier(request["actor"], "actor")
     _validated_identifier(request["decision_reference"], "decision_reference")
     _validated_identifier(request["reason"], "reason")
+
+
+def _validate_workflow_simulation_execution_request(request: Mapping[str, Any]) -> None:
+    if set(request) != WORKFLOW_SIMULATION_EXECUTION_KEYS:
+        raise LocalPersistenceError("workflow simulation execution request fields are invalid")
+    if request["schema_version"] != 1 or isinstance(request["schema_version"], bool):
+        raise LocalPersistenceError("workflow simulation execution schema_version must be 1")
+    _positive_integer(request["expected_workflow_version"], "expected_workflow_version")
+    for field_name in (
+        "workflow_id",
+        "run_id",
+        "approval_ticket_id",
+        "approval_decision_id",
+        "order_intent_id",
+        "risk_decision_id",
+        "order_id",
+        "execution_id",
+        "actor",
+        "execution_reference",
+        "reason",
+    ):
+        _validated_identifier(request[field_name], field_name)
+    _parse_timestamp(request["executed_at"], "executed_at")
+    if not isinstance(request["broker_state_known"], bool):
+        raise LocalPersistenceError("broker_state_known must be a boolean")
+    if not isinstance(request["expected_protection_present"], bool):
+        raise LocalPersistenceError("expected_protection_present must be a boolean")
 
 
 def _sha256(value: str) -> str:

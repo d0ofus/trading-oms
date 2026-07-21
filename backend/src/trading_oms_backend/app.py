@@ -47,6 +47,7 @@ from trading_oms_backend.workflow_definitions import (
 )
 from trading_oms_backend.workflow_simulation_runs import (
     WorkflowSimulationDecisionRequest,
+    WorkflowSimulationExecutionRequest,
     WorkflowSimulationRunConflictError,
     WorkflowSimulationRunError,
     WorkflowSimulationRunner,
@@ -99,6 +100,25 @@ class WorkflowSimulationDecisionBody(BaseModel):
     actor: str
     decision_reference: str
     reason: str
+    schema_version: int = 1
+
+
+class WorkflowSimulationExecutionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    expected_workflow_version: int = Field(gt=0)
+    approval_ticket_id: str
+    approval_decision_id: str
+    order_intent_id: str
+    risk_decision_id: str
+    order_id: str
+    execution_id: str
+    executed_at: str
+    actor: str
+    execution_reference: str
+    reason: str
+    broker_state_known: bool
+    expected_protection_present: bool
     schema_version: int = 1
 
 
@@ -459,6 +479,38 @@ def reject_workflow_simulation_run(
     )
 
 
+@app.post("/api/workflows/{workflow_id}/simulation-runs/{run_id}/execute")
+def execute_workflow_simulation_run(
+    request: Request,
+    workflow_id: str,
+    run_id: str,
+    execution: WorkflowSimulationExecutionBody,
+) -> dict[str, Any]:
+    identity = _authorize_request(
+        request,
+        permission=ADMINISTER_SYSTEM_PERMISSION,
+        resource=f"workflow_simulation_run.{workflow_id}.{run_id}",
+        action="execute",
+    )
+    try:
+        record = get_workflow_simulation_runner().execute_approved_run(
+            workflow_id,
+            run_id,
+            _workflow_simulation_execution_request(execution),
+            executed_by=identity.operator_id,
+        )
+    except WorkflowSimulationRunConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except WorkflowSimulationRunUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except WorkflowSimulationRunError as exc:
+        if "emergency stop is active" in str(exc):
+            raise HTTPException(status_code=423, detail=str(exc)) from exc
+        status_code = 404 if "unknown workflow simulation run" in str(exc) else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return record.to_json_dict()
+
+
 @app.put("/api/workflows/{workflow_id}")
 def update_workflow(
     request: Request,
@@ -813,6 +865,27 @@ def _workflow_simulation_run_request(
         evaluated_at=run.evaluated_at,
         approval_expires_at=run.approval_expires_at,
         replay_input_reference=run.replay_input_reference,
+    )
+
+
+def _workflow_simulation_execution_request(
+    execution: WorkflowSimulationExecutionBody,
+) -> WorkflowSimulationExecutionRequest:
+    return WorkflowSimulationExecutionRequest(
+        schema_version=execution.schema_version,
+        expected_workflow_version=execution.expected_workflow_version,
+        approval_ticket_id=execution.approval_ticket_id,
+        approval_decision_id=execution.approval_decision_id,
+        order_intent_id=execution.order_intent_id,
+        risk_decision_id=execution.risk_decision_id,
+        order_id=execution.order_id,
+        execution_id=execution.execution_id,
+        executed_at=execution.executed_at,
+        actor=execution.actor,
+        execution_reference=execution.execution_reference,
+        reason=execution.reason,
+        broker_state_known=execution.broker_state_known,
+        expected_protection_present=execution.expected_protection_present,
     )
 
 

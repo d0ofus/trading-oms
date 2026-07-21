@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -171,6 +172,29 @@ class OrderTransitionRequest:
             "cumulative_filled_quantity": self.cumulative_filled_quantity,
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> OrderTransitionRequest:
+        expected_keys = {
+            "schema_version",
+            "transition_id",
+            "order_id",
+            "client_order_id",
+            "symbol",
+            "side",
+            "quantity",
+            "risk_intent",
+            "target_state",
+            "occurred_at",
+            "reason",
+            "risk_decision_id",
+            "approval_reference",
+            "broker_transition_reference",
+            "cumulative_filled_quantity",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise OMSStateMachineError("transition request fields are invalid")
+        return cls(**dict(raw_record))
+
 
 @dataclass(frozen=True)
 class OrderSnapshot:
@@ -257,6 +281,30 @@ class OrderSnapshot:
             "requires_reconciliation": self.requires_reconciliation,
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> OrderSnapshot:
+        expected_keys = {
+            "schema_version",
+            "order_id",
+            "client_order_id",
+            "symbol",
+            "side",
+            "quantity",
+            "risk_intent",
+            "state",
+            "created_at",
+            "updated_at",
+            "risk_decision_id",
+            "approval_reference",
+            "broker_transition_reference",
+            "cumulative_filled_quantity",
+            "leaves_quantity",
+            "requires_reconciliation",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise OMSStateMachineError("order snapshot fields are invalid")
+        return cls(**dict(raw_record))
+
 
 @dataclass(frozen=True)
 class OrderTransitionRecord:
@@ -303,6 +351,38 @@ class OrderTransitionRecord:
             "snapshot": self.snapshot.to_json_dict(),
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> OrderTransitionRecord:
+        expected_keys = {
+            "schema_version",
+            "transition_id",
+            "order_id",
+            "previous_state",
+            "new_state",
+            "occurred_at",
+            "reason",
+            "request",
+            "snapshot",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise OMSStateMachineError("transition record fields are invalid")
+        request = raw_record["request"]
+        snapshot = raw_record["snapshot"]
+        if not isinstance(request, Mapping) or not isinstance(snapshot, Mapping):
+            raise OMSStateMachineError("transition record nested fields are invalid")
+        typed_request = OrderTransitionRequest.from_json_dict(request)
+        return cls(
+            schema_version=raw_record["schema_version"],
+            transition_id=raw_record["transition_id"],
+            order_id=raw_record["order_id"],
+            previous_state=raw_record["previous_state"],
+            new_state=raw_record["new_state"],
+            occurred_at=raw_record["occurred_at"],
+            reason=raw_record["reason"],
+            request=typed_request.to_json_dict(),
+            snapshot=OrderSnapshot.from_json_dict(snapshot),
+        )
+
 
 class OrderStateMachine:
     def __init__(self, journal: JsonlEventJournal) -> None:
@@ -344,6 +424,50 @@ class OrderStateMachine:
         self._transition_requests[request.transition_id] = request_payload
         self._transition_records[request.transition_id] = record
         return record
+
+    def restore_history(self, records: tuple[OrderTransitionRecord, ...]) -> None:
+        if not isinstance(records, tuple) or not records:
+            raise OMSStateMachineError("restored transition history must be a non-empty tuple")
+        if self._snapshots or self._transition_requests or self._transition_records:
+            raise OMSStateMachineError("OMS state machine already contains transition history")
+
+        restored = OrderStateMachine(self._journal)
+        try:
+            for record in records:
+                if not isinstance(record, OrderTransitionRecord):
+                    raise OMSStateMachineError(
+                        "restored history must contain order transition records"
+                    )
+                request = OrderTransitionRequest.from_json_dict(record.request)
+                if request.transition_id in restored._transition_requests:
+                    raise OMSStateMachineError("duplicate restored transition_id")
+                previous_snapshot = restored._snapshots.get(request.order_id)
+                previous_state = None if previous_snapshot is None else previous_snapshot.state
+                restored._validate_transition(request, previous_snapshot)
+                expected_snapshot = restored._next_snapshot(request, previous_snapshot)
+                expected_record = OrderTransitionRecord(
+                    transition_id=request.transition_id,
+                    order_id=request.order_id,
+                    previous_state=previous_state,
+                    new_state=request.target_state,
+                    occurred_at=request.occurred_at,
+                    reason=request.reason,
+                    request=request.to_json_dict(),
+                    snapshot=expected_snapshot,
+                )
+                if expected_record != record:
+                    raise OMSStateMachineError(
+                        "restored transition does not match recomputed state"
+                    )
+                restored._snapshots[request.order_id] = expected_snapshot
+                restored._transition_requests[request.transition_id] = request.to_json_dict()
+                restored._transition_records[request.transition_id] = record
+        except OMSStateMachineError as exc:
+            raise OMSStateMachineError("restored transition history is invalid") from exc
+
+        self._snapshots = restored._snapshots
+        self._transition_requests = restored._transition_requests
+        self._transition_records = restored._transition_records
 
     def current_snapshot(self, order_id: str) -> OrderSnapshot:
         order_id = _validated_identifier(order_id, "order_id")

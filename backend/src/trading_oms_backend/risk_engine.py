@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
@@ -82,6 +82,16 @@ class ProtectiveOrderPlan:
             "stop_price": self.stop_price,
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> ProtectiveOrderPlan:
+        if not isinstance(raw_record, Mapping) or set(raw_record) != {
+            "schema_version",
+            "kind",
+            "stop_price",
+        }:
+            raise RiskEngineError("protective order fields are invalid")
+        return cls(**dict(raw_record))
+
 
 @dataclass(frozen=True)
 class RiskEvaluationRequest:
@@ -151,6 +161,44 @@ class RiskEvaluationRequest:
             "protective_exception_approved": self.protective_exception_approved,
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> RiskEvaluationRequest:
+        expected_keys = {
+            "schema_version",
+            "request_id",
+            "symbol",
+            "side",
+            "risk_intent",
+            "quantity",
+            "reference_price",
+            "market_data_timestamp",
+            "evaluated_at",
+            "broker_state_known",
+            "protective_order",
+            "protective_exception_approved",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise RiskEngineError("risk evaluation request fields are invalid")
+        raw_plan = raw_record["protective_order"]
+        if raw_plan is not None and not isinstance(raw_plan, Mapping):
+            raise RiskEngineError("protective_order must be an object or null")
+        return cls(
+            schema_version=raw_record["schema_version"],
+            request_id=raw_record["request_id"],
+            symbol=raw_record["symbol"],
+            side=raw_record["side"],
+            risk_intent=raw_record["risk_intent"],
+            quantity=raw_record["quantity"],
+            reference_price=raw_record["reference_price"],
+            market_data_timestamp=raw_record["market_data_timestamp"],
+            evaluated_at=raw_record["evaluated_at"],
+            broker_state_known=raw_record["broker_state_known"],
+            protective_order=(
+                None if raw_plan is None else ProtectiveOrderPlan.from_json_dict(raw_plan)
+            ),
+            protective_exception_approved=raw_record["protective_exception_approved"],
+        )
+
 
 @dataclass(frozen=True)
 class RiskCheckResult:
@@ -177,6 +225,17 @@ class RiskCheckResult:
             "status": self.status,
             "reason": self.reason,
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> RiskCheckResult:
+        if not isinstance(raw_record, Mapping) or set(raw_record) != {
+            "schema_version",
+            "name",
+            "status",
+            "reason",
+        }:
+            raise RiskEngineError("risk check fields are invalid")
+        return cls(**dict(raw_record))
 
 
 @dataclass(frozen=True)
@@ -238,6 +297,36 @@ class RiskDecision:
             "request": self.request,
             "checks": [check.to_json_dict() for check in self.checks],
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> RiskDecision:
+        expected_keys = {
+            "schema_version",
+            "request_id",
+            "evaluated_at",
+            "symbol",
+            "risk_intent",
+            "result",
+            "request",
+            "checks",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise RiskEngineError("risk decision fields are invalid")
+        request = raw_record["request"]
+        checks = raw_record["checks"]
+        if not isinstance(request, Mapping) or not isinstance(checks, list):
+            raise RiskEngineError("risk decision nested fields are invalid")
+        typed_request = RiskEvaluationRequest.from_json_dict(request)
+        return cls(
+            schema_version=raw_record["schema_version"],
+            request_id=raw_record["request_id"],
+            evaluated_at=raw_record["evaluated_at"],
+            symbol=raw_record["symbol"],
+            risk_intent=raw_record["risk_intent"],
+            result=raw_record["result"],
+            request=typed_request.to_json_dict(),
+            checks=tuple(RiskCheckResult.from_json_dict(check) for check in checks),
+        )
 
 
 def evaluate_risk(

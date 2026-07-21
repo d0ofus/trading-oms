@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -53,6 +54,16 @@ class OrderIntentProtectivePlan:
             "kind": self.kind,
             "stop_price": self.stop_price,
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> OrderIntentProtectivePlan:
+        if not isinstance(raw_record, Mapping) or set(raw_record) != {
+            "schema_version",
+            "kind",
+            "stop_price",
+        }:
+            raise OrderIntentError("protective plan fields are invalid")
+        return cls(**dict(raw_record))
 
 
 @dataclass(frozen=True)
@@ -211,6 +222,53 @@ class OrderIntentProposal:
             "protective_exception_reference": self.protective_exception_reference,
             "journal_references": list(self.journal_references),
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> OrderIntentProposal:
+        expected_keys = {
+            "schema_version",
+            "proposal_id",
+            "status",
+            "source_signal_reference",
+            "symbol",
+            "side",
+            "risk_intent",
+            "quantity",
+            "order_type",
+            "reference_price",
+            "limit_price",
+            "proposed_at",
+            "protective_order_plan",
+            "protective_exception_reference",
+            "journal_references",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise OrderIntentError("order-intent proposal fields are invalid")
+        raw_plan = raw_record["protective_order_plan"]
+        if raw_plan is not None and not isinstance(raw_plan, Mapping):
+            raise OrderIntentError("protective_order_plan must be an object or null")
+        references = raw_record["journal_references"]
+        if not isinstance(references, list):
+            raise OrderIntentError("journal_references must be a list")
+        return cls(
+            schema_version=raw_record["schema_version"],
+            proposal_id=raw_record["proposal_id"],
+            status=raw_record["status"],
+            source_signal_reference=raw_record["source_signal_reference"],
+            symbol=raw_record["symbol"],
+            side=raw_record["side"],
+            risk_intent=raw_record["risk_intent"],
+            quantity=raw_record["quantity"],
+            order_type=raw_record["order_type"],
+            reference_price=raw_record["reference_price"],
+            limit_price=raw_record["limit_price"],
+            proposed_at=raw_record["proposed_at"],
+            protective_order_plan=(
+                None if raw_plan is None else OrderIntentProtectivePlan.from_json_dict(raw_plan)
+            ),
+            protective_exception_reference=raw_record["protective_exception_reference"],
+            journal_references=tuple(references),
+        )
 
 
 class OrderIntentProposalBook:

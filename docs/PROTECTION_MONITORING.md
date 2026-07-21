@@ -31,6 +31,17 @@ connect to a broker, amend orders, or change protection state.
 
 Secret-shaped text is redacted before rendering in dashboard-derived rows.
 
+## Saved-Workflow Execution
+
+The deliberate saved-workflow simulation execution command consumes a proposal that already has a
+persisted protective-order plan. After the deterministic fake fill, it records either
+`expected_protection_present` or `missing_expected_protection` in the position and execution
+evidence. Missing expected protection creates one critical local alert with no-op dispatch and
+sets `risk_increasing_actions_blocked=true`.
+
+This is a deterministic simulation observation. It does not place, inspect, or reconcile any real
+protective order.
+
 ## Current Limitations
 
 - Exception references are derived from current read-model state until explicit protection-exception

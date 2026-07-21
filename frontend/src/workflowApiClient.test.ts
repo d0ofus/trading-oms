@@ -8,6 +8,7 @@ import {
   type WorkflowDefinitionSaveRequest,
   type WorkflowDefinitionUpdateRequest,
   type WorkflowSimulationDecisionRequest,
+  type WorkflowSimulationExecutionRequest,
   type WorkflowSimulationRunApiView,
   type WorkflowSimulationRunRequest,
 } from "./workflowApiClient";
@@ -89,6 +90,7 @@ const simulationRunRequest: WorkflowSimulationRunRequest = {
 const simulationRun: WorkflowSimulationRunApiView = {
   schema_version: 1,
   workflow_id: "workflow-001",
+  expected_workflow_version: 1,
   run_id: "workflow-run-001",
   status: "waiting_for_approval",
   created_at: "2026-07-08T13:29:55Z",
@@ -127,6 +129,23 @@ const decisionRequest: WorkflowSimulationDecisionRequest = {
   reason: "operator_reviewed_simulation_evidence",
 };
 
+const executionRequest: WorkflowSimulationExecutionRequest = {
+  schema_version: 1,
+  expected_workflow_version: 1,
+  approval_ticket_id: "workflow-run-001-approval-ticket",
+  approval_decision_id: "workflow-run-001-approve-decision",
+  order_intent_id: "workflow-run-001-intent",
+  risk_decision_id: "workflow-run-001-risk",
+  order_id: "workflow-run-001-order",
+  execution_id: "workflow-run-001-execution",
+  executed_at: "2026-07-08T13:47:00Z",
+  actor: "human-operator-001",
+  execution_reference: "workflow-run-001-admin-execution-review",
+  reason: "operator_confirmed_simulation_execution",
+  broker_state_known: true,
+  expected_protection_present: true,
+};
+
 describe("workflow API client", () => {
   it("uses safe workflow persistence endpoints with explicit methods", async () => {
     const calls: { input: string; init?: RequestInit }[] = [];
@@ -144,6 +163,11 @@ describe("workflow API client", () => {
     await client.startSimulationRun("workflow-001", simulationRunRequest);
     await client.listSimulationRuns("workflow-001");
     await client.getSimulationRun("workflow-001", "workflow-run-001");
+    await client.executeSimulationRun(
+      "workflow-001",
+      "workflow-run-001",
+      executionRequest,
+    );
 
     expect(calls.map((call) => [call.input, call.init?.method])).toEqual([
       [WORKFLOW_API_ENDPOINTS.workflows, "GET"],
@@ -156,10 +180,15 @@ describe("workflow API client", () => {
         `${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001/simulation-runs/workflow-run-001`,
         "GET",
       ],
+      [
+        `${WORKFLOW_API_ENDPOINTS.workflows}/workflow-001/simulation-runs/workflow-run-001/execute`,
+        "POST",
+      ],
     ]);
     expect(calls[2].init?.body).toBe(JSON.stringify(saveRequest));
     expect(calls[3].init?.body).toBe(JSON.stringify(updateRequest));
     expect(calls[4].init?.body).toBe(JSON.stringify(simulationRunRequest));
+    expect(calls[7].init?.body).toBe(JSON.stringify(executionRequest));
   });
 
   it("exposes response status without exposing response payloads", async () => {

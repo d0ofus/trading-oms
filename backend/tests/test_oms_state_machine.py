@@ -9,6 +9,7 @@ from trading_oms_backend.oms_state_machine import (
     OMS_TRANSITION_EVENT_TYPE,
     OMSStateMachineError,
     OrderStateMachine,
+    OrderTransitionRecord,
     OrderTransitionRequest,
 )
 
@@ -243,6 +244,57 @@ def test_oms_state_machine_replays_duplicate_transition_id_idempotently(tmp_path
 
     assert replayed == first
     assert len(journal.read_all()) == 1
+
+
+def test_oms_state_machine_restores_validated_history_without_rejournaling(tmp_path) -> None:
+    source_journal = JsonlEventJournal(tmp_path / "source-events.jsonl")
+    source = OrderStateMachine(source_journal)
+    source.apply_transition(transition_request())
+    source.apply_transition(
+        transition_request(
+            transition_id="oms-transition-002",
+            target_state="PENDING_APPROVAL",
+            occurred_at=PENDING_AT,
+            reason="risk_passed_pending_approval",
+        )
+    )
+    history = tuple(
+        OrderTransitionRecord.from_json_dict(record.payload) for record in source_journal.read_all()
+    )
+    restored_journal = JsonlEventJournal(tmp_path / "restored-events.jsonl")
+    restored = OrderStateMachine(restored_journal)
+
+    restored.restore_history(history)
+
+    assert restored.current_snapshot("order-001").state == "PENDING_APPROVAL"
+    assert restored_journal.read_all() == []
+    approved = restored.apply_transition(
+        transition_request(
+            transition_id="oms-transition-003",
+            target_state="APPROVED",
+            occurred_at=APPROVED_AT,
+            reason="simulation_ticket_approved",
+            approval_reference="approval-001",
+        )
+    )
+    assert approved.previous_state == "PENDING_APPROVAL"
+    assert len(restored_journal.read_all()) == 1
+
+
+def test_oms_state_machine_rejects_inconsistent_restored_history(tmp_path) -> None:
+    source_journal = JsonlEventJournal(tmp_path / "source-events.jsonl")
+    source = OrderStateMachine(source_journal)
+    source.apply_transition(transition_request())
+    raw = source_journal.read_all()[0].payload
+    corrupt = {
+        **raw,
+        "snapshot": {**raw["snapshot"], "state": "PENDING_APPROVAL"},
+    }
+
+    with pytest.raises(OMSStateMachineError, match="restored transition history"):
+        OrderStateMachine(JsonlEventJournal(tmp_path / "restored-events.jsonl")).restore_history(
+            (OrderTransitionRecord.from_json_dict(corrupt),)
+        )
 
 
 def test_oms_state_machine_rejects_conflicting_duplicate_transition_id(tmp_path) -> None:

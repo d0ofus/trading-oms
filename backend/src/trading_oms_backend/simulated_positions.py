@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -112,6 +113,38 @@ class SimulatedPosition:
             "source_fill_reference": self.source_fill_reference,
             "journal_references": list(self.journal_references),
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> SimulatedPosition:
+        expected_keys = {
+            "schema_version",
+            "position_id",
+            "symbol",
+            "quantity",
+            "average_price",
+            "protection_status",
+            "expected_protection_kind",
+            "updated_at",
+            "source_fill_reference",
+            "journal_references",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise PositionProtectionError("simulated position fields are invalid")
+        journal_references = raw_record["journal_references"]
+        if not isinstance(journal_references, list):
+            raise PositionProtectionError("journal_references must be a list")
+        return cls(
+            schema_version=raw_record["schema_version"],
+            position_id=raw_record["position_id"],
+            symbol=raw_record["symbol"],
+            quantity=raw_record["quantity"],
+            average_price=raw_record["average_price"],
+            protection_status=raw_record["protection_status"],
+            expected_protection_kind=raw_record["expected_protection_kind"],
+            updated_at=raw_record["updated_at"],
+            source_fill_reference=raw_record["source_fill_reference"],
+            journal_references=tuple(journal_references),
+        )
 
 
 @dataclass(frozen=True)

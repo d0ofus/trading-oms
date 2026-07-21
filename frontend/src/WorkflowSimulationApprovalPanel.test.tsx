@@ -134,6 +134,7 @@ const pendingRun: WorkflowRunInspectionItem = {
   run: {
     schema_version: 1,
     workflow_id: "workflow-001",
+    expected_workflow_version: 1,
     run_id: "workflow-run-001",
     status: "waiting_for_approval",
     created_at: "2026-07-08T13:29:55Z",

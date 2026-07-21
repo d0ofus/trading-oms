@@ -84,6 +84,132 @@ def test_workflow_simulation_api_approves_persisted_run_and_recovers_after_resta
     assert len(app_module.get_workflow_simulation_runner().journal_records()) == journal_count
 
 
+def test_workflow_simulation_api_executes_committed_approval_and_recovers_exact_retry(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+    approved = client.post(
+        "/api/workflows/workflow-001/simulation-runs/workflow-run-001/approve",
+        headers=_approver_headers(),
+        json=_decision_body("approve"),
+    )
+
+    path = "/api/workflows/workflow-001/simulation-runs/workflow-run-001/execute"
+    executed = client.post(path, json=_execution_body())
+    journal_count = len(app_module.get_workflow_simulation_runner().journal_records())
+    reconstruct_workflow_services()
+    recovered = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    retried = client.post(path, json=_execution_body())
+
+    assert approved.status_code == 200
+    assert executed.status_code == 200
+    payload = executed.json()
+    assert payload["status"] == "executed"
+    assert payload["execution"]["approval_decision_id"] == ("workflow-run-001-approve-decision")
+    assert payload["execution"]["order_intent_id"] == "workflow-run-001-intent"
+    assert payload["execution"]["risk_decision_id"] == "workflow-run-001-risk"
+    assert payload["execution"]["order_id"] == "workflow-run-001-order"
+    assert [item["new_state"] for item in payload["execution"]["oms_transitions"]] == [
+        "APPROVED",
+        "SUBMITTED",
+        "ACKNOWLEDGED",
+        "FILLED",
+    ]
+    assert [item["state"] for item in payload["execution"]["broker_transitions"]] == [
+        "acknowledged",
+        "filled",
+    ]
+    assert payload["execution"]["position"]["quantity"] == 10
+    assert payload["execution"]["protection_status"] == "expected_protection_present"
+    assert payload["execution"]["alert_dispatches"] == [
+        {
+            **payload["execution"]["alert_dispatches"][0],
+            "channel": "local",
+            "status": "recorded",
+            "dispatcher": "noop",
+        }
+    ]
+    assert recovered.json() == payload
+    assert retried.json() == payload
+    assert len(app_module.get_workflow_simulation_runner().journal_records()) == journal_count
+
+
+def test_workflow_simulation_execution_requires_admin_committed_approval_and_matching_actor(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+    path = "/api/workflows/workflow-001/simulation-runs/workflow-run-001/execute"
+
+    before_approval = client.post(path, json=_execution_body())
+    client.post(
+        "/api/workflows/workflow-001/simulation-runs/workflow-run-001/approve",
+        headers=_approver_headers(),
+        json=_decision_body("approve"),
+    )
+    approver = client.post(path, headers=_approver_headers(), json=_execution_body())
+    actor_mismatch = client.post(path, json=_execution_body(actor="other-admin"))
+
+    assert before_approval.status_code == 409
+    assert approver.status_code == 403
+    assert "administer_system" in approver.json()["detail"]
+    assert actor_mismatch.status_code == 400
+    loaded = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    assert loaded.json()["status"] == "approved_not_executed"
+    assert loaded.json()["execution"] is None
+    assert any(
+        record.event_type == "workflow_simulation.execution_blocked"
+        and record.payload["reason"] == "actor_mismatch"
+        for record in app_module.get_workflow_simulation_runner().journal_records()
+    )
+
+
+def test_workflow_simulation_execution_maps_emergency_and_unknown_state_fail_closed(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    _set_safe_env(monkeypatch)
+    reset_workflow_definition_service()
+    reset_workflow_simulation_runner_service()
+    client = TestClient(app)
+    client.post("/api/workflows", json=_workflow_body())
+    client.post("/api/workflows/workflow-001/simulation-runs", json=_run_body())
+    client.post(
+        "/api/workflows/workflow-001/simulation-runs/workflow-run-001/approve",
+        headers=_approver_headers(),
+        json=_decision_body("approve"),
+    )
+    path = "/api/workflows/workflow-001/simulation-runs/workflow-run-001/execute"
+
+    unknown_state = client.post(path, json=_execution_body(broker_state_known=False))
+    activated = client.post(
+        "/api/emergency-stop/activate",
+        json={
+            "event_id": "execution-stop-001",
+            "requested_at": "2026-07-08T13:46:30Z",
+            "actor": "human-operator-001",
+            "reason": "operator_safety_hold",
+        },
+    )
+    stopped = client.post(path, json=_execution_body())
+
+    assert unknown_state.status_code == 400
+    assert "unknown simulated broker state" in unknown_state.json()["detail"]
+    assert activated.status_code == 200
+    assert stopped.status_code == 423
+    loaded = client.get("/api/workflows/workflow-001/simulation-runs/workflow-run-001")
+    assert loaded.json()["status"] == "approved_not_executed"
+    assert loaded.json()["execution"] is None
+
+
 def test_workflow_simulation_api_requires_separate_approver_and_matching_actor(
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -416,6 +542,7 @@ def test_app_module_allows_only_known_simulation_mutation_routes() -> None:
         "/api/workflows",
         "/api/workflows/{workflow_id}/simulation-runs",
         "/api/workflows/{workflow_id}/simulation-runs/{run_id}/approve",
+        "/api/workflows/{workflow_id}/simulation-runs/{run_id}/execute",
         "/api/workflows/{workflow_id}/simulation-runs/{run_id}/reject",
     }
     assert put_routes == {"/api/workflows/{workflow_id}"}
@@ -474,6 +601,27 @@ def _decision_body(action: str, **overrides: Any) -> dict[str, Any]:
         "actor": "approver-operator-001",
         "decision_reference": f"workflow-run-001-{action}-manual-review",
         "reason": "operator_reviewed_simulation_evidence",
+    }
+    values.update(overrides)
+    return values
+
+
+def _execution_body(**overrides: Any) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "schema_version": 1,
+        "expected_workflow_version": 1,
+        "approval_ticket_id": "workflow-run-001-approval-ticket",
+        "approval_decision_id": "workflow-run-001-approve-decision",
+        "order_intent_id": "workflow-run-001-intent",
+        "risk_decision_id": "workflow-run-001-risk",
+        "order_id": "workflow-run-001-order",
+        "execution_id": "workflow-run-001-execution",
+        "executed_at": "2026-07-08T13:47:00Z",
+        "actor": "human-operator-001",
+        "execution_reference": "workflow-run-001-admin-execution-review",
+        "reason": "operator_confirmed_simulation_execution",
+        "broker_state_known": True,
+        "expected_protection_present": True,
     }
     values.update(overrides)
     return values

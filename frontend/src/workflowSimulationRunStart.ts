@@ -272,6 +272,7 @@ function validateWorkflowSimulationRunResponse(
   const record = requireExactObject(value, [
     "schema_version",
     "workflow_id",
+    "expected_workflow_version",
     "run_id",
     "status",
     "created_at",
@@ -281,13 +282,16 @@ function validateWorkflowSimulationRunResponse(
     "node_statuses",
     "journal_references",
     "approval_decision",
+    "execution",
   ]);
   if (
     record.schema_version !== 1 ||
     record.workflow_id !== attempt.workflowId ||
+    record.expected_workflow_version !== attempt.workflowVersion ||
     record.run_id !== attempt.request.run_id ||
     record.status !== "waiting_for_approval" ||
-    record.approval_decision !== null
+    record.approval_decision !== null ||
+    record.execution !== null
   ) {
     throw new Error("simulation response attribution is invalid");
   }
@@ -316,6 +320,7 @@ function validateWorkflowSimulationRunResponse(
   return {
     schema_version: 1,
     workflow_id: attempt.workflowId,
+    expected_workflow_version: attempt.workflowVersion,
     run_id: attempt.request.run_id,
     status: "waiting_for_approval",
     created_at: record.created_at as string,
@@ -325,6 +330,7 @@ function validateWorkflowSimulationRunResponse(
     node_statuses: nodeStatuses,
     journal_references: validateJournalReferences(record.journal_references),
     approval_decision: null,
+    execution: null,
   };
 }
 

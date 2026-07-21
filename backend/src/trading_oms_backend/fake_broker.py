@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal, Protocol
@@ -134,6 +135,26 @@ class BrokerOrderRequest:
             "limit_price": self.limit_price,
         }
 
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> BrokerOrderRequest:
+        expected_keys = {
+            "schema_version",
+            "client_order_id",
+            "symbol",
+            "side",
+            "quantity",
+            "order_type",
+            "reference_price",
+            "requested_at",
+            "risk_decision_id",
+            "risk_decision_result",
+            "approval_reference",
+            "limit_price",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise FakeBrokerError("order request fields are invalid")
+        return cls(**dict(raw_record))
+
     def default_fill_price(self) -> float:
         if self.order_type == "limit":
             if self.limit_price is None:
@@ -216,6 +237,45 @@ class BrokerOrderTransition:
             "fill_price": self.fill_price,
             "order": self.order,
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_record: Mapping[str, Any]) -> BrokerOrderTransition:
+        expected_keys = {
+            "schema_version",
+            "client_order_id",
+            "fake_broker_order_id",
+            "symbol",
+            "side",
+            "quantity",
+            "state",
+            "occurred_at",
+            "reason",
+            "cumulative_filled_quantity",
+            "leaves_quantity",
+            "fill_price",
+            "order",
+        }
+        if not isinstance(raw_record, Mapping) or set(raw_record) != expected_keys:
+            raise FakeBrokerError("order transition fields are invalid")
+        order = raw_record["order"]
+        if not isinstance(order, Mapping):
+            raise FakeBrokerError("order transition order must be an object")
+        typed_order = BrokerOrderRequest.from_json_dict(order)
+        return cls(
+            schema_version=raw_record["schema_version"],
+            client_order_id=raw_record["client_order_id"],
+            fake_broker_order_id=raw_record["fake_broker_order_id"],
+            symbol=raw_record["symbol"],
+            side=raw_record["side"],
+            quantity=raw_record["quantity"],
+            state=raw_record["state"],
+            occurred_at=raw_record["occurred_at"],
+            reason=raw_record["reason"],
+            cumulative_filled_quantity=raw_record["cumulative_filled_quantity"],
+            leaves_quantity=raw_record["leaves_quantity"],
+            fill_price=raw_record["fill_price"],
+            order=typed_order.to_json_dict(),
+        )
 
     def _validate_state_quantities(self) -> None:
         if self.state == "acknowledged":

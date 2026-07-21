@@ -95,12 +95,12 @@ message, reason, and metadata string values also reject obvious credential label
 - Telegram formatting does not include token, chat ID, URL, or network transport fields.
 - Alert payloads contain no broker routing, order submission, credential, token, or secret fields.
 
-## Current Limitations
+## Current Integration And Limitations
 
-- State is in memory only.
-- No database-backed alert persistence yet.
-- No scheduler or escalation workflow yet.
-- No real Telegram adapter yet.
-- No authentication or authorization model yet.
-- No UI yet.
+- The standalone alert service remains in memory. Saved-workflow execution captures exactly one
+  typed local alert intent and one no-op dispatch in durable execution evidence.
+- A protected simulated fill creates an informational local alert; missing expected protection
+  creates a critical local alert and a durable risk-increasing-actions block.
+- No scheduler, escalation workflow, real Telegram adapter, webhook, or external delivery exists.
+- Local authorization controls the saved-workflow execution command, not the alert domain itself.
 - Callers must not put real secrets in any alert text, reference, reason, or metadata value.

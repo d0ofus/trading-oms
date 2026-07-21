@@ -51,10 +51,11 @@ alert.dispatch.recorded
 - Duplicate position update IDs are idempotent when payloads match.
 - Conflicting duplicate update IDs fail without new journal records.
 
-## Current Limitations
+## Current Integration And Limitations
 
-- State is in-memory only.
-- Positions are not yet exposed through a dedicated simulation run detail API.
-- No real broker reconciliation exists.
-- No real alert delivery exists.
-- The frontend does not yet show run-specific protection monitoring details.
+- The standalone position book remains in memory. Saved-workflow execution stores the exact typed
+  position and its source fake-fill reference inside durable run evidence.
+- The saved-run inspector exposes run-specific position and protection evidence after execution.
+- `expected_protection_present` is a deterministic local simulation observation, not proof of a
+  broker-side protective order.
+- No real broker reconciliation or real alert delivery exists.

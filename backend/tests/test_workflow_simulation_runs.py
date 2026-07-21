@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import json
 import sqlite3
+import threading
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -24,6 +25,7 @@ from trading_oms_backend.workflow_definitions import (
 )
 from trading_oms_backend.workflow_simulation_runs import (
     WorkflowSimulationDecisionRequest,
+    WorkflowSimulationExecutionRequest,
     WorkflowSimulationRunConflictError,
     WorkflowSimulationRunError,
     WorkflowSimulationRunner,
@@ -149,6 +151,509 @@ def test_workflow_simulation_approval_is_durable_idempotent_and_does_not_execute
         == approved
     )
     assert len(restarted.journal_records()) == journal_count
+
+
+def test_approved_workflow_simulation_executes_durably_and_exact_retry_is_idempotent(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    approved = runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+
+    executed = runner.execute_approved_run(
+        "workflow-001",
+        "workflow-run-001",
+        _execution_request(),
+        executed_by="human-operator-001",
+    )
+
+    assert approved.status == "approved_not_executed"
+    assert executed.status == "executed"
+    assert executed.execution is not None
+    assert executed.execution.execution_id == "workflow-run-001-execution"
+    assert executed.execution.position.protection_status == "expected_protection_present"
+    assert executed.execution.risk_increasing_actions_blocked is False
+    assert [transition.new_state for transition in executed.execution.oms_transitions] == [
+        "APPROVED",
+        "SUBMITTED",
+        "ACKNOWLEDGED",
+        "FILLED",
+    ]
+    assert [transition.state for transition in executed.execution.broker_transitions] == [
+        "acknowledged",
+        "filled",
+    ]
+    assert {node.node_type: node.status for node in executed.node_statuses}[
+        "fake_broker"
+    ] == "filled"
+    event_types = [record.event_type for record in runner.journal_records()]
+    assert event_types.count("fake_broker.order.transitioned") == 2
+    assert event_types.count("position.updated") == 1
+    assert event_types.count("alert.intent.created") == 1
+    assert event_types.count("workflow_simulation.execution_completed") == 1
+
+    journal_count = len(runner.journal_records())
+    restarted = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    assert restarted.get_run("workflow-001", "workflow-run-001") == executed
+    assert (
+        restarted.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(),
+            executed_by="human-operator-001",
+        )
+        == executed
+    )
+    assert len(restarted.journal_records()) == journal_count
+
+
+def test_approved_execution_remains_bound_to_persisted_run_version(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    store = _store_with_workflow(store_path)
+    runner = WorkflowSimulationRunner(
+        store,
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
+    runner.start_run("workflow-001", _run_request(expected_workflow_version=1))
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved", expected_workflow_version=1),
+        decided_by="approver-operator-001",
+    )
+    store.update_workflow(
+        "workflow-001",
+        WorkflowDefinitionSaveRequest(
+            workflow_id="workflow-001",
+            display_name="Opening breakout simulation version two",
+            description="Validated visual simulation workflow",
+            document=_valid_workflow_dsl(),
+            requested_at="2026-07-08T13:46:30Z",
+            expected_version=1,
+        ),
+    )
+
+    executed = runner.execute_approved_run(
+        "workflow-001",
+        "workflow-run-001",
+        _execution_request(expected_workflow_version=1),
+        executed_by="human-operator-001",
+    )
+
+    assert store.get_workflow("workflow-001").version == 2
+    assert executed.expected_workflow_version == 1
+    assert executed.execution is not None
+    assert executed.execution.expected_workflow_version == 1
+
+
+def test_approved_workflow_simulation_records_missing_protection_as_critical_block(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
+    runner.start_run("workflow-001", _run_request())
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+
+    executed = runner.execute_approved_run(
+        "workflow-001",
+        "workflow-run-001",
+        _execution_request(expected_protection_present=False),
+        executed_by="human-operator-001",
+    )
+
+    assert executed.status == "executed_protection_missing"
+    assert executed.execution is not None
+    assert executed.execution.position.protection_status == "missing_expected_protection"
+    assert executed.execution.risk_increasing_actions_blocked is True
+    assert len(executed.execution.alert_intents) == 1
+    assert executed.execution.alert_intents[0].severity == "critical"
+    assert len(executed.execution.alert_dispatches) == 1
+    assert executed.execution.alert_dispatches[0].status == "recorded"
+    assert executed.execution.alert_dispatches[0].dispatcher == "noop"
+    assert {node.node_type: node.status for node in executed.node_statuses}[
+        "position_update"
+    ] == "critical_missing_protection"
+
+
+def test_workflow_simulation_execution_requires_committed_approval_and_rejection_blocks(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
+    runner.start_run("workflow-001", _run_request())
+
+    with pytest.raises(WorkflowSimulationRunConflictError, match="not approved"):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(),
+            executed_by="human-operator-001",
+        )
+
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("rejected"),
+        decided_by="approver-operator-001",
+    )
+    with pytest.raises(WorkflowSimulationRunConflictError, match="not approved"):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(approval_decision_id="workflow-run-001-rejected-decision"),
+            executed_by="human-operator-001",
+        )
+    assert "fake_broker.order.transitioned" not in {
+        item.event_type for item in runner.journal_records()
+    }
+
+
+@pytest.mark.parametrize(
+    ("field_name", "value"),
+    [
+        ("expected_workflow_version", 2),
+        ("approval_ticket_id", "other-ticket"),
+        ("approval_decision_id", "other-decision"),
+        ("order_intent_id", "other-intent"),
+        ("risk_decision_id", "other-risk"),
+        ("order_id", "other-order"),
+    ],
+)
+def test_workflow_simulation_execution_binds_all_persisted_identities(
+    workflow_paths: tuple[Path, Path],
+    field_name: str,
+    value: Any,
+) -> None:
+    store_path, journal_path = workflow_paths
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
+    runner.start_run("workflow-001", _run_request())
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+
+    with pytest.raises(WorkflowSimulationRunConflictError, match=field_name):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(**{field_name: value}),
+            executed_by="human-operator-001",
+        )
+
+
+def test_workflow_simulation_execution_blocks_actor_expiry_and_unknown_broker_state(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence = LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3"))
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=persistence,
+    )
+    runner.start_run("workflow-001", _run_request())
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+
+    with pytest.raises(WorkflowSimulationRunError, match="actor"):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(actor="other-admin"),
+            executed_by="human-operator-001",
+        )
+    with pytest.raises(WorkflowSimulationRunError, match="expired"):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(executed_at="2026-07-08T13:51:00Z"),
+            executed_by="human-operator-001",
+        )
+    unknown_request = _execution_request(broker_state_known=False)
+    with pytest.raises(WorkflowSimulationRunError, match="unknown simulated broker state"):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            unknown_request,
+            executed_by="human-operator-001",
+        )
+    with pytest.raises(WorkflowSimulationRunError, match="unknown simulated broker state"):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            unknown_request,
+            executed_by="human-operator-001",
+        )
+    blocked_reasons = [
+        item.payload["reason"]
+        for item in runner.journal_records()
+        if item.event_type == "workflow_simulation.execution_blocked"
+    ]
+    assert blocked_reasons == [
+        "actor_mismatch",
+        "approval_expired",
+        "unknown_simulated_broker_state",
+    ]
+    evidence = persistence.get_workflow_simulation_run_evidence("workflow-run-001")
+    assert evidence is not None
+    assert evidence["execution_evidence_state"] is None
+
+
+def test_workflow_simulation_execution_is_blocked_by_emergency_stop_before_reservation(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    journal = JsonlEventJournal(journal_path)
+    persistence = LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3"))
+    emergency_stop = EmergencyStopService(journal)
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        journal,
+        persistence_store=persistence,
+        emergency_stop_service=emergency_stop,
+    )
+    runner.start_run("workflow-001", _run_request())
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+    emergency_stop.activate(
+        EmergencyStopChangeRequest(
+            event_id="emergency-stop-activate-execution-001",
+            requested_at="2026-07-08T13:46:30Z",
+            actor="human-operator-001",
+            reason="operator_review",
+        )
+    )
+
+    with pytest.raises(WorkflowSimulationRunError, match="emergency stop is active"):
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(),
+            executed_by="human-operator-001",
+        )
+
+    evidence = persistence.get_workflow_simulation_run_evidence("workflow-run-001")
+    assert evidence is not None
+    assert evidence["execution_evidence_state"] is None
+    assert EMERGENCY_STOP_BLOCKED_EVENT_TYPE in {
+        item.event_type for item in runner.journal_records()
+    }
+
+
+def test_workflow_simulation_execution_rejects_concurrent_requests_but_allows_later_retry(
+    workflow_paths: tuple[Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store_path, journal_path = workflow_paths
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(journal_path.with_suffix(".sqlite3")),
+    )
+    runner.start_run("workflow-001", _run_request())
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+    request = _execution_request()
+    entered_execution = threading.Event()
+    release_execution = threading.Event()
+    execute_domains = runner._execute_simulation_domains
+
+    def gated_execute_domains(*args: Any, **kwargs: Any) -> Any:
+        entered_execution.set()
+        if not release_execution.wait(timeout=5):
+            raise AssertionError("timed out waiting to exercise concurrent execution")
+        return execute_domains(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "_execute_simulation_domains", gated_execute_domains)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        accepted = executor.submit(
+            runner.execute_approved_run,
+            "workflow-001",
+            "workflow-run-001",
+            request,
+            executed_by="human-operator-001",
+        )
+        assert entered_execution.wait(timeout=5)
+        conflicts = tuple(
+            executor.submit(
+                runner.execute_approved_run,
+                "workflow-001",
+                "workflow-run-001",
+                request,
+                executed_by="human-operator-001",
+            )
+            for _ in range(3)
+        )
+        for conflict in conflicts:
+            with pytest.raises(
+                WorkflowSimulationRunConflictError,
+                match="concurrent execution",
+            ):
+                conflict.result(timeout=5)
+        release_execution.set()
+        record = accepted.result(timeout=5)
+
+    assert (
+        runner.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            request,
+            executed_by="human-operator-001",
+        )
+        == record
+    )
+    assert (
+        sum(
+            item.event_type == "workflow_simulation.execution_completed"
+            for item in runner.journal_records()
+        )
+        == 1
+    )
+
+
+def test_workflow_simulation_runner_fails_closed_for_pending_execution_evidence(
+    workflow_paths: tuple[Path, Path],
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    persistence = LocalSqlitePersistenceStore(persistence_path)
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=persistence,
+    )
+    runner.start_run("workflow-001", _run_request())
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+    request = _execution_request()
+    persistence.reserve_workflow_simulation_execution(
+        request.to_payload("workflow-001", "workflow-run-001")
+    )
+
+    restarted = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted.get_run("workflow-001", "workflow-run-001")
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            _execution_request(execution_id="conflicting-execution"),
+            executed_by="human-operator-001",
+        )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted.execute_approved_run(
+            "workflow-001",
+            "workflow-run-001",
+            request,
+            executed_by="human-operator-001",
+        )
+
+
+@pytest.mark.parametrize(
+    "corruption_sql",
+    [
+        "execution_request_sha256 = 'invalid-digest'",
+        "execution_record_json = NULL",
+        "execution_record_json = '{'",
+        "execution_id = 'different-execution'",
+    ],
+)
+def test_workflow_simulation_runner_fails_closed_for_corrupt_execution_evidence(
+    workflow_paths: tuple[Path, Path],
+    corruption_sql: str,
+) -> None:
+    store_path, journal_path = workflow_paths
+    persistence_path = journal_path.with_suffix(".sqlite3")
+    runner = WorkflowSimulationRunner(
+        _store_with_workflow(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    runner.start_run("workflow-001", _run_request())
+    runner.apply_decision(
+        "workflow-001",
+        "workflow-run-001",
+        _decision_request("approved"),
+        decided_by="approver-operator-001",
+    )
+    runner.execute_approved_run(
+        "workflow-001",
+        "workflow-run-001",
+        _execution_request(),
+        executed_by="human-operator-001",
+    )
+    connection = sqlite3.connect(persistence_path)
+    try:
+        connection.execute(f"UPDATE workflow_simulation_run_evidence SET {corruption_sql}")
+        connection.commit()
+    finally:
+        connection.close()
+
+    restarted = WorkflowSimulationRunner(
+        WorkflowDefinitionStore(store_path),
+        JsonlEventJournal(journal_path),
+        persistence_store=LocalSqlitePersistenceStore(persistence_path),
+    )
+    with pytest.raises(WorkflowSimulationRunUnavailableError, match="evidence is unavailable"):
+        restarted.get_run("workflow-001", "workflow-run-001")
 
 
 def test_workflow_simulation_rejection_remains_available_during_emergency_stop(
@@ -983,6 +1488,26 @@ def _decision_request(
     }
     values.update(overrides)
     return WorkflowSimulationDecisionRequest(**values)
+
+
+def _execution_request(**overrides: Any) -> WorkflowSimulationExecutionRequest:
+    values = {
+        "expected_workflow_version": 1,
+        "approval_ticket_id": "workflow-run-001-approval-ticket",
+        "approval_decision_id": "workflow-run-001-approved-decision",
+        "order_intent_id": "workflow-run-001-intent",
+        "risk_decision_id": "workflow-run-001-risk",
+        "order_id": "workflow-run-001-order",
+        "execution_id": "workflow-run-001-execution",
+        "executed_at": "2026-07-08T13:47:00Z",
+        "actor": "human-operator-001",
+        "execution_reference": "workflow-run-001-manual-simulation-execution",
+        "reason": "operator_confirmed_approved_simulation_execution",
+        "broker_state_known": True,
+        "expected_protection_present": True,
+    }
+    values.update(overrides)
+    return WorkflowSimulationExecutionRequest(**values)
 
 
 def _valid_workflow_dsl() -> dict[str, object]:
