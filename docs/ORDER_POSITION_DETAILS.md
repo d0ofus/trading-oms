@@ -21,6 +21,10 @@ snapshot. It shows:
 The section is inspection-only. It has no submit, route, transmit, cancel, amend, or broker-connect
 controls.
 
+Durable saved-workflow simulation orders show the exact workflow/version, run, execution, intent,
+risk, manual approval, OMS order, fake-fill, position, protection, local alert, and journal lineage.
+This is local fake-broker evidence, not broker-derived or externally verified evidence.
+
 ## Position Detail
 
 The position detail section renders the first position read model currently available from the
@@ -35,9 +39,12 @@ backend snapshot. It shows:
 - linked audit records by symbol.
 
 Missing expected protection is rendered as a critical operator-visible state.
+Durable position audit linkage uses the exact projected position identity rather than symbol-only
+matching, so concurrent runs of the same symbol cannot be mixed.
 
 ## Current Limitations
 
 - The first detail views select the first available order and position from the read snapshot.
-- Richer historical OMS transition lists and position-specific audit IDs remain future work.
+- Full historical OMS transition payload inspection remains future work; the current audit list
+  exposes validated event identities and exact execution attribution.
 - Detail sections use existing read APIs only; no new backend mutation endpoints are added.

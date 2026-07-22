@@ -39,6 +39,10 @@ from trading_oms_backend.simulation_approval_service import (
 from trading_oms_backend.simulation_approval_service import (
     reset_simulation_approval_service as _reset_simulation_approval_service,
 )
+from trading_oms_backend.simulation_execution_projections import (
+    SimulationExecutionProjectionError,
+    project_simulation_executions,
+)
 from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionConflictError,
     WorkflowDefinitionError,
@@ -187,7 +191,7 @@ def get_audit_events(request: Request) -> dict[str, Any]:
         resource="audit_events",
         action="view",
     )
-    return _operations_read_model().to_api_envelope("audit_events")
+    return _execution_operations_read_model().to_api_envelope("audit_events")
 
 
 @app.get("/api/signals")
@@ -231,7 +235,7 @@ def get_orders(request: Request) -> dict[str, Any]:
         resource="orders",
         action="view",
     )
-    return _operations_read_model().to_api_envelope("orders")
+    return _execution_operations_read_model().to_api_envelope("orders")
 
 
 @app.get("/api/positions")
@@ -242,7 +246,7 @@ def get_positions(request: Request) -> dict[str, Any]:
         resource="positions",
         action="view",
     )
-    return _operations_read_model().to_api_envelope("positions")
+    return _execution_operations_read_model().to_api_envelope("positions")
 
 
 @app.get("/api/alerts")
@@ -253,7 +257,7 @@ def get_alerts(request: Request) -> dict[str, Any]:
         resource="alerts",
         action="view",
     )
-    return _operations_read_model().to_api_envelope("alerts")
+    return _execution_operations_read_model().to_api_envelope("alerts")
 
 
 @app.get("/api/readiness")
@@ -596,6 +600,22 @@ def _operations_read_model() -> OperationsReadModel:
         get_settings(),
         emergency_stop=_emergency_stop_read_model(),
     )
+
+
+def _execution_operations_read_model() -> OperationsReadModel:
+    try:
+        return project_simulation_executions(
+            _operations_read_model(),
+            get_workflow_simulation_runner().list_projection_sources(),
+        )
+    except (
+        SimulationExecutionProjectionError,
+        WorkflowSimulationRunUnavailableError,
+    ) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="simulation execution read evidence is unavailable",
+        ) from exc
 
 
 def _emergency_stop_read_model() -> EmergencyStopReadModel:

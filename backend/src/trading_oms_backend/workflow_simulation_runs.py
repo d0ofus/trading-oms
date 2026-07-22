@@ -709,6 +709,8 @@ class WorkflowSimulationRunPersistence(Protocol):
         workflow_id: str,
     ) -> tuple[dict[str, Any], ...]: ...
 
+    def list_all_workflow_simulation_run_evidence(self) -> tuple[dict[str, Any], ...]: ...
+
     def reserve_workflow_simulation_decision(
         self,
         request_payload: Mapping[str, Any],
@@ -745,6 +747,20 @@ class _ApprovedExecutionContext:
     oms_history: tuple[OrderTransitionRecord, ...]
 
 
+@dataclass(frozen=True)
+class WorkflowSimulationProjectionSource:
+    run: WorkflowSimulationRunRecord
+    journal_manifest: tuple[JournalRecord, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.run, WorkflowSimulationRunRecord):
+            raise WorkflowSimulationRunError("projection source run is invalid")
+        if not isinstance(self.journal_manifest, tuple) or not self.journal_manifest:
+            raise WorkflowSimulationRunError("projection source manifest is invalid")
+        if any(not isinstance(item, JournalRecord) for item in self.journal_manifest):
+            raise WorkflowSimulationRunError("projection source manifest records are invalid")
+
+
 class WorkflowSimulationRunner:
     def __init__(
         self,
@@ -768,6 +784,7 @@ class WorkflowSimulationRunner:
             "finalize_workflow_simulation_run",
             "get_workflow_simulation_run_evidence",
             "list_workflow_simulation_run_evidence",
+            "list_all_workflow_simulation_run_evidence",
             "reserve_workflow_simulation_decision",
             "finalize_workflow_simulation_decision",
             "reserve_workflow_simulation_execution",
@@ -1469,6 +1486,32 @@ class WorkflowSimulationRunner:
             except Exception as exc:
                 raise _evidence_unavailable() from exc
             return tuple(self._validated_record_from_evidence(row) for row in evidence_rows)
+
+    def list_projection_sources(self) -> tuple[WorkflowSimulationProjectionSource, ...]:
+        with self._lock:
+            try:
+                evidence_rows = self._persistence_store.list_all_workflow_simulation_run_evidence()
+                source_records = self._read_journal_for_evidence()
+                sources = []
+                for evidence in evidence_rows:
+                    run = _validated_persisted_evidence(
+                        evidence,
+                        source_records=source_records,
+                    )
+                    manifest = tuple(
+                        JournalRecord.from_json_dict(item) for item in _required_manifest(evidence)
+                    )
+                    sources.append(
+                        WorkflowSimulationProjectionSource(
+                            run=run,
+                            journal_manifest=manifest,
+                        )
+                    )
+                return tuple(sources)
+            except WorkflowSimulationRunUnavailableError:
+                raise
+            except Exception as exc:
+                raise _evidence_unavailable() from exc
 
     def get_run(self, workflow_id: str, run_id: str) -> WorkflowSimulationRunRecord:
         _validated_identifier(workflow_id, "workflow_id")

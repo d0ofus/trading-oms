@@ -89,6 +89,11 @@ first review the command and then check a second confirmation before execution i
 shows executing, completed, protection-blocked, conflict, unavailable, and recovered states and
 reloads the run inspector from backend evidence after success.
 
+After commit, the broader read-only operations surfaces project the same validated execution into
+orders, positions, alerts, protection monitoring, and audit events. Every projected record carries
+exact workflow/version/run/execution lineage and is explicitly local-only, simulated,
+fake-broker-derived, and externally unverified. The projection adds no execution action.
+
 There are no broker, account, credential, host, port, live-order, production-rollout, or external-
 alert controls.
 

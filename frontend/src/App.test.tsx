@@ -6,6 +6,7 @@ import {
   safeFallbackOperationsSnapshot,
   type OperationsApiSnapshot,
   type ReadApiLoadState,
+  type SimulationExecutionAttributionApiView,
 } from "./readApiClient";
 import type { WorkflowRunInspectionState } from "./workflowRunInspector";
 import {
@@ -250,7 +251,9 @@ describe("App", () => {
 
     expect(text).toContain("Audit explorer");
     expect(text).toContain("Filter audit events");
+    expect(html).toContain('name="auditWorkflowId"');
     expect(html).toContain('name="auditRunId"');
+    expect(html).toContain('name="auditExecutionId"');
     expect(html).toContain('name="auditEventType"');
     expect(html).toContain('name="auditSymbol"');
     expect(html).toContain('name="auditOrderId"');
@@ -304,6 +307,39 @@ describe("App", () => {
     expect(text).toContain("5 TSLA at 210.5");
     expect(text).toContain("Linked position audit records");
     expect(text).not.toContain("broker amendment");
+  });
+
+  it("renders durable simulation execution lineage across operator inspection views", () => {
+    const html = renderToStaticMarkup(<App initialReadState={projectedExecutionReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Durable execution lineage");
+    expect(text).toContain("workflow-projected-001");
+    expect(text).toContain("version 3");
+    expect(text).toContain("run-projected-001");
+    expect(text).toContain("run-projected-001-execution");
+    expect(text).toContain("run-projected-001-intent");
+    expect(text).toContain("run-projected-001-risk");
+    expect(text).toContain("run-projected-001-approval-ticket");
+    expect(text).toContain("run-projected-001-approved-decision");
+    expect(text).toContain("fake-run-projected-001-client");
+    expect(text).toContain("run-projected-001-position");
+    expect(text).toContain("missing expected protection");
+    expect(text).toContain("alert-run-projected-001-missing-protection");
+    expect(text).toContain("journal_sequence:201");
+    expect(text).toContain("Fake broker derived");
+    expect(text).toContain("Externally unverified");
+    expect(text).toContain("Missing expected protection: TSLA");
+    expect(text).toContain("critical local alert: Position protection missing");
+    for (const forbiddenAction of [
+      "Connect IBKR",
+      "Transmit order",
+      "Execute live order",
+      "Send external alert",
+      "Production rollout",
+    ]) {
+      expect(text).not.toContain(forbiddenAction);
+    }
   });
 
   it("renders read-only protection monitoring dashboard", () => {
@@ -730,6 +766,105 @@ const executionReadyReadState: ReadApiLoadState = {
       status: "inactive",
       blocking_risk_increasing_actions: false,
     },
+  },
+  errorMessage: null,
+};
+
+const projectedAttribution: SimulationExecutionAttributionApiView = {
+  schema_version: 1,
+  workflow_id: "workflow-projected-001",
+  workflow_version: 3,
+  run_id: "run-projected-001",
+  execution_id: "run-projected-001-execution",
+  order_intent_id: "run-projected-001-intent",
+  risk_decision_id: "run-projected-001-risk",
+  approval_ticket_id: "run-projected-001-approval-ticket",
+  approval_decision_id: "run-projected-001-approved-decision",
+  order_id: "run-projected-001-order",
+  fill_reference: "fake-run-projected-001-client",
+  position_id: "run-projected-001-position",
+  protection_status: "missing_expected_protection",
+  expected_protection_kind: "stop_loss",
+  risk_increasing_actions_blocked: true,
+  alert_id: "alert-run-projected-001-missing-protection",
+  journal_references: ["journal_sequence:201", "journal_sequence:202"],
+  execution_journal_references: ["journal_sequence:201", "journal_sequence:202"],
+  evidence_source: "schema_v4_sqlite_digest_bound_jsonl",
+  classifications: [
+    "simulated",
+    "local_only",
+    "fake_broker_derived",
+    "externally_unverified",
+  ],
+  broker_derived: false,
+  externally_verified: false,
+};
+
+const projectedExecutionReadState: ReadApiLoadState = {
+  status: "loaded",
+  snapshot: {
+    ...backendSnapshot,
+    provenance: {
+      ...backendSnapshot.provenance,
+      ...Object.fromEntries(
+        (["audit_events", "orders", "positions", "alerts"] as const).map((resource) => [
+          resource,
+          {
+            schema_version: 1 as const,
+            resource,
+            source: "durable_saved_workflow_simulation_execution",
+            classifications: projectedAttribution.classifications,
+            broker_derived: false as const,
+            externally_verified: false as const,
+            summary: "Validated local saved-workflow simulation execution evidence",
+          },
+        ]),
+      ),
+    },
+    orders: [
+      {
+        ...backendSnapshot.orders[0],
+        order_id: projectedAttribution.order_id,
+        client_order_id: "run-projected-001-client",
+        state: "FILLED",
+        risk_decision_id: projectedAttribution.risk_decision_id,
+        approval_reference: "run-projected-001-manual-review",
+        cumulative_filled_quantity: 5,
+        leaves_quantity: 0,
+        execution_attribution: projectedAttribution,
+      },
+    ],
+    positions: [
+      {
+        ...backendSnapshot.positions[0],
+        position_id: projectedAttribution.position_id,
+        protection_status: "missing_expected_protection",
+        source: "durable_saved_workflow_simulation",
+        execution_attribution: projectedAttribution,
+      },
+    ],
+    alerts: [
+      {
+        ...backendSnapshot.alerts[0],
+        alert_id: projectedAttribution.alert_id,
+        severity: "critical",
+        title: "Position protection missing",
+        source_event_reference: "journal_sequence:201",
+        execution_attribution: projectedAttribution,
+      },
+    ],
+    auditEvents: [
+      {
+        ...backendSnapshot.auditEvents[0],
+        sequence: 201,
+        event_type: "workflow_simulation.execution_completed",
+        run_id: projectedAttribution.run_id,
+        order_id: projectedAttribution.order_id,
+        ticket_id: projectedAttribution.approval_ticket_id,
+        severity: "critical",
+        execution_attribution: projectedAttribution,
+      },
+    ],
   },
   errorMessage: null,
 };

@@ -47,6 +47,7 @@ PROVENANCE_CLASSIFICATIONS = {
     "test_double",
     "adapter_only",
     "externally_unverified",
+    "fake_broker_derived",
 }
 
 
@@ -221,6 +222,116 @@ class OperatorSessionReadModel:
 
 
 @dataclass(frozen=True)
+class SimulationExecutionAttributionReadModel:
+    workflow_id: str
+    workflow_version: int
+    run_id: str
+    execution_id: str
+    order_intent_id: str
+    risk_decision_id: str
+    approval_ticket_id: str
+    approval_decision_id: str
+    order_id: str
+    fill_reference: str
+    position_id: str
+    protection_status: str
+    expected_protection_kind: str
+    risk_increasing_actions_blocked: bool
+    alert_id: str
+    journal_references: tuple[str, ...]
+    execution_journal_references: tuple[str, ...]
+    evidence_source: str = "schema_v4_sqlite_digest_bound_jsonl"
+    classifications: tuple[str, ...] = (
+        "simulated",
+        "local_only",
+        "fake_broker_derived",
+        "externally_unverified",
+    )
+    broker_derived: bool = False
+    externally_verified: bool = False
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        for field_name in (
+            "workflow_id",
+            "run_id",
+            "execution_id",
+            "order_intent_id",
+            "risk_decision_id",
+            "approval_ticket_id",
+            "approval_decision_id",
+            "order_id",
+            "fill_reference",
+            "position_id",
+            "alert_id",
+        ):
+            _validated_identifier(getattr(self, field_name), field_name)
+        _positive_integer(self.workflow_version, "workflow_version")
+        if self.protection_status not in {
+            "expected_protection_present",
+            "missing_expected_protection",
+        }:
+            raise ReadModelError("protection_status must be an execution protection state")
+        _validated_identifier(self.expected_protection_kind, "expected_protection_kind")
+        _validated_bool(
+            self.risk_increasing_actions_blocked,
+            "risk_increasing_actions_blocked",
+        )
+        if self.risk_increasing_actions_blocked is not (
+            self.protection_status == "missing_expected_protection"
+        ):
+            raise ReadModelError("risk block must match execution protection state")
+        _validated_journal_reference_tuple(self.journal_references, "journal_references")
+        _validated_journal_reference_tuple(
+            self.execution_journal_references,
+            "execution_journal_references",
+        )
+        if not set(self.execution_journal_references).issubset(self.journal_references):
+            raise ReadModelError("execution journal references must belong to the run manifest")
+        if self.evidence_source != "schema_v4_sqlite_digest_bound_jsonl":
+            raise ReadModelError("evidence_source must identify validated schema-v4 evidence")
+        if self.classifications != (
+            "simulated",
+            "local_only",
+            "fake_broker_derived",
+            "externally_unverified",
+        ):
+            raise ReadModelError("execution classifications must match local simulation evidence")
+        if self.broker_derived is not False:
+            raise ReadModelError("broker_derived must remain false")
+        if self.externally_verified is not False:
+            raise ReadModelError("externally_verified must remain false")
+        _assert_json_serializable(self.to_json_dict(), "simulation execution attribution")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "workflow_id": self.workflow_id,
+            "workflow_version": self.workflow_version,
+            "run_id": self.run_id,
+            "execution_id": self.execution_id,
+            "order_intent_id": self.order_intent_id,
+            "risk_decision_id": self.risk_decision_id,
+            "approval_ticket_id": self.approval_ticket_id,
+            "approval_decision_id": self.approval_decision_id,
+            "order_id": self.order_id,
+            "fill_reference": self.fill_reference,
+            "position_id": self.position_id,
+            "protection_status": self.protection_status,
+            "expected_protection_kind": self.expected_protection_kind,
+            "risk_increasing_actions_blocked": self.risk_increasing_actions_blocked,
+            "alert_id": self.alert_id,
+            "journal_references": list(self.journal_references),
+            "execution_journal_references": list(self.execution_journal_references),
+            "evidence_source": self.evidence_source,
+            "classifications": list(self.classifications),
+            "broker_derived": self.broker_derived,
+            "externally_verified": self.externally_verified,
+        }
+
+
+@dataclass(frozen=True)
 class AuditEventReadModel:
     sequence: int
     event_type: str
@@ -231,6 +342,7 @@ class AuditEventReadModel:
     order_id: str | None = None
     ticket_id: str | None = None
     severity: str | None = None
+    execution_attribution: SimulationExecutionAttributionReadModel | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -251,6 +363,12 @@ class AuditEventReadModel:
             "emergency",
         }:
             raise ReadModelError("severity must be a known alert severity")
+        if self.execution_attribution is not None:
+            _validated_model(
+                self.execution_attribution,
+                SimulationExecutionAttributionReadModel,
+                "execution_attribution",
+            )
         _assert_json_serializable(self.to_json_dict(), "audit event read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -265,6 +383,11 @@ class AuditEventReadModel:
             "order_id": self.order_id,
             "ticket_id": self.ticket_id,
             "severity": self.severity,
+            "execution_attribution": (
+                None
+                if self.execution_attribution is None
+                else self.execution_attribution.to_json_dict()
+            ),
         }
 
 
@@ -398,6 +521,7 @@ class OrderReadModel:
     requires_reconciliation: bool
     cumulative_filled_quantity: int
     leaves_quantity: int
+    execution_attribution: SimulationExecutionAttributionReadModel | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -417,6 +541,17 @@ class OrderReadModel:
         _nonnegative_integer(self.leaves_quantity, "leaves_quantity")
         if self.cumulative_filled_quantity + self.leaves_quantity > self.quantity:
             raise ReadModelError("filled and leaves quantities must not exceed quantity")
+        if self.execution_attribution is not None:
+            _validated_model(
+                self.execution_attribution,
+                SimulationExecutionAttributionReadModel,
+                "execution_attribution",
+            )
+            if (
+                self.execution_attribution.order_id != self.order_id
+                or self.execution_attribution.risk_decision_id != self.risk_decision_id
+            ):
+                raise ReadModelError("order execution attribution is inconsistent")
         _assert_json_serializable(self.to_json_dict(), "order read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -434,6 +569,11 @@ class OrderReadModel:
             "requires_reconciliation": self.requires_reconciliation,
             "cumulative_filled_quantity": self.cumulative_filled_quantity,
             "leaves_quantity": self.leaves_quantity,
+            "execution_attribution": (
+                None
+                if self.execution_attribution is None
+                else self.execution_attribution.to_json_dict()
+            ),
         }
 
 
@@ -446,6 +586,7 @@ class PositionReadModel:
     protection_status: str
     updated_at: str
     source: str = "simulation"
+    execution_attribution: SimulationExecutionAttributionReadModel | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -464,6 +605,17 @@ class PositionReadModel:
             raise ReadModelError("protection_status must be a known protection state")
         _parse_timestamp(self.updated_at, "updated_at")
         _validated_identifier(self.source, "source")
+        if self.execution_attribution is not None:
+            _validated_model(
+                self.execution_attribution,
+                SimulationExecutionAttributionReadModel,
+                "execution_attribution",
+            )
+            if (
+                self.execution_attribution.position_id != self.position_id
+                or self.execution_attribution.protection_status != self.protection_status
+            ):
+                raise ReadModelError("position execution attribution is inconsistent")
         _assert_json_serializable(self.to_json_dict(), "position read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -476,6 +628,11 @@ class PositionReadModel:
             "protection_status": self.protection_status,
             "updated_at": self.updated_at,
             "source": self.source,
+            "execution_attribution": (
+                None
+                if self.execution_attribution is None
+                else self.execution_attribution.to_json_dict()
+            ),
         }
 
 
@@ -488,6 +645,7 @@ class AlertReadModel:
     title: str
     created_at: str
     source_event_reference: str
+    execution_attribution: SimulationExecutionAttributionReadModel | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -501,6 +659,14 @@ class AlertReadModel:
         _validated_text(self.title, "title")
         _parse_timestamp(self.created_at, "created_at")
         _validated_identifier(self.source_event_reference, "source_event_reference")
+        if self.execution_attribution is not None:
+            _validated_model(
+                self.execution_attribution,
+                SimulationExecutionAttributionReadModel,
+                "execution_attribution",
+            )
+            if self.execution_attribution.alert_id != self.alert_id:
+                raise ReadModelError("alert execution attribution is inconsistent")
         _assert_json_serializable(self.to_json_dict(), "alert read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -513,6 +679,11 @@ class AlertReadModel:
             "title": self.title,
             "created_at": self.created_at,
             "source_event_reference": self.source_event_reference,
+            "execution_attribution": (
+                None
+                if self.execution_attribution is None
+                else self.execution_attribution.to_json_dict()
+            ),
         }
 
 
@@ -1697,6 +1868,27 @@ def _validated_identifier_tuple(values: tuple[str, ...], field_name: str) -> tup
         raise ReadModelError(f"{field_name} must be a tuple")
     for value in values:
         _validated_identifier(value, field_name)
+    return values
+
+
+def _validated_journal_reference_tuple(
+    values: tuple[str, ...],
+    field_name: str,
+) -> tuple[str, ...]:
+    _validated_identifier_tuple(values, field_name)
+    if not values or len(set(values)) != len(values):
+        raise ReadModelError(f"{field_name} must contain unique journal references")
+    sequences = []
+    for value in values:
+        prefix, separator, raw_sequence = value.partition(":")
+        if prefix != "journal_sequence" or separator != ":" or not raw_sequence.isdigit():
+            raise ReadModelError(f"{field_name} must contain journal_sequence references")
+        sequence = int(raw_sequence)
+        if sequence < 1:
+            raise ReadModelError(f"{field_name} must contain positive journal sequences")
+        sequences.append(sequence)
+    if sequences != sorted(sequences):
+        raise ReadModelError(f"{field_name} must be sequence ordered")
     return values
 
 

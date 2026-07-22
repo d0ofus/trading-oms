@@ -223,6 +223,7 @@ def test_read_model_json_shapes_are_stable() -> None:
         "order_id": "order-001",
         "ticket_id": "ticket-001",
         "severity": "warning",
+        "execution_attribution": None,
     }
     assert signal.to_json_dict()["signal"] == "long_bias"
     assert risk.to_json_dict()["failed_check_names"] == ["market_data_freshness"]

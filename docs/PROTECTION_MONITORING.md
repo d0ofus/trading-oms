@@ -26,6 +26,10 @@ It shows:
 Missing expected protection is rendered as a critical operator-visible condition. Critical and
 emergency local alerts remain visible with their source event reference.
 
+Durable execution positions link alerts and audit records through exact execution and position
+attribution. The monitor displays workflow/run/execution, protection, risk-block, and journal facts.
+It does not infer linkage from a shared symbol when durable attribution is available.
+
 The dashboard is inspection-only. It cannot reconcile positions, acknowledge alerts, deliver alerts,
 connect to a broker, amend orders, or change protection state.
 
@@ -46,5 +50,6 @@ protective order.
 
 - Exception references are derived from current read-model state until explicit protection-exception
   records exist.
-- Alert linkage uses `source_event_reference` matching a position ID when available.
+- Representative alert linkage uses `source_event_reference`; durable execution linkage uses exact
+  projected position attribution.
 - Richer protection lifecycle history remains future work.

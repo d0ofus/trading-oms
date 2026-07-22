@@ -524,6 +524,18 @@ class LocalSqlitePersistenceStore:
             ).fetchall()
         return tuple(_workflow_simulation_evidence_from_row(row) for row in rows)
 
+    def list_all_workflow_simulation_run_evidence(self) -> tuple[dict[str, Any], ...]:
+        self.initialize()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT *
+                FROM workflow_simulation_run_evidence
+                ORDER BY updated_at, workflow_id, run_id
+                """,
+            ).fetchall()
+        return tuple(_workflow_simulation_evidence_from_row(row) for row in rows)
+
     def reserve_workflow_simulation_decision(
         self,
         request_payload: Mapping[str, Any],

@@ -47,8 +47,16 @@ export function buildProtectionMonitoringView(
       position,
       statusLabel: formatIdentifier(position.protection_status),
       exceptionReference: buildExceptionReference(position),
-      linkedAlerts: alerts.filter((alert) => alert.source_event_reference === position.position_id),
-      linkedAuditEvents: auditEvents.filter((event) => event.symbol === position.symbol),
+      linkedAlerts: alerts.filter((alert) =>
+        position.execution_attribution
+          ? alert.execution_attribution?.position_id === position.position_id
+          : alert.source_event_reference === position.position_id,
+      ),
+      linkedAuditEvents: auditEvents.filter((event) =>
+        position.execution_attribution
+          ? event.execution_attribution?.position_id === position.position_id
+          : event.symbol === position.symbol,
+      ),
     };
   });
   const protectedPositions = positionViews.filter(
