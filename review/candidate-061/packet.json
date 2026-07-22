@@ -4456,7 +4456,7 @@
   "schema_version": 1,
   "tooling": {
     "generator_path": "backend/src/trading_oms_backend/independent_review_packet.py",
-    "generator_sha256": "8a70cea441852dc030767d497fd30fa6dc43337b9d1a850abbb303e8c45cd703",
+    "generator_sha256": "04e277f97e3d1ba3fb26fea55cc90e3c01bc5d8cc59f38e89bde8766123b1d0e",
     "specification_path": "review/candidate-061/spec.json",
     "specification_sha256": "2c0c7de06d22a6510dabb9eaa8f5fa9e424904f07fce75fbceb87e6c2c7a57df"
   },
