@@ -110,5 +110,12 @@ Committed saved-workflow approval/rejection and explicit execution evidence reco
 same list/get APIs. Approval alone remains `approved_not_executed`; only the separate Admin command
 can execute, and persistence never routes to a real broker.
 
+The read-only execution projector enumerates all evidence rows in deterministic
+`updated_at`, `workflow_id`, and `run_id` order. The runner validates the complete row set against
+one JSONL read before exposing projection sources. A malformed, pending, digest-invalid,
+source-mismatched, or contradictory row therefore quarantines the complete execution-backed read
+snapshot rather than allowing healthy-looking rows to hide it. Projection reads do not write,
+repair, delete, or append evidence.
+
 This is bounded local development storage. It is not a production database, backup/restore design,
 multi-host writer, deployment approval, broker-session record, or paper/live trading history.

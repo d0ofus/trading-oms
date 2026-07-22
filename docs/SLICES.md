@@ -2982,3 +2982,62 @@ Recommended following slice:
   audit read APIs so the broader operations shell reflects real local simulation results rather
   than separate representative read-model data;
 - keep Candidate 063, IBKR transport, deployment, production rollout, and live trading deferred.
+
+---
+
+## Non-broker candidate - durable simulation execution read-model projections
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; read-only local simulation evidence only
+
+branch: `candidate-slice-durable-simulation-execution-read-model-projections`
+
+Goal:
+Project only fully validated committed saved-workflow execution evidence into the existing orders,
+positions, alerts, protection, and audit read surfaces with exact lineage and explicit local
+simulation provenance.
+
+Scope:
+- deterministic all-workflow schema-v4 evidence enumeration and one-source JSONL validation;
+- atomic read-only projection of orders, positions, local alerts, and execution audit events;
+- exact workflow/version/run/execution/intent/risk/approval/order/fill/position/protection/alert and
+  journal attribution;
+- replacement, never mixing, of representative records when a durable execution exists;
+- generic 503 quarantine for pending, malformed, corrupt, source-mismatched, contradictory,
+  duplicate, or otherwise unavailable evidence;
+- operations rows, audit explorer, order detail, position detail, and protection monitor
+  workflow/run drill-down.
+
+Completed:
+- [x] The safety-critical ExecPlan was the first branch edit.
+- [x] The persistence and runner boundary validates every evidence row before exposing projection
+  sources and performs no writes or repairs.
+- [x] Durable rows carry fixed local-only, simulated, fake-broker-derived, externally-unverified
+  provenance while `broker_derived` and `externally_verified` remain false.
+- [x] Protected and missing-protection executions project through backend APIs and frontend views.
+- [x] Client validation rejects mixed durable/representative provenance and partial identity sets.
+
+Non-goals:
+- mutation endpoints, automatic execution, automatic retry, repair, or journal rewriting;
+- IBKR SDK, socket, probe, contract lookup, host/port, account, credential, or broker transport;
+- external alert delivery, deployment, production rollout, readiness-gate relaxation, or live
+  trading;
+- Candidate 063 implementation or relaxation of its review gates.
+
+Acceptance criteria:
+- [x] Focused backend and frontend tests cover protected/missing protection, restart, repeated
+  reads, deterministic ordering, duplicates, provenance, filtering, corruption, representative
+  separation, generic API failure, and absent unsafe controls.
+- [x] Full repository verification passes with 671 backend and 153 frontend tests, Ruff formatting
+  and lint, TypeScript type checking, frontend lint, repository security checks, and resilience
+  tests; the frontend production build passes with only the existing advisory chunk-size warning.
+- [x] Localhost Vite-proxy inspection confirms durable protected and missing-protection evidence is
+  visible with exact workflow/run/execution lineage and no broker, account, credential, transmit,
+  deployment, production, or live-trading control.
+- [x] P0/P1 self-review is clear; exact remote PR-head CI remains required before this candidate is
+  complete and the PR must remain unmerged for human review.
+
+Recommended following slice:
+- reassess the highest-value non-broker operator gap after this read-only evidence loop is complete;
+- keep Candidate 063, IBKR transport, deployment, production rollout, and live trading deferred.

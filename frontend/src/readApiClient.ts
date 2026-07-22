@@ -42,6 +42,7 @@ export type ProvenanceClassification =
   | "local_only"
   | "test_double"
   | "adapter_only"
+  | "fake_broker_derived"
   | "externally_unverified";
 
 export type ReadModelProvenanceApiView = {
@@ -116,6 +117,32 @@ export type AuditEventApiView = {
   order_id: string | null;
   ticket_id: string | null;
   severity: "informational" | "warning" | "critical" | "emergency" | null;
+  execution_attribution?: SimulationExecutionAttributionApiView | null;
+};
+
+export type SimulationExecutionAttributionApiView = {
+  schema_version: 1;
+  workflow_id: string;
+  workflow_version: number;
+  run_id: string;
+  execution_id: string;
+  order_intent_id: string;
+  risk_decision_id: string;
+  approval_ticket_id: string;
+  approval_decision_id: string;
+  order_id: string;
+  fill_reference: string;
+  position_id: string;
+  protection_status: "expected_protection_present" | "missing_expected_protection";
+  expected_protection_kind: string;
+  risk_increasing_actions_blocked: boolean;
+  alert_id: string;
+  journal_references: string[];
+  execution_journal_references: string[];
+  evidence_source: "schema_v4_sqlite_digest_bound_jsonl";
+  classifications: ProvenanceClassification[];
+  broker_derived: false;
+  externally_verified: false;
 };
 
 export type SignalApiView = {
@@ -166,6 +193,7 @@ export type OrderApiView = {
   requires_reconciliation: boolean;
   cumulative_filled_quantity: number;
   leaves_quantity: number;
+  execution_attribution?: SimulationExecutionAttributionApiView | null;
 };
 
 export type PositionApiView = {
@@ -181,6 +209,7 @@ export type PositionApiView = {
     | "review_required";
   updated_at: string;
   source: string;
+  execution_attribution?: SimulationExecutionAttributionApiView | null;
 };
 
 export type AlertApiView = {
@@ -192,6 +221,7 @@ export type AlertApiView = {
   title: string;
   created_at: string;
   source_event_reference: string;
+  execution_attribution?: SimulationExecutionAttributionApiView | null;
 };
 
 export type ReadinessApiView = {
@@ -752,7 +782,7 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         client.getOperationalControls(),
       ]);
 
-      return {
+      const snapshot = {
         provenance: {
           emergency_stop: emergencyStopEnvelope.provenance,
           operator_session: operatorSessionEnvelope.provenance,
@@ -784,6 +814,8 @@ export function createReadApiClient(options: ReadApiClientOptions = {}): ReadApi
         paperTrading: paperTradingEnvelope.data,
         operationalControls: operationalControlsEnvelope.data,
       };
+      validateExecutionProjectionSnapshot(snapshot);
+      return snapshot;
     },
   };
 
@@ -858,6 +890,7 @@ function validateEnvelope<Payload>(
     "local_only",
     "test_double",
     "adapter_only",
+    "fake_broker_derived",
     "externally_unverified",
   ]);
   const classifications = provenance.classifications;
@@ -877,6 +910,193 @@ function validateEnvelope<Payload>(
     throw new ReadApiProvenanceError("Read API provenance exceeds the current evidence boundary");
   }
   return value as ReadApiEnvelope<Payload>;
+}
+
+function validateExecutionProjectionSnapshot(snapshot: OperationsApiSnapshot) {
+  const resources = ["audit_events", "orders", "positions", "alerts"] as const;
+  const projectedResources = resources.filter((resource) =>
+    snapshot.provenance[resource].classifications.includes("fake_broker_derived"),
+  );
+  const records = [
+    ...snapshot.auditEvents,
+    ...snapshot.orders,
+    ...snapshot.positions,
+    ...snapshot.alerts,
+  ];
+  if (projectedResources.length === 0) {
+    if (records.some((record) => record.execution_attribution != null)) {
+      throw new ReadApiProvenanceError(
+        "Representative read records must not claim durable execution attribution",
+      );
+    }
+    return;
+  }
+  if (projectedResources.length !== resources.length) {
+    throw new ReadApiProvenanceError("Durable execution provenance is incomplete");
+  }
+  const expectedClassifications = [
+    "simulated",
+    "local_only",
+    "fake_broker_derived",
+    "externally_unverified",
+  ];
+  if (
+    resources.some(
+      (resource) =>
+        snapshot.provenance[resource].source !==
+          "durable_saved_workflow_simulation_execution" ||
+        snapshot.provenance[resource].classifications.join(",") !==
+          expectedClassifications.join(","),
+    )
+  ) {
+    throw new ReadApiProvenanceError("Durable execution provenance is inconsistent");
+  }
+  if (
+    snapshot.orders.length === 0 ||
+    snapshot.positions.length === 0 ||
+    snapshot.alerts.length === 0 ||
+    snapshot.auditEvents.length === 0
+  ) {
+    throw new ReadApiProvenanceError("Durable execution projection is partial");
+  }
+  for (const record of records) {
+    validateExecutionAttribution(record.execution_attribution);
+  }
+  for (const order of snapshot.orders) {
+    const attribution = order.execution_attribution!;
+    if (
+      order.order_id !== attribution.order_id ||
+      order.risk_decision_id !== attribution.risk_decision_id
+    ) {
+      throw new ReadApiProvenanceError("Durable order attribution is inconsistent");
+    }
+  }
+  for (const position of snapshot.positions) {
+    const attribution = position.execution_attribution!;
+    if (
+      position.position_id !== attribution.position_id ||
+      position.protection_status !== attribution.protection_status
+    ) {
+      throw new ReadApiProvenanceError("Durable position attribution is inconsistent");
+    }
+  }
+  for (const alert of snapshot.alerts) {
+    if (alert.alert_id !== alert.execution_attribution!.alert_id) {
+      throw new ReadApiProvenanceError("Durable alert attribution is inconsistent");
+    }
+  }
+  for (const event of snapshot.auditEvents) {
+    const attribution = event.execution_attribution!;
+    if (
+      event.run_id !== attribution.run_id ||
+      event.order_id !== attribution.order_id ||
+      event.ticket_id !== attribution.approval_ticket_id
+    ) {
+      throw new ReadApiProvenanceError("Durable audit attribution is inconsistent");
+    }
+  }
+  const orderExecutions = new Set(
+    snapshot.orders.map((record) => record.execution_attribution?.execution_id),
+  );
+  const positionExecutions = new Set(
+    snapshot.positions.map((record) => record.execution_attribution?.execution_id),
+  );
+  const alertExecutions = new Set(
+    snapshot.alerts.map((record) => record.execution_attribution?.execution_id),
+  );
+  const auditExecutions = new Set(
+    snapshot.auditEvents.map((record) => record.execution_attribution?.execution_id),
+  );
+  if (
+    orderExecutions.size !== snapshot.orders.length ||
+    positionExecutions.size !== snapshot.positions.length ||
+    alertExecutions.size !== snapshot.alerts.length ||
+    new Set(snapshot.auditEvents.map((event) => event.sequence)).size !==
+      snapshot.auditEvents.length ||
+    !sameStringSet(orderExecutions, positionExecutions) ||
+    !sameStringSet(orderExecutions, alertExecutions) ||
+    !sameStringSet(orderExecutions, auditExecutions)
+  ) {
+    throw new ReadApiProvenanceError("Durable execution projection identities are incomplete");
+  }
+}
+
+function validateExecutionAttribution(
+  value: SimulationExecutionAttributionApiView | null | undefined,
+): asserts value is SimulationExecutionAttributionApiView {
+  if (
+    !isRecord(value) ||
+    value.schema_version !== 1 ||
+    typeof value.workflow_version !== "number" ||
+    !Number.isInteger(value.workflow_version) ||
+    value.workflow_version < 1
+  ) {
+    throw new ReadApiProvenanceError("Durable execution attribution is invalid");
+  }
+  const identifiers = [
+    "workflow_id",
+    "run_id",
+    "execution_id",
+    "order_intent_id",
+    "risk_decision_id",
+    "approval_ticket_id",
+    "approval_decision_id",
+    "order_id",
+    "fill_reference",
+    "position_id",
+    "expected_protection_kind",
+    "alert_id",
+  ] as const;
+  const expectedClassifications = [
+    "simulated",
+    "local_only",
+    "fake_broker_derived",
+    "externally_unverified",
+  ];
+  if (
+    identifiers.some((field) => typeof value[field] !== "string" || !value[field]) ||
+    !["expected_protection_present", "missing_expected_protection"].includes(
+      String(value.protection_status),
+    ) ||
+    value.risk_increasing_actions_blocked !==
+      (value.protection_status === "missing_expected_protection") ||
+    value.evidence_source !== "schema_v4_sqlite_digest_bound_jsonl" ||
+    value.broker_derived !== false ||
+    value.externally_verified !== false ||
+    !Array.isArray(value.classifications) ||
+    value.classifications.join(",") !== expectedClassifications.join(",") ||
+    !validJournalReferences(value.journal_references) ||
+    !validJournalReferences(value.execution_journal_references) ||
+    !value.execution_journal_references.every((item) =>
+      value.journal_references.includes(item),
+    )
+  ) {
+    throw new ReadApiProvenanceError("Durable execution attribution is unsafe");
+  }
+}
+
+function validJournalReferences(value: unknown): value is string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    !value.every(
+      (item) => typeof item === "string" && /^journal_sequence:[1-9][0-9]*$/.test(item),
+    ) ||
+    new Set(value).size !== value.length
+  ) {
+    return false;
+  }
+  const sequences = value.map((item) => Number(item.split(":")[1]));
+  return sequences.every((sequence, index) => index === 0 || sequence > sequences[index - 1]);
+}
+
+function sameStringSet(left: Set<string | undefined>, right: Set<string | undefined>) {
+  return (
+    !left.has(undefined) &&
+    !right.has(undefined) &&
+    left.size === right.size &&
+    [...left].every((item) => right.has(item))
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

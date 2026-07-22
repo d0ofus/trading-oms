@@ -31,6 +31,7 @@ import {
   type ReadApiClient,
   type ReadApiLoadState,
   type ReadModelProvenanceApiView,
+  type SimulationExecutionAttributionApiView,
 } from "./readApiClient";
 import {
   createSimulationApprovalApiClient,
@@ -1320,12 +1321,28 @@ export function App({
             <div className="audit-explorer-layout">
               <div className="audit-filter-grid" aria-label="Audit event filters">
                 <AuditFilterInput
+                  label="Workflow"
+                  name="auditWorkflowId"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, workflowId: value }))
+                  }
+                  value={auditFilters.workflowId}
+                />
+                <AuditFilterInput
                   label="Run"
                   name="auditRunId"
                   onChange={(value) =>
                     setAuditFilters((current) => ({ ...current, runId: value }))
                   }
                   value={auditFilters.runId}
+                />
+                <AuditFilterInput
+                  label="Execution"
+                  name="auditExecutionId"
+                  onChange={(value) =>
+                    setAuditFilters((current) => ({ ...current, executionId: value }))
+                  }
+                  value={auditFilters.executionId}
                 />
                 <AuditFilterInput
                   label="Event type"
@@ -1693,6 +1710,9 @@ function AuditEventDetail({ event }: { event: AuditEventApiView | null }) {
       <AuditDetailRow label="Ticket" value={event.ticket_id} />
       <AuditDetailRow label="Severity" value={event.severity} />
       <AuditDetailRow label="Summary" value={event.summary} />
+      {event.execution_attribution ? (
+        <ExecutionAttributionFacts attribution={event.execution_attribution} />
+      ) : null}
     </article>
   );
 }
@@ -1741,6 +1761,9 @@ function OrderDetailPanel({ detail }: { detail: OrderDetailView | null }) {
           <PostureItem label="Updated" value={order.updated_at} />
           <PostureItem label="Reconciliation" value={detail.reconciliationLabel} />
         </dl>
+        {order.execution_attribution ? (
+          <ExecutionAttributionFacts attribution={order.execution_attribution} />
+        ) : null}
       </article>
 
       <article className="detail-card">
@@ -1790,6 +1813,9 @@ function PositionDetailPanel({ detail }: { detail: PositionDetailView | null }) 
           <PostureItem label="Updated" value={position.updated_at} />
           <PostureItem label="Protection state" value={detail.protectionLabel} />
         </dl>
+        {position.execution_attribution ? (
+          <ExecutionAttributionFacts attribution={position.execution_attribution} />
+        ) : null}
       </article>
 
       <article className="detail-card">
@@ -2448,7 +2474,67 @@ function ProtectionPositionCard({
         <PostureItem label="Linked alerts" value={`${positionView.linkedAlerts.length}`} />
         <PostureItem label="Linked audit" value={`${positionView.linkedAuditEvents.length}`} />
       </dl>
+      {position.execution_attribution ? (
+        <ExecutionAttributionFacts attribution={position.execution_attribution} compact />
+      ) : null}
     </article>
+  );
+}
+
+function ExecutionAttributionFacts({
+  attribution,
+  compact = false,
+}: {
+  attribution: SimulationExecutionAttributionApiView;
+  compact?: boolean;
+}) {
+  return (
+    <div className="execution-attribution" aria-label="Durable execution lineage">
+      <p className="eyebrow">Durable execution lineage</p>
+      <dl className={`detail-facts${compact ? " compact" : ""}`}>
+        <PostureItem
+          label="Workflow"
+          value={`${attribution.workflow_id} version ${attribution.workflow_version}`}
+        />
+        <PostureItem label="Run" value={attribution.run_id} />
+        <PostureItem label="Execution" value={attribution.execution_id} />
+        {!compact ? (
+          <>
+            <PostureItem label="Order intent" value={attribution.order_intent_id} />
+            <PostureItem label="Risk decision" value={attribution.risk_decision_id} />
+            <PostureItem label="Approval ticket" value={attribution.approval_ticket_id} />
+            <PostureItem
+              label="Approval decision"
+              value={attribution.approval_decision_id}
+            />
+            <PostureItem label="OMS order" value={attribution.order_id} />
+            <PostureItem label="Fill reference" value={attribution.fill_reference} />
+            <PostureItem label="Position" value={attribution.position_id} />
+            <PostureItem label="Alert" value={attribution.alert_id} />
+          </>
+        ) : null}
+        <PostureItem
+          label="Protection"
+          value={formatIdentifier(attribution.protection_status)}
+        />
+        <PostureItem
+          label="Risk block"
+          value={
+            attribution.risk_increasing_actions_blocked
+              ? "Risk-increasing actions blocked"
+              : "No protection-derived risk block"
+          }
+        />
+        <PostureItem
+          label="Journal"
+          value={`${attribution.journal_references[0]} plus ${Math.max(0, attribution.journal_references.length - 1)} linked`}
+        />
+        <PostureItem
+          label="Provenance"
+          value={attribution.classifications.map(formatIdentifier).join(" / ")}
+        />
+      </dl>
+    </div>
   );
 }
 
@@ -2502,25 +2588,33 @@ function buildWorkflowRows(snapshot: OperationsApiSnapshot): Record<WorkflowSect
     })),
     Orders: snapshot.orders.map((order) => ({
       label: order.client_order_id,
-      detail: `${order.side} ${order.quantity} ${order.symbol}; leaves ${order.leaves_quantity}`,
+      detail: order.execution_attribution
+        ? `${order.side} ${order.quantity} ${order.symbol}; run ${order.execution_attribution.run_id}`
+        : `${order.side} ${order.quantity} ${order.symbol}; leaves ${order.leaves_quantity}`,
       status: formatIdentifier(order.state),
       tone: order.requires_reconciliation ? "critical" : orderTone(order.state),
     })),
     Positions: snapshot.positions.map((position) => ({
       label: position.position_id,
-      detail: `${position.symbol} quantity ${position.quantity} at ${position.average_price}`,
+      detail: position.execution_attribution
+        ? `${position.symbol} quantity ${position.quantity}; run ${position.execution_attribution.run_id}`
+        : `${position.symbol} quantity ${position.quantity} at ${position.average_price}`,
       status: formatIdentifier(position.protection_status),
       tone: positionTone(position),
     })),
     "Audit events": snapshot.auditEvents.map((event) => ({
       label: event.event_type,
-      detail: event.summary,
+      detail: event.execution_attribution
+        ? `${event.summary}; run ${event.execution_attribution.run_id}`
+        : event.summary,
       status: `sequence ${event.sequence}`,
       tone: event.event_type.includes("alert") ? "critical" : "info",
     })),
     Alerts: snapshot.alerts.map((alert) => ({
       label: alert.title,
-      detail: `${formatIdentifier(alert.channel)} alert from ${alert.source_event_reference}`,
+      detail: alert.execution_attribution
+        ? `${formatIdentifier(alert.channel)} alert; run ${alert.execution_attribution.run_id}`
+        : `${formatIdentifier(alert.channel)} alert from ${alert.source_event_reference}`,
       status: alert.severity,
       tone: alertTone(alert),
     })),

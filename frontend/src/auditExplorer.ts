@@ -1,7 +1,9 @@
 import type { AuditEventApiView } from "./readApiClient";
 
 export type AuditExplorerFilterState = {
+  workflowId: string;
   runId: string;
+  executionId: string;
   eventType: string;
   symbol: string;
   orderId: string;
@@ -11,7 +13,9 @@ export type AuditExplorerFilterState = {
 };
 
 export const defaultAuditExplorerFilters: AuditExplorerFilterState = {
+  workflowId: "",
   runId: "",
+  executionId: "",
   eventType: "",
   symbol: "",
   orderId: "",
@@ -40,7 +44,9 @@ export function filterAuditEvents(
 ) {
   return events.filter((event) => {
     return (
+      matchesFilter(event.execution_attribution?.workflow_id, filters.workflowId) &&
       matchesFilter(event.run_id, filters.runId) &&
+      matchesFilter(event.execution_attribution?.execution_id, filters.executionId) &&
       matchesFilter(event.event_type, filters.eventType) &&
       matchesFilter(event.symbol, filters.symbol) &&
       matchesFilter(event.order_id, filters.orderId) &&

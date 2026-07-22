@@ -12,8 +12,10 @@ Strategy DSL mutation.
 The UI shell is a read-only inspection surface for the local trading workflow. It gives operators a
 single place to see the current safety posture and workflow records from the backend read API.
 
-The current backend read API still serves safe local demo read models. If the backend is unavailable,
-the frontend shows a conservative fallback with paper mode, live trading disabled, and no broker
+The backend read API serves safe representative records until committed saved-workflow simulation
+execution evidence exists. Orders, positions, alerts, and audit events then switch atomically to
+validated durable local projections. If the backend or execution evidence is unavailable, the
+frontend shows a conservative fallback with paper mode, live trading disabled, and no broker
 connectivity.
 
 ## Safety Posture
@@ -46,6 +48,10 @@ Each section uses backend read-model data when available. Slice 015 adds a local
 safe inputs for the replay-only Strategy DSL preview. There are no forms, action buttons, API
 mutation controls, broker controls, or order submission controls.
 
+Durable execution rows show exact workflow/run drill-down in the operations lists, audit explorer,
+order detail, position detail, and protection monitor. The client rejects mixed durable and
+representative provenance or any partial execution identity set.
+
 ## Guarantees
 
 - The operational workflow sections are read-only.
@@ -71,9 +77,10 @@ Frontend tests render the shell to static markup and assert:
 
 ## Current Limitations
 
-- Backend read API records are currently safe demo data.
+- Signals, general risk decisions, and general approval-ticket records remain safe representative
+  data outside the saved-workflow run inspector.
 - The visual builder is local state only.
-- There is no authentication or authorization model yet.
+- Local development authentication and separated Admin/Approver roles are not production identity.
 - User-customizable behavior is limited to local visual-builder DSL preview fields.
-- The UI is not yet wired to approval decisions, OMS state transitions, alert delivery, or audit
-  event queries.
+- The UI can inspect durable simulation OMS, position, protection, local-alert, and journal evidence;
+  it cannot deliver alerts externally or control a broker.

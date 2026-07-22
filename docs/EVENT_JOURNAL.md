@@ -60,3 +60,8 @@ broker, fill, position, protection, local alert intent/no-op dispatch, node-stat
 Exact retries do not append again. Interrupted or corrupt evidence is preserved and unavailable,
 not silently completed. No event represents external alert delivery, real broker contact, account
 routing, or a live order.
+
+The durable execution read-model projector uses only the already validated manifest records and
+their original JSONL sequences. It never appends a projection event, rewrites a record, or treats
+the SQLite manifest as a replacement source. Audit projection order is the original sequence order;
+duplicate sequences across projected executions fail closed.

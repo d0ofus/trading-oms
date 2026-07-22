@@ -52,6 +52,27 @@ Audit event read models include optional filter metadata for the audit explorer:
 API slice. It uses static inspection records only. It does not read from a database, write to the
 event journal, submit orders, approve tickets, connect to brokers, or call external services.
 
+## Durable Simulation Execution Projection
+
+The orders, positions, alerts, and audit-event endpoints replace their representative rows when at
+least one committed saved-workflow simulation execution exists. The projection consumes only
+records returned by `WorkflowSimulationRunner.list_projection_sources()`. The runner reconstructs
+every SQLite schema-v4 row and verifies its SHA-256-bound manifest against the append-only JSONL
+journal before any row reaches the read-model projector.
+
+Each durable row contains one strict `execution_attribution` object with the exact workflow and
+version, run, execution, order intent, risk decision, approval ticket and decision, OMS order,
+fake-fill reference, position, protection status, local alert, complete run manifest references,
+and execution-specific journal references. Its fixed classifications are `simulated`, `local_only`,
+`fake_broker_derived`, and `externally_unverified`; `broker_derived` and `externally_verified`
+remain false.
+
+The projector is all-or-nothing. Pending, partial, malformed, digest-invalid, source-mismatched,
+contradictory, duplicate, or otherwise unavailable evidence returns generic HTTP 503 from all four
+affected endpoints without partial data. Unaffected safety and readiness endpoints remain
+available. If there is no committed execution, the existing representative rows and representative
+provenance remain visibly unchanged.
+
 ## Safety Guarantees
 
 - Read models are frozen dataclasses.
@@ -84,7 +105,6 @@ event journal, submit orders, approve tickets, connect to brokers, or call exter
   live trading or controlled paper rollout.
 - The operations controls read model is representative read-only visibility, not external
   observability, backup execution, restore execution, audit deletion, or production rollout.
-- SQLite persistence exists as a local foundation, but these read models are not yet backed by it at
-  runtime.
-- Position records are inspection summaries only; full simulated position tracking remains a later
-  slice.
+- Signals, general risk decisions, and general approval tickets remain representative in these
+  aggregate APIs; exact saved-workflow execution lineage is available on projected orders,
+  positions, alerts, and audit events.

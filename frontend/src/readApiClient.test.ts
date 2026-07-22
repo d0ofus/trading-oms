@@ -8,6 +8,7 @@ import {
   safeFallbackOperationsSnapshot,
   type OperationsApiSnapshot,
   type OperationsProvenanceResource,
+  type SimulationExecutionAttributionApiView,
 } from "./readApiClient";
 
 const sampleSnapshot: OperationsApiSnapshot = {
@@ -395,6 +396,51 @@ describe("read API client", () => {
     expect(JSON.stringify(state)).not.toContain("secret-token-value");
   });
 
+  it("fails closed when durable execution provenance is only partially present", async () => {
+    const partialResponses: Record<string, unknown> = {
+      ...responseByEndpoint,
+      [READ_API_ENDPOINTS.orders]: {
+        ...readEnvelope("orders", sampleSnapshot.orders),
+        provenance: {
+          ...sampleSnapshot.provenance.orders,
+          source: "durable_saved_workflow_simulation_execution",
+          classifications: [
+            "simulated",
+            "local_only",
+            "fake_broker_derived",
+            "externally_unverified",
+          ],
+        },
+      },
+    };
+    const client = createReadApiClient({
+      fetchImpl: async (input) => jsonResponse(partialResponses[String(input)]),
+    });
+
+    const state = await loadOperationsSnapshot(client);
+
+    expect(state.status).toBe("error");
+    expect(state.snapshot).toEqual(safeFallbackOperationsSnapshot);
+    expect(JSON.stringify(state.snapshot)).not.toContain(
+      "durable_saved_workflow_simulation_execution",
+    );
+  });
+
+  it("accepts one complete durable execution projection identity set", async () => {
+    const client = createReadApiClient({
+      fetchImpl: async (input) => jsonResponse(projectedResponseByEndpoint[String(input)]),
+    });
+
+    const state = await loadOperationsSnapshot(client);
+
+    expect(state.status).toBe("loaded");
+    expect(state.snapshot.orders[0]?.execution_attribution).toEqual(projectedAttribution);
+    expect(state.snapshot.positions[0]?.protection_status).toBe(
+      "missing_expected_protection",
+    );
+    expect(state.snapshot.alerts[0]?.severity).toBe("critical");
+  });
+
   it("exposes no action, broker-network, credential, or secret affordance keys", () => {
     const keys = allPayloadKeys({
       initialReadApiState,
@@ -474,3 +520,84 @@ const forbiddenAffordanceKeys = new Set([
   "transmit",
   "transmit_url",
 ]);
+
+const projectedAttribution: SimulationExecutionAttributionApiView = {
+  schema_version: 1,
+  workflow_id: "workflow-001",
+  workflow_version: 2,
+  run_id: "run-001",
+  execution_id: "execution-001",
+  order_intent_id: "intent-001",
+  risk_decision_id: "risk-001",
+  approval_ticket_id: "ticket-001",
+  approval_decision_id: "decision-001",
+  order_id: "order-001",
+  fill_reference: "fake-client-001",
+  position_id: "position-001",
+  protection_status: "missing_expected_protection",
+  expected_protection_kind: "stop_loss",
+  risk_increasing_actions_blocked: true,
+  alert_id: "alert-001",
+  journal_references: ["journal_sequence:1", "journal_sequence:2"],
+  execution_journal_references: ["journal_sequence:2"],
+  evidence_source: "schema_v4_sqlite_digest_bound_jsonl",
+  classifications: [
+    "simulated",
+    "local_only",
+    "fake_broker_derived",
+    "externally_unverified",
+  ],
+  broker_derived: false,
+  externally_verified: false,
+};
+
+const projectedResponseByEndpoint: Record<string, unknown> = {
+  ...responseByEndpoint,
+  [READ_API_ENDPOINTS.auditEvents]: projectedEnvelope("audit_events", [
+    {
+      ...sampleSnapshot.auditEvents[0],
+      sequence: 2,
+      run_id: projectedAttribution.run_id,
+      order_id: projectedAttribution.order_id,
+      ticket_id: projectedAttribution.approval_ticket_id,
+      execution_attribution: projectedAttribution,
+    },
+  ]),
+  [READ_API_ENDPOINTS.orders]: projectedEnvelope("orders", [
+    {
+      ...sampleSnapshot.orders[0],
+      execution_attribution: projectedAttribution,
+    },
+  ]),
+  [READ_API_ENDPOINTS.positions]: projectedEnvelope("positions", [
+    {
+      ...sampleSnapshot.positions[0],
+      protection_status: projectedAttribution.protection_status,
+      execution_attribution: projectedAttribution,
+    },
+  ]),
+  [READ_API_ENDPOINTS.alerts]: projectedEnvelope("alerts", [
+    {
+      ...sampleSnapshot.alerts[0],
+      severity: "critical",
+      execution_attribution: projectedAttribution,
+    },
+  ]),
+};
+
+function projectedEnvelope(resource: OperationsProvenanceResource, data: unknown) {
+  return {
+    schema_version: 1,
+    resource,
+    provenance: {
+      schema_version: 1,
+      resource,
+      source: "durable_saved_workflow_simulation_execution",
+      classifications: projectedAttribution.classifications,
+      broker_derived: false,
+      externally_verified: false,
+      summary: "Validated local saved-workflow simulation execution evidence",
+    },
+    data,
+  };
+}

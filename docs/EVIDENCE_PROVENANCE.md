@@ -46,12 +46,17 @@ fallback.
 - `demo`: produced by the deterministic demo read-model builder.
 - `simulated`: produced by local simulation or replay behavior.
 - `local_only`: observed or recorded only in the local process or local artifacts.
+- `fake_broker_derived`: derived from the deterministic local fake-broker execution path, never
+  from an authenticated broker session or transport.
 - `test_double`: supplied by an injected fake or test connector.
 - `adapter_only`: demonstrates an adapter boundary without an authenticated external session.
 - `externally_unverified`: not reviewed and accepted as external evidence.
 
-All current operations resources are explicitly not broker-derived and externally unverified. The
-paper-trading view is adapter-only/test-double data and is not an authenticated IBKR paper session.
+Durable saved-workflow execution projections use the exact classifications `simulated`,
+`local_only`, `fake_broker_derived`, and `externally_unverified`. Their envelope and attribution
+still set `broker_derived` to false because the evidence came from the local fake broker, not an
+authenticated external broker. Representative paper-trading data remains adapter-only/test-double
+data. Neither source is an authenticated IBKR paper session or externally verified evidence.
 
 ## Readiness Evidence
 
@@ -75,7 +80,8 @@ live trading.
 
 ## Hard Stops
 
-- No current read-model record is authenticated broker evidence.
+- No current read-model record is authenticated broker evidence; `fake_broker_derived` explicitly
+  denotes local deterministic simulation evidence.
 - No current local artifact is externally verified rollout evidence.
 - Provenance metadata cannot authorize an action.
 - Missing, unverified, expired, and contradictory mandatory evidence all block readiness.

@@ -60,7 +60,11 @@ export function buildPositionDetailView(
     position,
     protectionLabel: formatIdentifier(position.protection_status),
     quantityLabel: `${position.quantity} ${position.symbol} at ${position.average_price}`,
-    linkedAuditEvents: auditEvents.filter((event) => event.symbol === position.symbol),
+    linkedAuditEvents: auditEvents.filter((event) =>
+      position.execution_attribution
+        ? event.execution_attribution?.position_id === position.position_id
+        : event.symbol === position.symbol,
+    ),
   };
 }
 

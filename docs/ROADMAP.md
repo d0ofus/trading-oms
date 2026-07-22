@@ -34,6 +34,10 @@ Separately authorized operators can now durably approve or reject the exact pers
 Approval itself stops at `approved_not_executed`. A separately authorized Admin can now consume
 that exact committed evidence through a deliberate simulation-only command, producing durable OMS,
 fake-fill, position, protection, local-alert, and journal evidence. No broker transport is added.
+That committed evidence now projects atomically into the existing order, position, alert,
+protection, and audit read surfaces with exact workflow/run attribution. Invalid durable evidence
+fails the execution-backed views closed; representative rows remain visibly separate when no
+execution exists.
 
 ## Phase 6: Alerts
 
