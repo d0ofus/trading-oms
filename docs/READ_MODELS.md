@@ -52,13 +52,21 @@ Audit event read models include optional filter metadata for the audit explorer:
 API slice. It uses static inspection records only. It does not read from a database, write to the
 event journal, submit orders, approve tickets, connect to brokers, or call external services.
 
-## Durable Simulation Execution Projection
+## Durable Simulation Lifecycle Projection
 
-The orders, positions, alerts, and audit-event endpoints replace their representative rows when at
-least one committed saved-workflow simulation execution exists. The projection consumes only
-records returned by `WorkflowSimulationRunner.list_projection_sources()`. The runner reconstructs
-every SQLite schema-v4 row and verifies its SHA-256-bound manifest against the append-only JSONL
-journal before any row reaches the read-model projector.
+The signal, risk-decision, approval-ticket, audit-event, order, position, and alert endpoints
+replace their representative rows when at least one committed saved-workflow simulation run
+exists. The projection consumes only records returned by
+`WorkflowSimulationRunner.list_projection_sources()`. The runner reconstructs every SQLite
+schema-v4 row and verifies its SHA-256-bound manifest against the append-only JSONL journal before
+any row reaches the read-model projector.
+
+Signals, risk decisions, approval tickets, and audit events carry a strict
+`decision_attribution` object. It preserves the exact workflow/version/run state, persisted signal
+reference, order-intent ID, risk-decision ID, approval-ticket ID, optional decision ID/value/actor/
+reason/timestamp, event references, and complete manifest references. Its fixed classifications
+are `simulated`, `local_only`, and `externally_unverified`; `broker_derived` and
+`externally_verified` remain false.
 
 Each durable row contains one strict `execution_attribution` object with the exact workflow and
 version, run, execution, order intent, risk decision, approval ticket and decision, OMS order,
@@ -67,11 +75,13 @@ and execution-specific journal references. Its fixed classifications are `simula
 `fake_broker_derived`, and `externally_unverified`; `broker_derived` and `externally_verified`
 remain false.
 
-The projector is all-or-nothing. Pending, partial, malformed, digest-invalid, source-mismatched,
-contradictory, duplicate, or otherwise unavailable evidence returns generic HTTP 503 from all four
-affected endpoints without partial data. Unaffected safety and readiness endpoints remain
-available. If there is no committed execution, the existing representative rows and representative
-provenance remain visibly unchanged.
+The projector is all-or-nothing across all seven lifecycle resources. Pending persistence,
+partial, malformed, digest-invalid, source-mismatched, contradictory, duplicate, or otherwise
+unavailable evidence returns generic HTTP 503 without partial data. A committed run waiting for a
+manual decision is valid lifecycle evidence; its order, position, and alert resources are empty
+with explicit durable provenance. Unaffected safety and readiness endpoints remain available. If
+there is no committed run, the existing representative rows and provenance remain visibly
+unchanged.
 
 ## Safety Guarantees
 
@@ -96,7 +106,8 @@ provenance remain visibly unchanged.
 
 ## Current Limitations
 
-- The aggregate assembler is local demo data only.
+- The base aggregate assembler is local demo data; validated committed runs replace all seven
+  lifecycle resources atomically.
 - Slice 021 exposes these models through read-only `GET /api/...` endpoints.
 - Frontend screens consume these models for read-only inspection.
 - The paper trading operator read model is representative read-only visibility, not a live IBKR
@@ -105,6 +116,6 @@ provenance remain visibly unchanged.
   live trading or controlled paper rollout.
 - The operations controls read model is representative read-only visibility, not external
   observability, backup execution, restore execution, audit deletion, or production rollout.
-- Signals, general risk decisions, and general approval tickets remain representative in these
-  aggregate APIs; exact saved-workflow execution lineage is available on projected orders,
-  positions, alerts, and audit events.
+- Durable projection remains local simulation evidence. It is not broker-derived or externally
+  verified and does not authorize automatic approval, automatic execution, broker transport, or
+  live trading.

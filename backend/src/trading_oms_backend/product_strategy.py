@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -113,6 +113,46 @@ class ProductBreakoutSignal:
             "historical_session_count": self.historical_session_count,
             "reason": self.reason,
         }
+
+    @classmethod
+    def from_json_dict(cls, raw_signal: Mapping[str, Any]) -> ProductBreakoutSignal:
+        expected_keys = {
+            "schema_version",
+            "strategy_id",
+            "strategy_type",
+            "symbol",
+            "trigger_bar_start_timestamp",
+            "trigger_bar_end_timestamp",
+            "signal",
+            "first_bar_high",
+            "breakout_bar_high",
+            "cumulative_volume",
+            "average_cumulative_volume",
+            "volume_threshold",
+            "volume_multiplier",
+            "historical_session_count",
+            "reason",
+        }
+        if not isinstance(raw_signal, Mapping) or set(raw_signal) != expected_keys:
+            raise ProductBreakoutStrategyError("product strategy signal fields are invalid")
+        if raw_signal["strategy_type"] != STRATEGY_TYPE:
+            raise ProductBreakoutStrategyError("strategy_type is invalid")
+        return cls(
+            schema_version=raw_signal["schema_version"],
+            strategy_id=raw_signal["strategy_id"],
+            symbol=raw_signal["symbol"],
+            trigger_bar_start_timestamp=raw_signal["trigger_bar_start_timestamp"],
+            trigger_bar_end_timestamp=raw_signal["trigger_bar_end_timestamp"],
+            signal=raw_signal["signal"],
+            first_bar_high=raw_signal["first_bar_high"],
+            breakout_bar_high=raw_signal["breakout_bar_high"],
+            cumulative_volume=raw_signal["cumulative_volume"],
+            average_cumulative_volume=raw_signal["average_cumulative_volume"],
+            volume_threshold=raw_signal["volume_threshold"],
+            volume_multiplier=raw_signal["volume_multiplier"],
+            historical_session_count=raw_signal["historical_session_count"],
+            reason=raw_signal["reason"],
+        )
 
 
 def run_first_bar_breakout_volume_strategy(

@@ -202,7 +202,7 @@ def get_signals(request: Request) -> dict[str, Any]:
         resource="signals",
         action="view",
     )
-    return _operations_read_model().to_api_envelope("signals")
+    return _execution_operations_read_model().to_api_envelope("signals")
 
 
 @app.get("/api/risk-decisions")
@@ -213,7 +213,7 @@ def get_risk_decisions(request: Request) -> dict[str, Any]:
         resource="risk_decisions",
         action="view",
     )
-    return _operations_read_model().to_api_envelope("risk_decisions")
+    return _execution_operations_read_model().to_api_envelope("risk_decisions")
 
 
 @app.get("/api/approval-tickets")
@@ -224,7 +224,7 @@ def get_approval_tickets(request: Request) -> dict[str, Any]:
         resource="approval_tickets",
         action="view",
     )
-    return _operations_read_model().to_api_envelope("approval_tickets")
+    return _execution_operations_read_model().to_api_envelope("approval_tickets")
 
 
 @app.get("/api/orders")

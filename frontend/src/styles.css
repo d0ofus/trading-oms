@@ -1344,6 +1344,28 @@ dd {
   padding: 10px 12px;
 }
 
+.decision-attribution {
+  min-width: 0;
+  border-top: 1px solid #edf0eb;
+  padding-top: 12px;
+}
+
+.record-lineage-link {
+  display: inline-flex;
+  width: fit-content;
+  color: #285c3a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.record-lineage-link:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid #78ad7b;
+  outline-offset: 3px;
+}
+
 .approval-form {
   display: grid;
   gap: 12px;

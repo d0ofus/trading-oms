@@ -32,12 +32,13 @@ current local in-process state. The provenance field identifies representative, 
 local-only, test-double, adapter-only, and externally unverified data as applicable. See
 `docs/EVIDENCE_PROVENANCE.md`.
 
-When committed saved-workflow simulation executions exist, `/api/audit-events`, `/api/orders`,
-`/api/positions`, and `/api/alerts` atomically replace their representative rows with validated
-schema-v4 SQLite plus digest-bound JSONL projections. Their provenance adds
-`fake_broker_derived`, while `broker_derived` and `externally_verified` remain false. Any pending,
-corrupt, source-mismatched, duplicate, or contradictory execution evidence returns generic HTTP
-503 from all four affected views without partial data.
+When committed saved-workflow simulation runs exist, `/api/audit-events`, `/api/signals`,
+`/api/risk-decisions`, `/api/approval-tickets`, `/api/orders`, `/api/positions`, and `/api/alerts`
+atomically replace representative rows with validated schema-v4 SQLite plus digest-bound JSONL
+projections. Upstream records remain simulated, local-only, externally unverified, and explicitly
+not broker-derived. Downstream records add `fake_broker_derived` only for an actual local execution.
+Any pending persistence, corrupt, source-mismatched, duplicate, or contradictory evidence returns
+generic HTTP 503 from all seven views without partial data.
 
 `GET /api/audit-export-bundle` returns a deterministic local review bundle built from the current
 read-model snapshot, workflow definitions, workflow simulation run records, and journal records. It
@@ -79,12 +80,12 @@ present.
 
 ## Current Limitations
 
-- Signals, general risk decisions, and general approval tickets use safe representative data;
-  execution-backed orders, positions, alerts, and audit events use validated durable local
-  projections when available.
+- Signals, risk decisions, approval tickets, audit events, orders, positions, and alerts use one
+  validated durable lifecycle projection when any committed run exists. Unreached downstream
+  stages are empty, not representative.
 - The provenance envelope is metadata only and cannot make representative or local-only data into
   broker-derived or externally verified evidence.
-- The execution projector reads local SQLite and JSONL evidence only; it does not write, repair,
+- The lifecycle projector reads local SQLite and JSONL evidence only; it does not write, repair,
   retry, delete, route, or transmit anything.
 - Frontend screens consume these endpoints for read-only inspection and safe fallback rendering.
 - Approval ticket read models are visible for inspection; simulation-only approval decision

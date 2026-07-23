@@ -6,6 +6,7 @@ import {
   safeFallbackOperationsSnapshot,
   type OperationsApiSnapshot,
   type ReadApiLoadState,
+  type SimulationDecisionAttributionApiView,
   type SimulationExecutionAttributionApiView,
 } from "./readApiClient";
 import type { WorkflowRunInspectionState } from "./workflowRunInspector";
@@ -289,6 +290,31 @@ describe("App", () => {
     expect(text).not.toContain("connect broker");
   });
 
+  it("keeps representative terminal approval tickets visible and non-actionable", () => {
+    const terminalStatuses = ["approved", "rejected", "expired", "cancelled"] as const;
+    const terminalState: ReadApiLoadState = {
+      status: "loaded",
+      snapshot: {
+        ...backendSnapshot,
+        approvalTickets: terminalStatuses.map((status) => ({
+          ...backendSnapshot.approvalTickets[0],
+          ticket_id: `ticket-${status}-001`,
+          status,
+        })),
+      },
+      errorMessage: null,
+    };
+    const html = renderToStaticMarkup(<App initialReadState={terminalState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    for (const status of terminalStatuses) {
+      expect(text).toContain(`ticket-${status}-001`);
+      expect(html).not.toContain(`name="ticket-${status}-001-actor"`);
+    }
+    expect(text).toContain("Historical ticket is terminal and read only");
+    expect(html).not.toContain('class="approval-form"');
+  });
+
   it("renders read-only order and position detail pages", () => {
     const html = renderToStaticMarkup(<App initialReadState={loadedReadState} />);
     const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -340,6 +366,34 @@ describe("App", () => {
     ]) {
       expect(text).not.toContain(forbiddenAction);
     }
+  });
+
+  it("renders durable upstream decision lifecycle without generic approval forms", () => {
+    const html = renderToStaticMarkup(<App initialReadState={durableDecisionReadState} />);
+    const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+    expect(text).toContain("Durable decision lineage");
+    expect(text).toContain("workflow-projected-001 version 3");
+    expect(text).toContain("run-projected-pending");
+    expect(text).toContain("run-projected-rejected");
+    expect(text).toContain("Waiting for approval");
+    expect(text).toContain("Rejected");
+    expect(text).toContain("reviewer-operator-002");
+    expect(text).toContain("Replay evidence did not satisfy operator review");
+    expect(text).toContain("2026-07-22T01:06:00Z");
+    expect(text).toContain("signal-run-projected-pending");
+    expect(text).toContain("run-projected-pending-intent");
+    expect(text).toContain("run-projected-pending-risk");
+    expect(text).toContain("run-projected-pending-approval-ticket");
+    expect(text).toContain("journal_sequence:301 plus 3 linked");
+    expect(text).toContain("Validated local saved-workflow simulation lifecycle evidence");
+    expect(text).toContain("Risk decisions");
+    expect(text).toContain("Inspect saved run");
+    expect(html).not.toContain('name="run-projected-pending-approval-ticket-actor"');
+    expect(html).not.toContain('name="run-projected-rejected-approval-ticket-actor"');
+    expect(text).not.toContain("Fake broker derived");
+    expect(text).not.toContain("Connect IBKR");
+    expect(text).not.toContain("Transmit order");
   });
 
   it("renders read-only protection monitoring dashboard", () => {
@@ -800,6 +854,202 @@ const projectedAttribution: SimulationExecutionAttributionApiView = {
   externally_verified: false,
 };
 
+const pendingDecisionAttribution: SimulationDecisionAttributionApiView = {
+  schema_version: 1,
+  workflow_id: "workflow-projected-001",
+  workflow_version: 3,
+  run_id: "run-projected-pending",
+  run_status: "waiting_for_approval",
+  signal_id: "signal-run-projected-pending",
+  order_intent_id: "run-projected-pending-intent",
+  risk_decision_id: "run-projected-pending-risk",
+  approval_ticket_id: "run-projected-pending-approval-ticket",
+  approval_decision_id: null,
+  approval_decision: null,
+  approval_actor: null,
+  approval_reason: null,
+  approval_decided_at: null,
+  signal_journal_reference: "journal_sequence:301",
+  order_intent_journal_reference: "journal_sequence:302",
+  risk_journal_reference: "journal_sequence:303",
+  approval_ticket_journal_reference: "journal_sequence:304",
+  approval_decision_journal_reference: null,
+  journal_references: [
+    "journal_sequence:301",
+    "journal_sequence:302",
+    "journal_sequence:303",
+    "journal_sequence:304",
+  ],
+  evidence_source: "schema_v4_sqlite_digest_bound_jsonl",
+  classifications: ["simulated", "local_only", "externally_unverified"],
+  broker_derived: false,
+  externally_verified: false,
+};
+
+const rejectedDecisionAttribution: SimulationDecisionAttributionApiView = {
+  ...pendingDecisionAttribution,
+  run_id: "run-projected-rejected",
+  run_status: "rejected",
+  signal_id: "signal-run-projected-rejected",
+  order_intent_id: "run-projected-rejected-intent",
+  risk_decision_id: "run-projected-rejected-risk",
+  approval_ticket_id: "run-projected-rejected-approval-ticket",
+  approval_decision_id: "run-projected-rejected-decision",
+  approval_decision: "rejected",
+  approval_actor: "reviewer-operator-002",
+  approval_reason: "Replay evidence did not satisfy operator review",
+  approval_decided_at: "2026-07-22T01:06:00Z",
+  signal_journal_reference: "journal_sequence:311",
+  order_intent_journal_reference: "journal_sequence:312",
+  risk_journal_reference: "journal_sequence:313",
+  approval_ticket_journal_reference: "journal_sequence:314",
+  approval_decision_journal_reference: "journal_sequence:315",
+  journal_references: [
+    "journal_sequence:311",
+    "journal_sequence:312",
+    "journal_sequence:313",
+    "journal_sequence:314",
+    "journal_sequence:315",
+  ],
+};
+
+const executedDecisionAttribution: SimulationDecisionAttributionApiView = {
+  ...pendingDecisionAttribution,
+  run_id: projectedAttribution.run_id,
+  run_status: "executed_protection_missing",
+  signal_id: "signal-run-projected-001",
+  order_intent_id: projectedAttribution.order_intent_id,
+  risk_decision_id: projectedAttribution.risk_decision_id,
+  approval_ticket_id: projectedAttribution.approval_ticket_id,
+  approval_decision_id: projectedAttribution.approval_decision_id,
+  approval_decision: "approved",
+  approval_actor: "reviewer-operator-001",
+  approval_reason: "Deterministic simulation evidence reviewed",
+  approval_decided_at: "2026-07-22T00:06:00Z",
+  signal_journal_reference: "journal_sequence:197",
+  order_intent_journal_reference: "journal_sequence:198",
+  risk_journal_reference: "journal_sequence:199",
+  approval_ticket_journal_reference: "journal_sequence:200",
+  approval_decision_journal_reference: "journal_sequence:201",
+  journal_references: [
+    "journal_sequence:197",
+    "journal_sequence:198",
+    "journal_sequence:199",
+    "journal_sequence:200",
+    "journal_sequence:201",
+    "journal_sequence:202",
+  ],
+};
+
+const durableDecisionReadState: ReadApiLoadState = {
+  status: "loaded",
+  snapshot: {
+    ...backendSnapshot,
+    provenance: {
+      ...backendSnapshot.provenance,
+      ...Object.fromEntries(
+        (
+          [
+            "audit_events",
+            "signals",
+            "risk_decisions",
+            "approval_tickets",
+            "orders",
+            "positions",
+            "alerts",
+          ] as const
+        ).map((resource) => [
+          resource,
+          {
+            schema_version: 1 as const,
+            resource,
+            source: "durable_saved_workflow_simulation",
+            classifications: pendingDecisionAttribution.classifications,
+            broker_derived: false as const,
+            externally_verified: false as const,
+            summary: "Validated local saved-workflow simulation lifecycle evidence",
+          },
+        ]),
+      ),
+    },
+    auditEvents: [
+      {
+        ...backendSnapshot.auditEvents[0],
+        sequence: 301,
+        event_type: "strategy.signal.generated",
+        run_id: pendingDecisionAttribution.run_id,
+        order_id: pendingDecisionAttribution.order_intent_id,
+        ticket_id: pendingDecisionAttribution.approval_ticket_id,
+        decision_attribution: pendingDecisionAttribution,
+      },
+      {
+        ...backendSnapshot.auditEvents[0],
+        sequence: 315,
+        event_type: "approval.ticket.rejected",
+        run_id: rejectedDecisionAttribution.run_id,
+        order_id: rejectedDecisionAttribution.order_intent_id,
+        ticket_id: rejectedDecisionAttribution.approval_ticket_id,
+        decision_attribution: rejectedDecisionAttribution,
+      },
+    ],
+    signals: [pendingDecisionAttribution, rejectedDecisionAttribution].map((attribution) => ({
+      schema_version: 1 as const,
+      signal_id: attribution.signal_id,
+      strategy_id: "first-five-minute-breakout",
+      symbol: "TSLA",
+      signal: "long_entry_candidate" as const,
+      reason: "breakout_and_volume_confirmed",
+      bar_start_timestamp: "2026-07-22T01:00:00Z",
+      bar_end_timestamp: "2026-07-22T01:05:00Z",
+      decision_attribution: attribution,
+    })),
+    riskDecisions: [pendingDecisionAttribution, rejectedDecisionAttribution].map(
+      (attribution) => ({
+        schema_version: 1 as const,
+        request_id: attribution.risk_decision_id,
+        evaluated_at: "2026-07-22T01:05:00Z",
+        symbol: "TSLA",
+        risk_intent: "increase" as const,
+        result: "passed" as const,
+        failed_check_names: [],
+        decision_attribution: attribution,
+      }),
+    ),
+    approvalTickets: [
+      {
+        schema_version: 1,
+        ticket_id: pendingDecisionAttribution.approval_ticket_id,
+        order_id: pendingDecisionAttribution.order_intent_id,
+        symbol: "TSLA",
+        side: "buy",
+        quantity: 5,
+        status: "pending",
+        risk_decision_id: pendingDecisionAttribution.risk_decision_id,
+        created_at: "2026-07-22T01:05:00Z",
+        expires_at: "2026-07-22T01:15:00Z",
+        decision_attribution: pendingDecisionAttribution,
+      },
+      {
+        schema_version: 1,
+        ticket_id: rejectedDecisionAttribution.approval_ticket_id,
+        order_id: rejectedDecisionAttribution.order_intent_id,
+        symbol: "TSLA",
+        side: "buy",
+        quantity: 5,
+        status: "rejected",
+        risk_decision_id: rejectedDecisionAttribution.risk_decision_id,
+        created_at: "2026-07-22T01:05:00Z",
+        expires_at: "2026-07-22T01:15:00Z",
+        decision_attribution: rejectedDecisionAttribution,
+      },
+    ],
+    orders: [],
+    positions: [],
+    alerts: [],
+  },
+  errorMessage: null,
+};
+
 const projectedExecutionReadState: ReadApiLoadState = {
   status: "loaded",
   snapshot: {
@@ -807,20 +1057,63 @@ const projectedExecutionReadState: ReadApiLoadState = {
     provenance: {
       ...backendSnapshot.provenance,
       ...Object.fromEntries(
-        (["audit_events", "orders", "positions", "alerts"] as const).map((resource) => [
-          resource,
-          {
-            schema_version: 1 as const,
+        [
+          ...(["audit_events", "signals", "risk_decisions", "approval_tickets"] as const).map(
+            (resource) => [
+              resource,
+              {
+                schema_version: 1 as const,
+                resource,
+                source: "durable_saved_workflow_simulation",
+                classifications: executedDecisionAttribution.classifications,
+                broker_derived: false as const,
+                externally_verified: false as const,
+                summary: "Validated local saved-workflow simulation lifecycle evidence",
+              },
+            ],
+          ),
+          ...(["orders", "positions", "alerts"] as const).map((resource) => [
             resource,
-            source: "durable_saved_workflow_simulation_execution",
-            classifications: projectedAttribution.classifications,
-            broker_derived: false as const,
-            externally_verified: false as const,
-            summary: "Validated local saved-workflow simulation execution evidence",
-          },
-        ]),
+            {
+              schema_version: 1 as const,
+              resource,
+              source: "durable_saved_workflow_simulation_execution",
+              classifications: projectedAttribution.classifications,
+              broker_derived: false as const,
+              externally_verified: false as const,
+              summary: "Validated local saved-workflow simulation execution evidence",
+            },
+          ]),
+        ],
       ),
     },
+    signals: [
+      {
+        ...backendSnapshot.signals[0],
+        signal_id: executedDecisionAttribution.signal_id,
+        signal: "long_entry_candidate",
+        decision_attribution: executedDecisionAttribution,
+      },
+    ],
+    riskDecisions: [
+      {
+        ...backendSnapshot.riskDecisions[0],
+        request_id: executedDecisionAttribution.risk_decision_id,
+        result: "passed",
+        failed_check_names: [],
+        decision_attribution: executedDecisionAttribution,
+      },
+    ],
+    approvalTickets: [
+      {
+        ...backendSnapshot.approvalTickets[0],
+        ticket_id: executedDecisionAttribution.approval_ticket_id,
+        order_id: executedDecisionAttribution.order_intent_id,
+        risk_decision_id: executedDecisionAttribution.risk_decision_id,
+        status: "approved",
+        decision_attribution: executedDecisionAttribution,
+      },
+    ],
     orders: [
       {
         ...backendSnapshot.orders[0],
@@ -862,6 +1155,7 @@ const projectedExecutionReadState: ReadApiLoadState = {
         order_id: projectedAttribution.order_id,
         ticket_id: projectedAttribution.approval_ticket_id,
         severity: "critical",
+        decision_attribution: executedDecisionAttribution,
         execution_attribution: projectedAttribution,
       },
     ],

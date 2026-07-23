@@ -29,10 +29,11 @@ Audit event read models now include optional fields for filtering:
 
 The fields are inspection metadata only. They do not create order actions or mutable event history.
 
-Durable saved-workflow simulation events also carry a strict execution attribution object. The
-event detail exposes workflow/version, run, execution, intent, risk, manual approval, order, fill,
-position, protection, local alert, and journal references. The event list is deterministic by JSONL
-sequence and remains read-only.
+Durable saved-workflow simulation events carry strict decision attribution from signal through
+manual approval, including exact workflow/version/run, intent, risk, ticket, actor, reason,
+timestamp, and manifest references. Executed runs additionally carry execution attribution for
+the local OMS, fake fill, position, protection, and local alert. The event list is deterministic by
+JSONL sequence and remains read-only.
 
 ## Secret Rendering Boundary
 
@@ -42,7 +43,7 @@ screenshots, tests, or alert payloads.
 
 ## Current Limitations
 
-- The explorer uses representative data until committed saved-workflow execution evidence exists;
-  it then uses only the validated durable projection for execution-backed events.
+- The explorer uses representative data until any committed saved-workflow run exists; it then
+  uses only the validated durable lifecycle projection.
 - The filters are client-side.
 - Slice 040's SQLite journal index is not yet wired as the backend data source.

@@ -222,6 +222,151 @@ class OperatorSessionReadModel:
 
 
 @dataclass(frozen=True)
+class SimulationDecisionAttributionReadModel:
+    workflow_id: str
+    workflow_version: int
+    run_id: str
+    run_status: str
+    signal_id: str
+    order_intent_id: str
+    risk_decision_id: str
+    approval_ticket_id: str
+    approval_decision_id: str | None
+    approval_decision: str | None
+    approval_actor: str | None
+    approval_reason: str | None
+    approval_decided_at: str | None
+    signal_journal_reference: str
+    order_intent_journal_reference: str
+    risk_journal_reference: str
+    approval_ticket_journal_reference: str
+    approval_decision_journal_reference: str | None
+    journal_references: tuple[str, ...]
+    evidence_source: str = "schema_v4_sqlite_digest_bound_jsonl"
+    classifications: tuple[str, ...] = (
+        "simulated",
+        "local_only",
+        "externally_unverified",
+    )
+    broker_derived: bool = False
+    externally_verified: bool = False
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        _validate_schema_version(self.schema_version)
+        for field_name in (
+            "workflow_id",
+            "run_id",
+            "signal_id",
+            "order_intent_id",
+            "risk_decision_id",
+            "approval_ticket_id",
+        ):
+            _validated_identifier(getattr(self, field_name), field_name)
+        _positive_integer(self.workflow_version, "workflow_version")
+        if self.run_status not in {
+            "waiting_for_approval",
+            "approved_not_executed",
+            "rejected",
+            "executed",
+            "executed_protection_missing",
+        }:
+            raise ReadModelError("run_status must be a durable workflow simulation state")
+        decision_values = (
+            self.approval_decision_id,
+            self.approval_decision,
+            self.approval_actor,
+            self.approval_reason,
+            self.approval_decided_at,
+            self.approval_decision_journal_reference,
+        )
+        if self.run_status == "waiting_for_approval":
+            if any(value is not None for value in decision_values):
+                raise ReadModelError(
+                    "pending decision attribution must not contain decision fields"
+                )
+        else:
+            if any(value is None for value in decision_values):
+                raise ReadModelError("terminal decision attribution requires decision fields")
+            for field_name in (
+                "approval_decision_id",
+                "approval_actor",
+                "approval_reason",
+            ):
+                _validated_identifier(getattr(self, field_name), field_name)
+            _parse_timestamp(self.approval_decided_at, "approval_decided_at")
+            expected_decision = "rejected" if self.run_status == "rejected" else "approved"
+            if self.approval_decision != expected_decision:
+                raise ReadModelError("approval_decision must match run_status")
+        event_references = (
+            self.signal_journal_reference,
+            self.order_intent_journal_reference,
+            self.risk_journal_reference,
+            self.approval_ticket_journal_reference,
+        )
+        for index, reference in enumerate(event_references):
+            _validated_journal_reference_tuple((reference,), f"event_journal_reference_{index}")
+        if self.approval_decision_journal_reference is not None:
+            _validated_journal_reference_tuple(
+                (self.approval_decision_journal_reference,),
+                "approval_decision_journal_reference",
+            )
+        _validated_journal_reference_tuple(self.journal_references, "journal_references")
+        all_event_references = event_references + (
+            ()
+            if self.approval_decision_journal_reference is None
+            else (self.approval_decision_journal_reference,)
+        )
+        if len(set(all_event_references)) != len(all_event_references):
+            raise ReadModelError("decision event journal references must be unique")
+        if not set(all_event_references).issubset(self.journal_references):
+            raise ReadModelError("decision event references must belong to the run manifest")
+        if self.signal_id != self.signal_journal_reference:
+            raise ReadModelError("signal_id must be the persisted signal journal reference")
+        if self.evidence_source != "schema_v4_sqlite_digest_bound_jsonl":
+            raise ReadModelError("evidence_source must identify validated schema-v4 evidence")
+        if self.classifications != (
+            "simulated",
+            "local_only",
+            "externally_unverified",
+        ):
+            raise ReadModelError("decision classifications must match local simulation evidence")
+        if self.broker_derived is not False:
+            raise ReadModelError("broker_derived must remain false")
+        if self.externally_verified is not False:
+            raise ReadModelError("externally_verified must remain false")
+        _assert_json_serializable(self.to_json_dict(), "simulation decision attribution")
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "workflow_id": self.workflow_id,
+            "workflow_version": self.workflow_version,
+            "run_id": self.run_id,
+            "run_status": self.run_status,
+            "signal_id": self.signal_id,
+            "order_intent_id": self.order_intent_id,
+            "risk_decision_id": self.risk_decision_id,
+            "approval_ticket_id": self.approval_ticket_id,
+            "approval_decision_id": self.approval_decision_id,
+            "approval_decision": self.approval_decision,
+            "approval_actor": self.approval_actor,
+            "approval_reason": self.approval_reason,
+            "approval_decided_at": self.approval_decided_at,
+            "signal_journal_reference": self.signal_journal_reference,
+            "order_intent_journal_reference": self.order_intent_journal_reference,
+            "risk_journal_reference": self.risk_journal_reference,
+            "approval_ticket_journal_reference": self.approval_ticket_journal_reference,
+            "approval_decision_journal_reference": self.approval_decision_journal_reference,
+            "journal_references": list(self.journal_references),
+            "evidence_source": self.evidence_source,
+            "classifications": list(self.classifications),
+            "broker_derived": self.broker_derived,
+            "externally_verified": self.externally_verified,
+        }
+
+
+@dataclass(frozen=True)
 class SimulationExecutionAttributionReadModel:
     workflow_id: str
     workflow_version: int
@@ -342,6 +487,7 @@ class AuditEventReadModel:
     order_id: str | None = None
     ticket_id: str | None = None
     severity: str | None = None
+    decision_attribution: SimulationDecisionAttributionReadModel | None = None
     execution_attribution: SimulationExecutionAttributionReadModel | None = None
     schema_version: int = 1
 
@@ -369,6 +515,12 @@ class AuditEventReadModel:
                 SimulationExecutionAttributionReadModel,
                 "execution_attribution",
             )
+        if self.decision_attribution is not None:
+            _validated_model(
+                self.decision_attribution,
+                SimulationDecisionAttributionReadModel,
+                "decision_attribution",
+            )
         _assert_json_serializable(self.to_json_dict(), "audit event read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -383,6 +535,11 @@ class AuditEventReadModel:
             "order_id": self.order_id,
             "ticket_id": self.ticket_id,
             "severity": self.severity,
+            "decision_attribution": (
+                None
+                if self.decision_attribution is None
+                else self.decision_attribution.to_json_dict()
+            ),
             "execution_attribution": (
                 None
                 if self.execution_attribution is None
@@ -400,6 +557,7 @@ class SignalReadModel:
     reason: str
     bar_start_timestamp: str
     bar_end_timestamp: str
+    decision_attribution: SimulationDecisionAttributionReadModel | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -407,11 +565,19 @@ class SignalReadModel:
         _validated_identifier(self.signal_id, "signal_id")
         _validated_identifier(self.strategy_id, "strategy_id")
         _validated_symbol(self.symbol)
-        if self.signal not in {"long_bias", "risk_off_bias"}:
-            raise ReadModelError("signal must be long_bias or risk_off_bias")
+        if self.signal not in {"long_bias", "risk_off_bias", "long_entry_candidate"}:
+            raise ReadModelError("signal must be long_bias, risk_off_bias, or long_entry_candidate")
         _validated_identifier(self.reason, "reason")
         _parse_timestamp(self.bar_start_timestamp, "bar_start_timestamp")
         _parse_timestamp(self.bar_end_timestamp, "bar_end_timestamp")
+        if self.decision_attribution is not None:
+            _validated_model(
+                self.decision_attribution,
+                SimulationDecisionAttributionReadModel,
+                "decision_attribution",
+            )
+            if self.signal_id != self.decision_attribution.signal_id:
+                raise ReadModelError("signal attribution must match signal_id")
         _assert_json_serializable(self.to_json_dict(), "signal read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -424,6 +590,11 @@ class SignalReadModel:
             "reason": self.reason,
             "bar_start_timestamp": self.bar_start_timestamp,
             "bar_end_timestamp": self.bar_end_timestamp,
+            "decision_attribution": (
+                None
+                if self.decision_attribution is None
+                else self.decision_attribution.to_json_dict()
+            ),
         }
 
 
@@ -435,6 +606,7 @@ class RiskDecisionReadModel:
     risk_intent: str
     result: str
     failed_check_names: tuple[str, ...]
+    decision_attribution: SimulationDecisionAttributionReadModel | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -451,6 +623,14 @@ class RiskDecisionReadModel:
             raise ReadModelError("passed risk decisions must not contain failed checks")
         if self.result == "blocked" and not self.failed_check_names:
             raise ReadModelError("blocked risk decisions must contain failed checks")
+        if self.decision_attribution is not None:
+            _validated_model(
+                self.decision_attribution,
+                SimulationDecisionAttributionReadModel,
+                "decision_attribution",
+            )
+            if self.request_id != self.decision_attribution.risk_decision_id:
+                raise ReadModelError("risk attribution must match request_id")
         _assert_json_serializable(self.to_json_dict(), "risk decision read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -462,6 +642,11 @@ class RiskDecisionReadModel:
             "risk_intent": self.risk_intent,
             "result": self.result,
             "failed_check_names": list(self.failed_check_names),
+            "decision_attribution": (
+                None
+                if self.decision_attribution is None
+                else self.decision_attribution.to_json_dict()
+            ),
         }
 
 
@@ -476,6 +661,7 @@ class ApprovalTicketReadModel:
     risk_decision_id: str
     created_at: str
     expires_at: str
+    decision_attribution: SimulationDecisionAttributionReadModel | None = None
     schema_version: int = 1
 
     def __post_init__(self) -> None:
@@ -490,6 +676,17 @@ class ApprovalTicketReadModel:
         _validated_identifier(self.risk_decision_id, "risk_decision_id")
         _parse_timestamp(self.created_at, "created_at")
         _parse_timestamp(self.expires_at, "expires_at")
+        if self.decision_attribution is not None:
+            _validated_model(
+                self.decision_attribution,
+                SimulationDecisionAttributionReadModel,
+                "decision_attribution",
+            )
+            if (
+                self.ticket_id != self.decision_attribution.approval_ticket_id
+                or self.risk_decision_id != self.decision_attribution.risk_decision_id
+            ):
+                raise ReadModelError("approval attribution must match ticket identities")
         _assert_json_serializable(self.to_json_dict(), "approval ticket read model")
 
     def to_json_dict(self) -> dict[str, Any]:
@@ -504,6 +701,11 @@ class ApprovalTicketReadModel:
             "risk_decision_id": self.risk_decision_id,
             "created_at": self.created_at,
             "expires_at": self.expires_at,
+            "decision_attribution": (
+                None
+                if self.decision_attribution is None
+                else self.decision_attribution.to_json_dict()
+            ),
         }
 
 
