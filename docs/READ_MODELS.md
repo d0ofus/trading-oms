@@ -83,6 +83,22 @@ with explicit durable provenance. Unaffected safety and readiness endpoints rema
 there is no committed run, the existing representative rows and provenance remain visibly
 unchanged.
 
+## Saved-Run Comparison Snapshot
+
+`trading_oms_backend.simulation_run_comparison` builds a frozen read-only snapshot for exactly two
+explicit committed workflow/run selectors. It reuses the strict lifecycle validator and compares
+workflow, run, signal, order intent, risk, ticket, decision, execution, protection, alerts, and
+journal provenance in a fixed order.
+
+Each section and field difference is deterministically classified as added, removed, changed, or
+unchanged. The snapshot binds every manifest sequence to its canonical record SHA-256 and includes
+a deterministic comparison SHA-256. A same-run selection is valid and produces eleven unchanged
+sections. There is no representative fallback when committed sources exist.
+
+Selected audit-export evidence binds one exact committed run to its source-manifest digest and
+either the complete manifest or one exact sequence already contained in that manifest. These are
+in-memory/API records only; no database or journal schema is changed.
+
 ## Safety Guarantees
 
 - Read models are frozen dataclasses.
@@ -119,3 +135,5 @@ unchanged.
 - Durable projection remains local simulation evidence. It is not broker-derived or externally
   verified and does not authorize automatic approval, automatic execution, broker transport, or
   live trading.
+- Saved-run comparison validates every committed source before selection. One corrupt source
+  quarantines comparison/export availability rather than allowing a misleading partial view.

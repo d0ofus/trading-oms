@@ -4,7 +4,7 @@ A production-oriented, self-hosted, semi-automated trading workflow and order-ma
 
 ## Status
 
-Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, durable simulation-only approval and approved-order OMS/fake-broker execution, simulated positions with protection alerts, restart-safe lifecycle and execution read-model projections, a read-only simulation run detail UI, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a read-only protection monitoring dashboard, a read-only paper trading operator section, deterministic local audit export bundles, a typed replay-only Strategy DSL, an interactive typed visual workflow editor with backend-validated versioned local definition persistence and deliberate fixed-replay simulation start, restart-safe local workflow-run evidence bound to the append-only journal, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
+Initial safety foundation with a backend/frontend scaffold, safe configuration, append-only event journal, deterministic market-data replay reader, local bar builder, replay-only strategies including the first product breakout/volume-filter strategy, non-routable order-intent proposals, replay-to-risk-to-approval simulation orchestration, durable simulation-only approval and approved-order OMS/fake-broker execution, simulated positions with protection alerts, restart-safe lifecycle and execution read-model projections, a read-only simulation run detail UI, deterministic two-run comparison and exact saved-run audit selection, structured risk engine, simulation-only fake broker, explicit OMS state machine, local approval tickets, local no-op alerts, a backend-connected read-only UI shell, a read-only audit explorer, a simulation-only approval inbox, read-only order and position detail sections, a read-only protection monitoring dashboard, a read-only paper trading operator section, deterministic local audit export bundles, a typed replay-only Strategy DSL, an interactive typed visual workflow editor with backend-validated versioned local definition persistence and deliberate fixed-replay simulation start, restart-safe local workflow-run evidence bound to the append-only journal, a local SQLite persistence foundation, a local IBKR paper adapter foundation, deterministic local resilience/chaos tests, an auditable live-readiness checklist gate, typed backend read models, read-only backend API endpoints, a frontend read API client, and deterministic simulation run records for safe inspection workflows.
 
 No concrete IBKR application-protocol connector, authenticated broker session, production strategy
 engine, real alert delivery, production deployment, or live order submission exists.
@@ -23,6 +23,11 @@ engine, real alert delivery, production deployment, or live order submission exi
 - Simulated position protection alerts are local/no-op only.
 - Simulation run inspector loads saved workflow-run history through existing read APIs, exposes
   backend-recorded node and journal evidence, and cannot execute actions.
+- Saved-run comparison selects exactly two committed local simulations, reports deterministic
+  added/removed/changed/unchanged evidence, and fails closed rather than returning partial,
+  representative, corrupt, duplicate, mixed-source, or contradictory data.
+- Exact audit selection binds one committed run and either its complete manifest or one exact
+  manifest sequence to source and record digests. The resulting JSON download remains local.
 - Saved workflow run start requires an unchanged validated version, fixed local replay, local admin
   authorization, inactive emergency stop, and explicit two-step confirmation. It stops at manual
   approval and adds no broker transport.
@@ -163,6 +168,8 @@ python -m trading_oms_backend.local_persistence init --database .tmp/trading-oms
 - `docs/SIMULATION_EXECUTION.md`: approved-order OMS and fake broker simulation execution.
 - `docs/SIMULATED_POSITIONS.md`: simulated positions and protection monitoring alerts.
 - `docs/SIMULATION_RUN_DETAIL_UI.md`: read-only simulation run detail UI.
+- `docs/SIMULATION_RUN_COMPARISON.md`: deterministic committed-run comparison and exact local
+  audit-bundle selection.
 - `docs/RISK_ENGINE.md`: structured risk checks and journaled risk decisions.
 - `docs/FAKE_BROKER.md`: simulation-only fake broker behavior.
 - `docs/OMS_STATE_MACHINE.md`: explicit OMS lifecycle states and transitions.

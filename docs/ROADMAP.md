@@ -39,6 +39,9 @@ position, alert, and protection read surfaces with exact workflow/run attributio
 rejected, approved-not-executed, and executed runs share one validated lifecycle snapshot. Invalid
 durable evidence fails all seven lifecycle views closed; representative rows remain visibly
 separate only when no committed run exists.
+Operators can now compare exactly two committed saved simulations across the complete lifecycle
+and journal provenance, then prepare a deterministic local audit bundle for one exact run and
+manifest scope. This remains read-only local simulation evidence and adds no broker transport.
 
 ## Phase 6: Alerts
 

@@ -56,6 +56,7 @@ import {
   formatStrategyDslPreview,
   updateStrategyBuilderState,
 } from "./strategyBuilder";
+import { SimulationRunComparisonPanel } from "./SimulationRunComparisonPanel";
 import { VisualSimulationWorkflowCanvas } from "./visualSimulationWorkflowCanvas";
 import { WorkflowPersistencePanel } from "./WorkflowPersistencePanel";
 import { WorkflowSimulationApprovalPanel } from "./WorkflowSimulationApprovalPanel";
@@ -76,8 +77,18 @@ import {
   type WorkflowNodeRunStatusApiView,
 } from "./workflowApiClient";
 import {
+  createSimulationRunComparisonClient,
+  loadSelectedAuditBundle,
+  loadSimulationRunComparison,
+  type AuditJournalScope,
+  type SimulationAuditBundleState,
+  type SimulationRunComparisonClient,
+  type SimulationRunComparisonState,
+} from "./simulationRunComparison";
+import {
   initialWorkflowRunInspectionState as initialWorkflowRunInspectionLoadState,
   loadWorkflowRunInspection,
+  type WorkflowRunInspectionItem,
   type WorkflowRunInspectionState,
 } from "./workflowRunInspector";
 import {
@@ -138,6 +149,7 @@ type AppProps = {
   initialWorkflowRunInspectionState?: WorkflowRunInspectionState;
   readApiClient?: ReadApiClient;
   simulationApprovalApiClient?: SimulationApprovalApiClient;
+  simulationRunComparisonClient?: SimulationRunComparisonClient;
   workflowApiClient?: WorkflowApiClient;
 };
 
@@ -149,6 +161,7 @@ const defaultWorkflowMetadata: WorkflowPersistenceMetadata = {
 
 const visualBuilderSection = "Visual builder" as const;
 const simulationRunSection = "Simulation run detail" as const;
+const simulationRunComparisonSection = "Run comparison" as const;
 const approvalInboxSection = "Approval inbox" as const;
 const auditExplorerSection = "Audit explorer" as const;
 const orderDetailSection = "Order detail" as const;
@@ -177,6 +190,7 @@ const shellSections = [
   dataProvenanceSection,
   visualBuilderSection,
   simulationRunSection,
+  simulationRunComparisonSection,
   approvalInboxSection,
   auditExplorerSection,
   orderDetailSection,
@@ -197,6 +211,7 @@ export function App({
   initialWorkflowRunInspectionState,
   readApiClient,
   simulationApprovalApiClient,
+  simulationRunComparisonClient,
   workflowApiClient,
 }: AppProps = {}) {
   const [builderState, setBuilderState] = useState(defaultStrategyBuilderState);
@@ -239,6 +254,25 @@ export function App({
   const [workflowRunInspection, setWorkflowRunInspection] = useState<WorkflowRunInspectionState>(
     initialWorkflowRunInspectionState ?? initialWorkflowRunInspectionLoadState,
   );
+  const initialComparisonItems = initialWorkflowRunInspectionState?.items ?? [];
+  const [comparisonLeftKey, setComparisonLeftKey] = useState(
+    initialComparisonItems[0]?.key ?? "",
+  );
+  const [comparisonRightKey, setComparisonRightKey] = useState(
+    initialComparisonItems[1]?.key ?? initialComparisonItems[0]?.key ?? "",
+  );
+  const [simulationRunComparison, setSimulationRunComparison] =
+    useState<SimulationRunComparisonState>({ status: "idle" });
+  const [auditBundleSelection, setAuditBundleSelection] =
+    useState<SimulationAuditBundleState>({ status: "idle" });
+  const [auditBundleTarget, setAuditBundleTarget] = useState<"left" | "right">(
+    "right",
+  );
+  const [auditJournalScope, setAuditJournalScope] =
+    useState<AuditJournalScope>("complete_run_manifest");
+  const [auditJournalReference, setAuditJournalReference] = useState("");
+  const comparisonAttempt = useRef(0);
+  const auditBundleAttempt = useRef(0);
   const [selectedWorkflowRunKey, setSelectedWorkflowRunKey] = useState<string | null>(null);
   const [workflowSimulationDecision, setWorkflowSimulationDecision] =
     useState<WorkflowSimulationDecisionState>({ status: "idle" });
@@ -283,6 +317,14 @@ export function App({
         headers: localOperatorHeaders,
       }),
     [localOperatorHeaders, workflowApiClient],
+  );
+  const runComparisonClient = useMemo(
+    () =>
+      simulationRunComparisonClient ??
+      createSimulationRunComparisonClient({
+        headers: localOperatorHeaders,
+      }),
+    [localOperatorHeaders, simulationRunComparisonClient],
   );
   const dslPreview = useMemo(() => formatStrategyDslPreview(builderState), [builderState]);
   const workflowDslCompileResult = useMemo(
@@ -442,6 +484,27 @@ export function App({
     };
   }, [shouldLoadWorkflowDefinitions, workflowClient]);
 
+  useEffect(() => {
+    if (workflowRunInspection.status !== "loaded") {
+      return;
+    }
+    const items = workflowRunInspection.items;
+    const keys = new Set(items.map((item) => item.key));
+    setComparisonLeftKey((current) =>
+      keys.has(current) ? current : items[0]?.key ?? "",
+    );
+    setComparisonRightKey((current) =>
+      keys.has(current)
+        ? current
+        : items[1]?.key ?? items[0]?.key ?? "",
+    );
+    comparisonAttempt.current += 1;
+    auditBundleAttempt.current += 1;
+    setSimulationRunComparison({ status: "idle" });
+    setAuditBundleSelection({ status: "idle" });
+    setAuditJournalReference("");
+  }, [workflowRunInspection]);
+
   const resetWorkflowSimulationRunStart = () => {
     setWorkflowSimulationRunStart({ status: "idle" });
     setWorkflowSimulationRunConfirmed(false);
@@ -531,6 +594,139 @@ export function App({
   const resetWorkflowSimulationExecution = () => {
     setWorkflowSimulationExecution({ status: "idle" });
     setWorkflowSimulationExecutionConfirmed(false);
+  };
+
+  const resetRunComparisonEvidence = () => {
+    comparisonAttempt.current += 1;
+    auditBundleAttempt.current += 1;
+    setSimulationRunComparison({ status: "idle" });
+    setAuditBundleSelection({ status: "idle" });
+    setAuditJournalReference("");
+  };
+
+  const selectComparisonLeft = (key: string) => {
+    setComparisonLeftKey(key);
+    resetRunComparisonEvidence();
+  };
+
+  const selectComparisonRight = (key: string) => {
+    setComparisonRightKey(key);
+    resetRunComparisonEvidence();
+  };
+
+  const compareSavedSimulationRuns = async () => {
+    const left = inspectionItemForKey(
+      workflowRunInspection.items,
+      comparisonLeftKey,
+    );
+    const right = inspectionItemForKey(
+      workflowRunInspection.items,
+      comparisonRightKey,
+    );
+    if (!left || !right || workflowRunInspection.status !== "loaded") {
+      setSimulationRunComparison({
+        status: "partial_unavailable",
+        errorMessage: "Comparison evidence is incomplete and unavailable",
+      });
+      setAuditBundleSelection({ status: "idle" });
+      return;
+    }
+    const attempt = comparisonAttempt.current + 1;
+    comparisonAttempt.current = attempt;
+    auditBundleAttempt.current += 1;
+    setSimulationRunComparison({ status: "loading" });
+    setAuditBundleSelection({ status: "idle" });
+    const result = await loadSimulationRunComparison(runComparisonClient, {
+      left: comparisonSelector(left),
+      right: comparisonSelector(right),
+    });
+    if (comparisonAttempt.current !== attempt) {
+      return;
+    }
+    setSimulationRunComparison(result);
+    if (result.status === "identical" || result.status === "differing") {
+      setAuditBundleTarget("right");
+      setAuditJournalScope("complete_run_manifest");
+      setAuditJournalReference(
+        result.comparison.right.journal_provenance.journal_references[0] ?? "",
+      );
+    } else {
+      setAuditJournalReference("");
+    }
+  };
+
+  const selectAuditBundleTarget = (target: "left" | "right") => {
+    setAuditBundleTarget(target);
+    auditBundleAttempt.current += 1;
+    setAuditBundleSelection({ status: "idle" });
+    if (
+      simulationRunComparison.status === "identical" ||
+      simulationRunComparison.status === "differing"
+    ) {
+      setAuditJournalReference(
+        simulationRunComparison.comparison[target].journal_provenance
+          .journal_references[0] ?? "",
+      );
+    } else {
+      setAuditJournalReference("");
+    }
+  };
+
+  const selectAuditJournalScope = (scope: AuditJournalScope) => {
+    setAuditJournalScope(scope);
+    auditBundleAttempt.current += 1;
+    setAuditBundleSelection({ status: "idle" });
+  };
+
+  const selectAuditJournalReference = (reference: string) => {
+    setAuditJournalReference(reference);
+    auditBundleAttempt.current += 1;
+    setAuditBundleSelection({ status: "idle" });
+  };
+
+  const prepareSelectedAuditBundle = async () => {
+    if (
+      simulationRunComparison.status !== "identical" &&
+      simulationRunComparison.status !== "differing"
+    ) {
+      return;
+    }
+    const snapshot =
+      simulationRunComparison.comparison[auditBundleTarget];
+    const sequence =
+      auditJournalScope === "single_journal_event"
+        ? journalSequenceFromReference(auditJournalReference)
+        : undefined;
+    if (
+      auditJournalScope === "single_journal_event" &&
+      (!sequence ||
+        !snapshot.journal_provenance.journal_references.includes(
+          auditJournalReference,
+        ))
+    ) {
+      setAuditBundleSelection({
+        status: "partial_unavailable",
+        errorMessage:
+          "Selected audit bundle evidence is incomplete and unavailable",
+      });
+      return;
+    }
+    const attempt = auditBundleAttempt.current + 1;
+    auditBundleAttempt.current = attempt;
+    setAuditBundleSelection({ status: "loading" });
+    const result = await loadSelectedAuditBundle(runComparisonClient, {
+      selector: {
+        workflowId: snapshot.selector.workflow_id,
+        runId: snapshot.selector.run_id,
+      },
+      expectedManifestSha256:
+        snapshot.journal_provenance.manifest_sha256,
+      journalScope: auditJournalScope,
+      journalSequence: sequence,
+    });
+    if (auditBundleAttempt.current === attempt) {
+      setAuditBundleSelection(result);
+    }
   };
 
   const selectLocalOperatorRole = (role: LocalOperatorRole) => {
@@ -1220,6 +1416,44 @@ export function App({
                 </div>
               </div>
             ) : null}
+          </section>
+
+          <section
+            className="run-comparison-section"
+            id={sectionId(simulationRunComparisonSection)}
+          >
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Committed saved-run evidence</p>
+                <h2>Simulation run comparison</h2>
+              </div>
+              <div
+                className="status-strip"
+                aria-label="Run comparison safety posture"
+              >
+                <StatusPill tone="good" label="Read only" />
+                <StatusPill tone="neutral" label="Local evidence" />
+                <StatusPill tone="neutral" label="Simulation only" />
+              </div>
+            </div>
+            <SimulationRunComparisonPanel
+              auditJournalReference={auditJournalReference}
+              auditScope={auditJournalScope}
+              auditState={auditBundleSelection}
+              auditTarget={auditBundleTarget}
+              comparisonState={simulationRunComparison}
+              historyStatus={workflowRunInspection.status}
+              items={workflowRunInspection.items}
+              leftKey={comparisonLeftKey}
+              onAuditJournalReferenceChange={selectAuditJournalReference}
+              onAuditScopeChange={selectAuditJournalScope}
+              onAuditTargetChange={selectAuditBundleTarget}
+              onCompare={() => void compareSavedSimulationRuns()}
+              onLeftKeyChange={selectComparisonLeft}
+              onPrepareAuditBundle={() => void prepareSelectedAuditBundle()}
+              onRightKeyChange={selectComparisonRight}
+              rightKey={comparisonRightKey}
+            />
           </section>
 
           <section className="approval-inbox-section" id={sectionId(approvalInboxSection)}>
@@ -2873,6 +3107,29 @@ function PostureItem({ label, value }: { label: string; value: string }) {
 
 function sectionId(section: string) {
   return section.toLowerCase().replace(/\s+/g, "-");
+}
+
+function inspectionItemForKey(
+  items: WorkflowRunInspectionItem[],
+  key: string,
+) {
+  return items.find((item) => item.key === key) ?? null;
+}
+
+function comparisonSelector(item: WorkflowRunInspectionItem) {
+  return {
+    workflowId: item.workflowId,
+    runId: item.run.run_id,
+  };
+}
+
+function journalSequenceFromReference(reference: string) {
+  const match = /^journal_sequence:([1-9][0-9]*)$/.exec(reference);
+  if (!match) {
+    return undefined;
+  }
+  const sequence = Number(match[1]);
+  return Number.isSafeInteger(sequence) ? sequence : undefined;
 }
 
 function titleCase(value: string) {

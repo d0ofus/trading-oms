@@ -53,7 +53,7 @@ _EXECUTION_CLASSIFICATIONS = (
 
 
 @dataclass(frozen=True)
-class _LifecycleEvidence:
+class SimulationLifecycleEvidence:
     source: WorkflowSimulationProjectionSource
     signal_record: JournalRecord
     signal: ProductBreakoutSignal
@@ -92,7 +92,7 @@ def project_simulation_executions(
             ),
         )
     )
-    lifecycles: list[_LifecycleEvidence] = []
+    lifecycles: list[SimulationLifecycleEvidence] = []
     seen_run_ids: set[str] = set()
     seen_signal_ids: set[str] = set()
     seen_order_intent_ids: set[str] = set()
@@ -102,7 +102,7 @@ def project_simulation_executions(
     seen_journal_sequences: set[int] = set()
 
     for source in ordered_sources:
-        lifecycle = _validated_lifecycle(source)
+        lifecycle = validated_simulation_lifecycle(source)
         _claim_unique(seen_run_ids, source.run.run_id, "run")
         _claim_unique(seen_signal_ids, lifecycle.attribution.signal_id, "signal")
         _claim_unique(
@@ -279,7 +279,9 @@ def project_simulation_executions(
     )
 
 
-def _validated_lifecycle(source: WorkflowSimulationProjectionSource) -> _LifecycleEvidence:
+def validated_simulation_lifecycle(
+    source: WorkflowSimulationProjectionSource,
+) -> SimulationLifecycleEvidence:
     run = source.run
     signal_record = _one_record(source, "strategy.signal.generated")
     proposal_record = _one_record(source, "order_intent.proposed")
@@ -398,7 +400,7 @@ def _validated_lifecycle(source: WorkflowSimulationProjectionSource) -> _Lifecyc
         approval_decision_journal_reference=decision_reference,
         journal_references=journal_references,
     )
-    return _LifecycleEvidence(
+    return SimulationLifecycleEvidence(
         source=source,
         signal_record=signal_record,
         signal=signal,
@@ -416,7 +418,7 @@ def _validated_lifecycle(source: WorkflowSimulationProjectionSource) -> _Lifecyc
 
 
 def _execution_attribution(
-    lifecycle: _LifecycleEvidence,
+    lifecycle: SimulationLifecycleEvidence,
 ) -> SimulationExecutionAttributionReadModel | None:
     run = lifecycle.source.run
     execution = run.execution

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -9,6 +10,7 @@ from typing import Any
 
 from trading_oms_backend.event_journal import JournalRecord
 from trading_oms_backend.read_models import OperationsReadModel
+from trading_oms_backend.simulation_run_comparison import AuditExportSelection
 from trading_oms_backend.workflow_definitions import WorkflowDefinitionRecord
 from trading_oms_backend.workflow_simulation_runs import WorkflowSimulationRunRecord
 
@@ -41,7 +43,9 @@ FORBIDDEN_KEY_TOKENS = {
 
 FALSE_ONLY_BOOLEAN_KEYS = {
     "arbitrary_code_allowed",
+    "broker_derived",
     "broker_transport_allowed",
+    "externally_verified",
     "live_trading_authorized",
     "live_trading_enabled",
 }
@@ -110,6 +114,7 @@ def build_audit_export_bundle(
     workflow_definitions: Iterable[WorkflowDefinitionRecord | Mapping[str, Any]],
     workflow_simulation_runs: Iterable[WorkflowSimulationRunRecord | Mapping[str, Any]],
     journal_records: Iterable[JournalRecord | Mapping[str, Any]],
+    selection: AuditExportSelection | Mapping[str, Any] | None = None,
 ) -> AuditExportBundle:
     _validated_identifier(export_id, "export_id")
     _parse_timestamp(generated_at, "generated_at")
@@ -127,8 +132,15 @@ def build_audit_export_bundle(
         (_journal_payload(record) for record in journal_records),
         key=lambda payload: int(payload.get("sequence", 0)),
     )
+    selection_payload = _selection_payload(selection)
     workflow_ids = tuple(
-        str(payload["workflow_id"]) for payload in workflow_payloads if "workflow_id" in payload
+        sorted(
+            {
+                str(payload["workflow_id"])
+                for payload in (*workflow_payloads, *run_payloads)
+                if "workflow_id" in payload
+            }
+        )
     )
     run_ids = tuple(str(payload["run_id"]) for payload in run_payloads if "run_id" in payload)
     journal_references = tuple(
@@ -136,6 +148,14 @@ def build_audit_export_bundle(
         for payload in journal_payloads
         if "sequence" in payload
     )
+    if selection_payload is not None:
+        _validate_selected_bundle_inputs(
+            selection_payload,
+            run_payloads=run_payloads,
+            journal_payloads=journal_payloads,
+            journal_references=journal_references,
+        )
+        workflow_ids = tuple(sorted({*workflow_ids, str(selection_payload["workflow_id"])}))
     payload = {
         "schema_version": 1,
         "bundle_type": "audit_review_bundle",
@@ -161,6 +181,7 @@ def build_audit_export_bundle(
                 "result": "passed",
                 "finding_count": 0,
             },
+            **({"selection": selection_payload} if selection_payload is not None else {}),
         },
         "operations_read_model": operations_payload,
         "workflow_definitions": workflow_payloads,
@@ -268,6 +289,92 @@ def _journal_payload(value: JournalRecord | Mapping[str, Any]) -> dict[str, Any]
     if isinstance(value, Mapping):
         return _normalized_json_object(value, "journal_record")
     raise AuditExportError("journal_record must be JournalRecord or mapping")
+
+
+def _selection_payload(
+    value: AuditExportSelection | Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if isinstance(value, AuditExportSelection):
+        return _normalized_json_object(value.to_json_dict(), "audit export selection")
+    if isinstance(value, Mapping):
+        payload = _normalized_json_object(value, "audit export selection")
+        try:
+            selection = AuditExportSelection(
+                schema_version=payload["schema_version"],
+                workflow_id=payload["workflow_id"],
+                workflow_version=payload["workflow_version"],
+                run_id=payload["run_id"],
+                run_status=payload["run_status"],
+                source_manifest_sha256=payload["source_manifest_sha256"],
+                source_manifest_journal_references=tuple(
+                    payload["source_manifest_journal_references"]
+                ),
+                journal_scope=payload["journal_scope"],
+                selected_journal_references=tuple(payload["selected_journal_references"]),
+                selected_record_sha256=tuple(payload["selected_record_sha256"]),
+                classifications=tuple(payload["classifications"]),
+                broker_derived=payload["broker_derived"],
+                externally_verified=payload["externally_verified"],
+                selection_sha256=payload["selection_sha256"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AuditExportError("audit export selection is invalid") from exc
+        return _normalized_json_object(selection.to_json_dict(), "audit export selection")
+    raise AuditExportError("audit export selection must be a supported selection record")
+
+
+def _validate_selected_bundle_inputs(
+    selection: Mapping[str, Any],
+    *,
+    run_payloads: list[dict[str, Any]],
+    journal_payloads: list[dict[str, Any]],
+    journal_references: tuple[str, ...],
+) -> None:
+    required_keys = {
+        "schema_version",
+        "workflow_id",
+        "workflow_version",
+        "run_id",
+        "run_status",
+        "source_manifest_sha256",
+        "source_manifest_journal_references",
+        "journal_scope",
+        "selected_journal_references",
+        "selected_record_sha256",
+        "classifications",
+        "broker_derived",
+        "externally_verified",
+        "selection_sha256",
+    }
+    if set(selection) != required_keys:
+        raise AuditExportError("audit export selection fields are invalid")
+    if len(run_payloads) != 1:
+        raise AuditExportError("selected audit export requires exactly one run")
+    run = run_payloads[0]
+    if (
+        run.get("workflow_id") != selection["workflow_id"]
+        or run.get("run_id") != selection["run_id"]
+        or run.get("expected_workflow_version") != selection["workflow_version"]
+        or run.get("status") != selection["run_status"]
+    ):
+        raise AuditExportError("selected audit export run attribution is inconsistent")
+    selected_references = selection["selected_journal_references"]
+    selected_digests = selection["selected_record_sha256"]
+    if (
+        not isinstance(selected_references, list)
+        or not isinstance(selected_digests, list)
+        or tuple(selected_references) != journal_references
+        or len(selected_digests) != len(journal_payloads)
+    ):
+        raise AuditExportError("selected audit export journal scope is inconsistent")
+    actual_digests = tuple(
+        hashlib.sha256(_stable_json(payload).encode("utf-8")).hexdigest()
+        for payload in journal_payloads
+    )
+    if tuple(selected_digests) != actual_digests:
+        raise AuditExportError("selected audit export journal digests are inconsistent")
 
 
 def _normalized_json_object(value: Mapping[str, Any], payload_name: str) -> dict[str, Any]:

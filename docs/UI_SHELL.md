@@ -44,6 +44,7 @@ The shell includes read API-backed sections for:
 - Positions
 - Audit events
 - Alerts
+- Run comparison
 
 Each section uses backend read-model data when available. Slice 015 adds a local visual builder with
 safe inputs for the replay-only Strategy DSL preview. There are no forms, action buttons, API
@@ -55,6 +56,12 @@ the existing saved-run inspector. Approved, rejected, expired, cancelled, and ex
 visible and non-actionable. The client rejects mixed durable/representative provenance, incomplete
 manifest audit rows, or any partial decision/execution identity set.
 
+The run-comparison workspace has two independent committed-run selectors and an explicit Compare
+command. It renders exact selectors, lifecycle evidence sections, change counts, digests, manifest
+references, and local-only provenance. Audit controls appear only after a validated comparison and
+prepare either a complete-manifest or one-event local JSON bundle. Changing any selector or scope
+invalidates stale results.
+
 ## Guarantees
 
 - The operational workflow sections are read-only.
@@ -65,6 +72,8 @@ manifest audit rows, or any partial decision/execution identity set.
 - No order submission controls are added.
 - No Telegram send controls are added.
 - No credential, token, account, or secret inputs are added.
+- Run comparison and selected audit preparation use read-only GET requests and expose no approval,
+  execution, retry, repair, delete, connect, deploy, or live-mode action.
 
 ## Tests
 
@@ -86,3 +95,4 @@ Frontend tests render the shell to static markup and assert:
 - User-customizable behavior is limited to local visual-builder DSL preview fields.
 - The UI can inspect durable simulation OMS, position, protection, local-alert, and journal evidence;
   it cannot deliver alerts externally or control a broker.
+- Saved-run comparison is limited to committed local simulation evidence and local JSON download.

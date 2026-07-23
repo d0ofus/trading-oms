@@ -22,6 +22,15 @@ The endpoint returns a JSON bundle with:
 The manifest includes workflow IDs, run IDs, journal sequence references, record counts, and a
 passed safety-scan summary.
 
+The endpoint also supports exact saved-run selection. All four fields are required together:
+`workflow_id`, `run_id`, `expected_manifest_sha256`, and `journal_scope`. Complete-manifest scope
+includes every source record. Single-event scope additionally requires `journal_sequence` and
+includes only that exact source-manifest event.
+
+Selected manifests include the expected workflow version, run lifecycle status, complete source
+manifest digest and references, selected references and record digests, provenance, and a
+deterministic selection SHA-256. Stale digests and out-of-manifest sequences fail closed.
+
 ## Secret-Shaped Content Scan
 
 The export builder recursively scans the bundle before returning or writing it. It rejects:
@@ -42,6 +51,7 @@ output only and does not upload, email, send, or otherwise deliver the bundle.
 ## Current Limitations
 
 - The API endpoint exports the current in-process workflow/run stores and current read-model
-  snapshot.
-- Local SQLite-backed export orchestration remains future work.
+  snapshot when no selection is supplied.
+- Exact selected-run mode uses restart-safe committed SQLite and digest-bound JSONL evidence.
+- Arbitrary ranges and mixed-run exports are not supported by selected mode.
 - Export signing, compression, retention policy, and external review transport remain future work.

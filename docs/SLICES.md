@@ -3104,3 +3104,58 @@ Recommended following slice:
 - add read-only run comparison and deterministic audit-bundle selection across saved simulations,
   without mutation, broker transport, deployment, production rollout, or live trading;
 - keep Candidate 063 and every external/broker capability separately gated.
+
+---
+
+## Non-broker candidate - read-only saved-run comparison and exact audit selection
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; committed local simulation evidence only
+
+branch: `candidate-slice-read-only-run-comparison-audit-selection`
+
+Goal:
+Compare exactly two committed saved-workflow simulations across deterministic lifecycle and journal
+evidence, then prepare one exact run-scoped local audit bundle.
+
+Scope:
+- explicit left/right committed workflow/run selectors, including an intentional same-run state;
+- workflow, run, signal, order-intent, risk, ticket, decision, execution, protection, alert, and
+  journal-provenance comparison;
+- deterministic added, removed, changed, and unchanged sections and field paths;
+- exact source-manifest, sequence, record-digest, provenance, and comparison/selection digests;
+- complete-manifest or one exact manifest-event audit scope;
+- clear loading, empty, unavailable, partial-unavailable, identical, and differing UI states.
+
+Completed:
+- [x] The safety-critical ExecPlan was the first branch edit and remains current.
+- [x] Backend comparison/export projection validates all committed sources and complete selected
+  lifecycles without writes, repair, or representative fallback.
+- [x] The frontend client rejects wrong selectors, partial sections, duplicate references,
+  contradictory summaries, stale digest binding, and unsafe provenance.
+- [x] Audit controls appear only after a valid comparison and generate a local data-URL download
+  only after exact response validation.
+
+Non-goals:
+- approval, rejection, execution, retry, repair, deletion, journal rewriting, or automatic action;
+- Candidate 063, IBKR SDK or transport, broker contact, host/port/account/credential fields;
+- external alert or audit delivery, deployment, production rollout, readiness-gate relaxation, or
+  live trading.
+
+Acceptance criteria:
+- [x] Focused and full backend/frontend verification pass: 691 backend tests, 171 frontend tests,
+  four resilience tests, Ruff format/lint, TypeScript, ESLint, repository security checks, and the
+  production frontend build are green.
+- [x] Real Vite-proxy checks cover same/different runs, complete/single-event export, restart
+  determinism, and corruption failure without repair.
+- [x] Browser discovery and the required troubleshooting retry found no browser instance.
+  Twenty-nine App/panel render tests cover responsive structure, explicit states, local download,
+  and absent unsafe controls; no screenshot or visual browser claim is made.
+- [x] P0/P1 self-review is clear for trading safety, secret leakage, provenance, determinism,
+  audit integrity, mutation surfaces, and bounded scope.
+- [ ] The branch is pushed, an unmerged PR targets `main`, and exact remote PR-head CI is green.
+
+Recommended following slice:
+- reassess the highest-value remaining non-broker operator gap after human review;
+- keep Candidate 063 and every broker/external/live capability separately gated.

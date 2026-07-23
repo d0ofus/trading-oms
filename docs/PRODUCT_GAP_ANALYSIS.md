@@ -46,6 +46,12 @@ risk, approval-ticket, audit, order, position, and alert rows as one validated s
 downstream stages remain explicitly empty, terminal decisions are non-actionable, and every row
 drills into its exact saved run. This is still local simulation evidence only.
 
+The read-only saved-run comparison candidate closes the next auditability gap. Operators can
+select exactly two committed simulations, inspect deterministic lifecycle and provenance
+differences, and prepare one exact run-scoped audit bundle for a complete manifest or one manifest
+event. Corrupt, duplicate, mixed-source, contradictory, stale, or incomplete evidence fails
+closed, and no representative fallback or mutation path is introduced.
+
 Candidate 063 connector implementation is deferred. No IBKR dependency, broker contact, order
 transport, credentials, account identifiers, deployment, rollout, production operation, or live
 trading is authorized by this update.
