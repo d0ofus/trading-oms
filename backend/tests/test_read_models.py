@@ -223,11 +223,15 @@ def test_read_model_json_shapes_are_stable() -> None:
         "order_id": "order-001",
         "ticket_id": "ticket-001",
         "severity": "warning",
+        "decision_attribution": None,
         "execution_attribution": None,
     }
     assert signal.to_json_dict()["signal"] == "long_bias"
+    assert signal.to_json_dict()["decision_attribution"] is None
     assert risk.to_json_dict()["failed_check_names"] == ["market_data_freshness"]
+    assert risk.to_json_dict()["decision_attribution"] is None
     assert ticket.to_json_dict()["status"] == "pending"
+    assert ticket.to_json_dict()["decision_attribution"] is None
     assert order.to_json_dict()["state"] == "PENDING_APPROVAL"
     assert position.to_json_dict()["source"] == "simulation"
     assert alert.to_json_dict()["status"] == "recorded"

@@ -40,6 +40,12 @@ authorized approver can deliberately approve or reject the exact persisted pendi
 decision, updated node statuses, and source-journal bindings recover after restart. Approval is
 explicitly `approved_not_executed`; no OMS continuation or fake-broker action is added.
 
+The durable lifecycle read-projection candidate closes the split-view operator gap. Committed
+pending, rejected, approved-not-executed, and executed runs now replace representative signal,
+risk, approval-ticket, audit, order, position, and alert rows as one validated snapshot. Unreached
+downstream stages remain explicitly empty, terminal decisions are non-actionable, and every row
+drills into its exact saved run. This is still local simulation evidence only.
+
 Candidate 063 connector implementation is deferred. No IBKR dependency, broker contact, order
 transport, credentials, account identifiers, deployment, rollout, production operation, or live
 trading is authorized by this update.

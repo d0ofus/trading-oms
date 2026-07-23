@@ -13,9 +13,9 @@ The UI shell is a read-only inspection surface for the local trading workflow. I
 single place to see the current safety posture and workflow records from the backend read API.
 
 The backend read API serves safe representative records until committed saved-workflow simulation
-execution evidence exists. Orders, positions, alerts, and audit events then switch atomically to
-validated durable local projections. If the backend or execution evidence is unavailable, the
-frontend shows a conservative fallback with paper mode, live trading disabled, and no broker
+evidence exists. Signals, risk decisions, approval tickets, audit events, orders, positions, and
+alerts then switch atomically to validated durable local projections. If the backend or evidence is
+unavailable, the frontend shows a conservative fallback with live trading disabled and no broker
 connectivity.
 
 ## Safety Posture
@@ -37,6 +37,7 @@ broker, Telegram, or execution integration.
 The shell includes read API-backed sections for:
 
 - Signals
+- Risk decisions
 - Visual builder
 - Approval tickets
 - Orders
@@ -48,9 +49,11 @@ Each section uses backend read-model data when available. Slice 015 adds a local
 safe inputs for the replay-only Strategy DSL preview. There are no forms, action buttons, API
 mutation controls, broker controls, or order submission controls.
 
-Durable execution rows show exact workflow/run drill-down in the operations lists, audit explorer,
-order detail, position detail, and protection monitor. The client rejects mixed durable and
-representative provenance or any partial execution identity set.
+Durable lifecycle rows show exact workflow/run drill-down in the signals, risk decisions, approval
+tickets, audit explorer, orders, positions, and protection monitor. Pending decisions route only to
+the existing saved-run inspector. Approved, rejected, expired, cancelled, and executed tickets are
+visible and non-actionable. The client rejects mixed durable/representative provenance, incomplete
+manifest audit rows, or any partial decision/execution identity set.
 
 ## Guarantees
 
@@ -77,8 +80,7 @@ Frontend tests render the shell to static markup and assert:
 
 ## Current Limitations
 
-- Signals, general risk decisions, and general approval-ticket records remain safe representative
-  data outside the saved-workflow run inspector.
+- Representative lifecycle data remains only when no committed saved-workflow run exists.
 - The visual builder is local state only.
 - Local development authentication and separated Admin/Approver roles are not production identity.
 - User-customizable behavior is limited to local visual-builder DSL preview fields.

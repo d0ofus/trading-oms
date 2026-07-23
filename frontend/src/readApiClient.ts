@@ -117,7 +117,40 @@ export type AuditEventApiView = {
   order_id: string | null;
   ticket_id: string | null;
   severity: "informational" | "warning" | "critical" | "emergency" | null;
+  decision_attribution?: SimulationDecisionAttributionApiView | null;
   execution_attribution?: SimulationExecutionAttributionApiView | null;
+};
+
+export type SimulationDecisionAttributionApiView = {
+  schema_version: 1;
+  workflow_id: string;
+  workflow_version: number;
+  run_id: string;
+  run_status:
+    | "waiting_for_approval"
+    | "approved_not_executed"
+    | "rejected"
+    | "executed"
+    | "executed_protection_missing";
+  signal_id: string;
+  order_intent_id: string;
+  risk_decision_id: string;
+  approval_ticket_id: string;
+  approval_decision_id: string | null;
+  approval_decision: "approved" | "rejected" | null;
+  approval_actor: string | null;
+  approval_reason: string | null;
+  approval_decided_at: string | null;
+  signal_journal_reference: string;
+  order_intent_journal_reference: string;
+  risk_journal_reference: string;
+  approval_ticket_journal_reference: string;
+  approval_decision_journal_reference: string | null;
+  journal_references: string[];
+  evidence_source: "schema_v4_sqlite_digest_bound_jsonl";
+  classifications: ProvenanceClassification[];
+  broker_derived: false;
+  externally_verified: false;
 };
 
 export type SimulationExecutionAttributionApiView = {
@@ -150,10 +183,11 @@ export type SignalApiView = {
   signal_id: string;
   strategy_id: string;
   symbol: string;
-  signal: "long_bias" | "risk_off_bias";
+  signal: "long_bias" | "risk_off_bias" | "long_entry_candidate";
   reason: string;
   bar_start_timestamp: string;
   bar_end_timestamp: string;
+  decision_attribution?: SimulationDecisionAttributionApiView | null;
 };
 
 export type RiskDecisionApiView = {
@@ -164,6 +198,7 @@ export type RiskDecisionApiView = {
   risk_intent: "increase" | "reduce";
   result: "passed" | "blocked";
   failed_check_names: string[];
+  decision_attribution?: SimulationDecisionAttributionApiView | null;
 };
 
 export type ApprovalTicketApiView = {
@@ -177,6 +212,7 @@ export type ApprovalTicketApiView = {
   risk_decision_id: string;
   created_at: string;
   expires_at: string;
+  decision_attribution?: SimulationDecisionAttributionApiView | null;
 };
 
 export type OrderApiView = {
@@ -913,54 +949,233 @@ function validateEnvelope<Payload>(
 }
 
 function validateExecutionProjectionSnapshot(snapshot: OperationsApiSnapshot) {
-  const resources = ["audit_events", "orders", "positions", "alerts"] as const;
-  const projectedResources = resources.filter((resource) =>
-    snapshot.provenance[resource].classifications.includes("fake_broker_derived"),
+  const lifecycleResources = [
+    "audit_events",
+    "signals",
+    "risk_decisions",
+    "approval_tickets",
+    "orders",
+    "positions",
+    "alerts",
+  ] as const;
+  const lifecycleSource = "durable_saved_workflow_simulation";
+  const executionSource = "durable_saved_workflow_simulation_execution";
+  const durableResources = lifecycleResources.filter((resource) =>
+    [lifecycleSource, executionSource].includes(snapshot.provenance[resource].source),
   );
-  const records = [
+  const allRecords = [
     ...snapshot.auditEvents,
+    ...snapshot.signals,
+    ...snapshot.riskDecisions,
+    ...snapshot.approvalTickets,
     ...snapshot.orders,
     ...snapshot.positions,
     ...snapshot.alerts,
   ];
-  if (projectedResources.length === 0) {
-    if (records.some((record) => record.execution_attribution != null)) {
+  if (durableResources.length === 0) {
+    if (
+      allRecords.some(
+        (record) =>
+          ("decision_attribution" in record && record.decision_attribution != null) ||
+          ("execution_attribution" in record && record.execution_attribution != null),
+      )
+    ) {
       throw new ReadApiProvenanceError(
-        "Representative read records must not claim durable execution attribution",
+        "Representative read records must not claim durable simulation attribution",
       );
     }
     return;
   }
-  if (projectedResources.length !== resources.length) {
-    throw new ReadApiProvenanceError("Durable execution provenance is incomplete");
+  if (durableResources.length !== lifecycleResources.length) {
+    throw new ReadApiProvenanceError("Durable simulation provenance is incomplete");
   }
-  const expectedClassifications = [
-    "simulated",
-    "local_only",
-    "fake_broker_derived",
-    "externally_unverified",
-  ];
+  const lifecycleClassifications = ["simulated", "local_only", "externally_unverified"];
+  for (const resource of [
+    "audit_events",
+    "signals",
+    "risk_decisions",
+    "approval_tickets",
+  ] as const) {
+    const provenance = snapshot.provenance[resource];
+    if (
+      provenance.source !== lifecycleSource ||
+      provenance.classifications.join(",") !== lifecycleClassifications.join(",")
+    ) {
+      throw new ReadApiProvenanceError("Durable upstream provenance is inconsistent");
+    }
+  }
   if (
-    resources.some(
+    snapshot.signals.length === 0 ||
+    snapshot.riskDecisions.length === 0 ||
+    snapshot.approvalTickets.length === 0 ||
+    snapshot.auditEvents.length === 0
+  ) {
+    throw new ReadApiProvenanceError("Durable upstream projection is partial");
+  }
+  const downstreamResources = ["orders", "positions", "alerts"] as const;
+  const executionMode = snapshot.provenance.orders.source === executionSource;
+  const downstreamSource = executionMode ? executionSource : lifecycleSource;
+  const downstreamClassifications = executionMode
+    ? ["simulated", "local_only", "fake_broker_derived", "externally_unverified"]
+    : lifecycleClassifications;
+  if (
+    downstreamResources.some(
       (resource) =>
-        snapshot.provenance[resource].source !==
-          "durable_saved_workflow_simulation_execution" ||
+        snapshot.provenance[resource].source !== downstreamSource ||
         snapshot.provenance[resource].classifications.join(",") !==
-          expectedClassifications.join(","),
+          downstreamClassifications.join(","),
     )
   ) {
-    throw new ReadApiProvenanceError("Durable execution provenance is inconsistent");
+    throw new ReadApiProvenanceError("Durable downstream provenance is inconsistent");
+  }
+  if (
+    lifecycleResources.some((resource) =>
+      snapshot.provenance[resource].classifications.includes("representative"),
+    )
+  ) {
+    throw new ReadApiProvenanceError("Durable projection contains representative provenance");
+  }
+
+  const signalByRun = new Map<string, SignalApiView>();
+  const riskByRun = new Map<string, RiskDecisionApiView>();
+  const ticketByRun = new Map<string, ApprovalTicketApiView>();
+  const signalIds = new Set<string>();
+  const riskIds = new Set<string>();
+  const ticketIds = new Set<string>();
+  for (const signal of snapshot.signals) {
+    validateDecisionAttribution(signal.decision_attribution);
+    const attribution = signal.decision_attribution;
+    if (
+      signal.signal_id !== attribution.signal_id ||
+      signal.signal !== "long_entry_candidate" ||
+      signalIds.has(signal.signal_id) ||
+      signalByRun.has(attribution.run_id)
+    ) {
+      throw new ReadApiProvenanceError("Durable signal attribution is inconsistent");
+    }
+    signalIds.add(signal.signal_id);
+    signalByRun.set(attribution.run_id, signal);
+  }
+  for (const risk of snapshot.riskDecisions) {
+    validateDecisionAttribution(risk.decision_attribution);
+    const attribution = risk.decision_attribution;
+    if (
+      risk.request_id !== attribution.risk_decision_id ||
+      risk.result !== "passed" ||
+      risk.failed_check_names.length !== 0 ||
+      riskIds.has(risk.request_id) ||
+      riskByRun.has(attribution.run_id)
+    ) {
+      throw new ReadApiProvenanceError("Durable risk attribution is inconsistent");
+    }
+    riskIds.add(risk.request_id);
+    riskByRun.set(attribution.run_id, risk);
+  }
+  for (const ticket of snapshot.approvalTickets) {
+    validateDecisionAttribution(ticket.decision_attribution);
+    const attribution = ticket.decision_attribution;
+    const expectedTicketStatus =
+      attribution.run_status === "waiting_for_approval"
+        ? "pending"
+        : attribution.run_status === "rejected"
+          ? "rejected"
+          : "approved";
+    if (
+      ticket.ticket_id !== attribution.approval_ticket_id ||
+      ticket.risk_decision_id !== attribution.risk_decision_id ||
+      ticket.status !== expectedTicketStatus ||
+      ticketIds.has(ticket.ticket_id) ||
+      ticketByRun.has(attribution.run_id)
+    ) {
+      throw new ReadApiProvenanceError("Durable approval attribution is inconsistent");
+    }
+    ticketIds.add(ticket.ticket_id);
+    ticketByRun.set(attribution.run_id, ticket);
+  }
+  const runIds = new Set(signalByRun.keys());
+  if (
+    !sameStringSet(runIds, new Set(riskByRun.keys())) ||
+    !sameStringSet(runIds, new Set(ticketByRun.keys()))
+  ) {
+    throw new ReadApiProvenanceError("Durable upstream run identities are incomplete");
+  }
+  for (const runId of runIds) {
+    const signalAttribution = signalByRun.get(runId)?.decision_attribution;
+    const riskAttribution = riskByRun.get(runId)?.decision_attribution;
+    const ticketAttribution = ticketByRun.get(runId)?.decision_attribution;
+    if (
+      JSON.stringify(signalAttribution) !== JSON.stringify(riskAttribution) ||
+      JSON.stringify(signalAttribution) !== JSON.stringify(ticketAttribution)
+    ) {
+      throw new ReadApiProvenanceError("Durable upstream attribution snapshots disagree");
+    }
+  }
+  const auditReferencesByRun = new Map<string, Set<string>>();
+  for (const event of snapshot.auditEvents) {
+    validateDecisionAttribution(event.decision_attribution);
+    const attribution = event.decision_attribution;
+    const ticket = ticketByRun.get(attribution.run_id);
+    const eventReference = `journal_sequence:${event.sequence}`;
+    if (
+      event.run_id !== attribution.run_id ||
+      event.ticket_id !== attribution.approval_ticket_id ||
+      !ticket ||
+      event.order_id !== ticket.order_id ||
+      !attribution.journal_references.includes(eventReference) ||
+      JSON.stringify(attribution) !== JSON.stringify(ticket.decision_attribution)
+    ) {
+      throw new ReadApiProvenanceError("Durable audit decision attribution is inconsistent");
+    }
+    const references = auditReferencesByRun.get(attribution.run_id) ?? new Set<string>();
+    references.add(eventReference);
+    auditReferencesByRun.set(attribution.run_id, references);
+  }
+  for (const runId of runIds) {
+    const expectedReferences = new Set(
+      ticketByRun.get(runId)?.decision_attribution?.journal_references ?? [],
+    );
+    if (!sameStringSet(expectedReferences, auditReferencesByRun.get(runId) ?? new Set())) {
+      throw new ReadApiProvenanceError("Durable audit manifest projection is incomplete");
+    }
+  }
+
+  if (!executionMode) {
+    if (
+      snapshot.orders.length !== 0 ||
+      snapshot.positions.length !== 0 ||
+      snapshot.alerts.length !== 0 ||
+      snapshot.auditEvents.some((event) => event.execution_attribution != null)
+    ) {
+      throw new ReadApiProvenanceError("Unreached durable execution stages must be empty");
+    }
+    return;
   }
   if (
     snapshot.orders.length === 0 ||
     snapshot.positions.length === 0 ||
-    snapshot.alerts.length === 0 ||
-    snapshot.auditEvents.length === 0
+    snapshot.alerts.length === 0
   ) {
     throw new ReadApiProvenanceError("Durable execution projection is partial");
   }
-  for (const record of records) {
+  const executionRecords = [...snapshot.orders, ...snapshot.positions, ...snapshot.alerts];
+  for (const record of executionRecords) {
     validateExecutionAttribution(record.execution_attribution);
+    const executionAttribution = record.execution_attribution;
+    const decisionAttribution =
+      ticketByRun.get(executionAttribution.run_id)?.decision_attribution;
+    if (
+      !decisionAttribution ||
+      !["executed", "executed_protection_missing"].includes(decisionAttribution.run_status) ||
+      executionAttribution.workflow_id !== decisionAttribution.workflow_id ||
+      executionAttribution.workflow_version !== decisionAttribution.workflow_version ||
+      executionAttribution.order_intent_id !== decisionAttribution.order_intent_id ||
+      executionAttribution.risk_decision_id !== decisionAttribution.risk_decision_id ||
+      executionAttribution.approval_ticket_id !== decisionAttribution.approval_ticket_id ||
+      executionAttribution.approval_decision_id !==
+        decisionAttribution.approval_decision_id
+    ) {
+      throw new ReadApiProvenanceError("Durable execution and decision lineage disagree");
+    }
   }
   for (const order of snapshot.orders) {
     const attribution = order.execution_attribution!;
@@ -986,7 +1201,11 @@ function validateExecutionProjectionSnapshot(snapshot: OperationsApiSnapshot) {
     }
   }
   for (const event of snapshot.auditEvents) {
-    const attribution = event.execution_attribution!;
+    if (event.execution_attribution == null) {
+      continue;
+    }
+    const attribution = event.execution_attribution;
+    validateExecutionAttribution(attribution);
     if (
       event.run_id !== attribution.run_id ||
       event.order_id !== attribution.order_id ||
@@ -1005,7 +1224,9 @@ function validateExecutionProjectionSnapshot(snapshot: OperationsApiSnapshot) {
     snapshot.alerts.map((record) => record.execution_attribution?.execution_id),
   );
   const auditExecutions = new Set(
-    snapshot.auditEvents.map((record) => record.execution_attribution?.execution_id),
+    snapshot.auditEvents
+      .filter((record) => record.execution_attribution != null)
+      .map((record) => record.execution_attribution?.execution_id),
   );
   if (
     orderExecutions.size !== snapshot.orders.length ||
@@ -1019,6 +1240,111 @@ function validateExecutionProjectionSnapshot(snapshot: OperationsApiSnapshot) {
   ) {
     throw new ReadApiProvenanceError("Durable execution projection identities are incomplete");
   }
+}
+
+function validateDecisionAttribution(
+  value: SimulationDecisionAttributionApiView | null | undefined,
+): asserts value is SimulationDecisionAttributionApiView {
+  if (
+    !isRecord(value) ||
+    value.schema_version !== 1 ||
+    typeof value.workflow_version !== "number" ||
+    !Number.isInteger(value.workflow_version) ||
+    value.workflow_version < 1
+  ) {
+    throw new ReadApiProvenanceError("Durable decision attribution is invalid");
+  }
+  const identifiers = [
+    "workflow_id",
+    "run_id",
+    "signal_id",
+    "order_intent_id",
+    "risk_decision_id",
+    "approval_ticket_id",
+    "signal_journal_reference",
+    "order_intent_journal_reference",
+    "risk_journal_reference",
+    "approval_ticket_journal_reference",
+  ] as const;
+  if (identifiers.some((field) => typeof value[field] !== "string" || !value[field])) {
+    throw new ReadApiProvenanceError("Durable decision attribution identities are incomplete");
+  }
+  const validRunStatuses = new Set([
+    "waiting_for_approval",
+    "approved_not_executed",
+    "rejected",
+    "executed",
+    "executed_protection_missing",
+  ]);
+  if (!validRunStatuses.has(String(value.run_status))) {
+    throw new ReadApiProvenanceError("Durable decision attribution status is invalid");
+  }
+  const decisionValues = [
+    value.approval_decision_id,
+    value.approval_decision,
+    value.approval_actor,
+    value.approval_reason,
+    value.approval_decided_at,
+    value.approval_decision_journal_reference,
+  ];
+  if (value.run_status === "waiting_for_approval") {
+    if (decisionValues.some((item) => item !== null)) {
+      throw new ReadApiProvenanceError("Pending decision attribution contains terminal fields");
+    }
+  } else {
+    if (decisionValues.some((item) => typeof item !== "string" || !item)) {
+      throw new ReadApiProvenanceError("Terminal decision attribution is incomplete");
+    }
+    const expectedDecision = value.run_status === "rejected" ? "rejected" : "approved";
+    if (value.approval_decision !== expectedDecision) {
+      throw new ReadApiProvenanceError("Terminal decision attribution is contradictory");
+    }
+  }
+  const expectedClassifications = ["simulated", "local_only", "externally_unverified"];
+  if (
+    value.evidence_source !== "schema_v4_sqlite_digest_bound_jsonl" ||
+    !Array.isArray(value.classifications) ||
+    value.classifications.join(",") !== expectedClassifications.join(",") ||
+    value.broker_derived !== false ||
+    value.externally_verified !== false ||
+    !Array.isArray(value.journal_references) ||
+    value.journal_references.length === 0
+  ) {
+    throw new ReadApiProvenanceError("Durable decision provenance exceeds evidence boundary");
+  }
+  const journalReferences = value.journal_references;
+  if (
+    journalReferences.some((reference) => !isJournalReference(reference)) ||
+    new Set(journalReferences).size !== journalReferences.length ||
+    !isSequenceOrdered(journalReferences)
+  ) {
+    throw new ReadApiProvenanceError("Durable decision journal references are invalid");
+  }
+  const eventReferences = [
+    value.signal_journal_reference,
+    value.order_intent_journal_reference,
+    value.risk_journal_reference,
+    value.approval_ticket_journal_reference,
+    ...(value.approval_decision_journal_reference === null
+      ? []
+      : [value.approval_decision_journal_reference]),
+  ];
+  if (
+    value.signal_id !== value.signal_journal_reference ||
+    new Set(eventReferences).size !== eventReferences.length ||
+    eventReferences.some((reference) => !journalReferences.includes(reference))
+  ) {
+    throw new ReadApiProvenanceError("Durable decision event references are inconsistent");
+  }
+}
+
+function isJournalReference(value: unknown): value is string {
+  return typeof value === "string" && /^journal_sequence:[1-9][0-9]*$/.test(value);
+}
+
+function isSequenceOrdered(values: string[]) {
+  const sequences = values.map((value) => Number(value.slice("journal_sequence:".length)));
+  return sequences.every((value, index) => index === 0 || sequences[index - 1] < value);
 }
 
 function validateExecutionAttribution(

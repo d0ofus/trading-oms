@@ -3041,3 +3041,65 @@ Acceptance criteria:
 Recommended following slice:
 - reassess the highest-value non-broker operator gap after this read-only evidence loop is complete;
 - keep Candidate 063, IBKR transport, deployment, production rollout, and live trading deferred.
+
+---
+
+## Non-broker candidate - durable upstream simulation decision read-model projections
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 deferred; read-only local simulation lifecycle evidence only
+
+branch: `candidate-slice-durable-upstream-simulation-read-model-projections`
+
+Goal:
+Project fully validated committed saved-workflow simulation evidence into one coherent signal,
+risk-decision, approval-ticket, audit, order, position, and alert snapshot for every supported run
+lifecycle state.
+
+Scope:
+- exact typed signal, order-intent, risk, ticket, optional decision, and journal reconstruction;
+- pending, rejected, approved-not-executed, protected execution, and missing-protection execution;
+- atomic replacement of representative lifecycle resources when any committed run exists;
+- explicit empty durable downstream resources before execution;
+- workflow/run drill-down and read-only terminal ticket evidence in the operations shell;
+- generic all-seven-resource quarantine for unavailable or contradictory durable evidence.
+
+Completed:
+- [x] The safety-critical ExecPlan was the first branch edit and remained current.
+- [x] The projector validates exact IDs, timestamps, event multiplicity, source-signal binding,
+  decision state, global uniqueness, manifest references, and execution lineage before emission.
+- [x] Pre-execution evidence remains simulated, local-only, externally unverified, and not
+  broker-derived; fake-broker classification appears only on executed downstream resources.
+- [x] Pending durable tickets route to the existing workflow/run-scoped decision path; all terminal
+  durable and representative tickets are visible and non-actionable.
+- [x] The client rejects partial, mixed-source, mixed-provenance, incomplete-manifest, duplicate,
+  contradictory, or over-claimed durable snapshots.
+
+Non-goals:
+- approval or execution endpoint changes, automatic approval, automatic execution, repair, retry,
+  deletion, or journal rewriting;
+- Candidate 063, IBKR dependencies, broker contact, host/port/account/credential fields, or broker
+  transport;
+- external alert delivery, deployment, production rollout, readiness-gate relaxation, or live
+  trading.
+
+Acceptance criteria:
+- [x] Focused projection/read-model/API tests pass with 46 backend tests; focused App and read-client
+  tests pass with 32 frontend tests.
+- [x] Full Windows verification passes with 676 backend and 158 frontend tests, Ruff format/lint,
+  compilation, TypeScript type checking, frontend lint, security checks, and resilience tests.
+- [x] The real Vite proxy exposes empty fallback plus pending, rejected, approved-not-executed, and
+  executed durable states with four exact upstream chains, one execution, and 102 audit rows.
+- [x] Digest corruption returns the same generic HTTP 503 for all seven lifecycle resources while
+  the safety endpoint remains available.
+- [x] Browser discovery and its required retry found no available browser instance. Rendered UI
+  tests verify lineage, terminal actionability, and absent unsafe controls; no screenshot or visual
+  browser claim is made.
+- [ ] The branch is committed and pushed, and an unmerged PR is open against `main` with green CI on
+  the exact remote head.
+
+Recommended following slice:
+- add read-only run comparison and deterministic audit-bundle selection across saved simulations,
+  without mutation, broker transport, deployment, production rollout, or live trading;
+- keep Candidate 063 and every external/broker capability separately gated.

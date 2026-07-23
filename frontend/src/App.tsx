@@ -31,6 +31,7 @@ import {
   type ReadApiClient,
   type ReadApiLoadState,
   type ReadModelProvenanceApiView,
+  type SimulationDecisionAttributionApiView,
   type SimulationExecutionAttributionApiView,
 } from "./readApiClient";
 import {
@@ -127,6 +128,7 @@ type WorkflowRow = {
   detail: string;
   status: string;
   tone: Tone;
+  decisionAttribution?: SimulationDecisionAttributionApiView | null;
 };
 
 type AppProps = {
@@ -161,6 +163,7 @@ const dataProvenanceSection = "Data provenance" as const;
 
 const workflowSections = [
   "Signals",
+  "Risk decisions",
   "Approval tickets",
   "Orders",
   "Positions",
@@ -325,6 +328,15 @@ export function App({
     () => snapshot.approvalTickets.filter((ticket) => ticket.status === "pending"),
     [snapshot.approvalTickets],
   );
+  const terminalApprovalTickets = useMemo(
+    () =>
+      snapshot.approvalTickets.filter((ticket) => ticket.status !== "pending"),
+    [snapshot.approvalTickets],
+  );
+  const approvalInboxTickets = useMemo(
+    () => [...pendingApprovalTickets, ...terminalApprovalTickets],
+    [pendingApprovalTickets, terminalApprovalTickets],
+  );
   const orderDetail = useMemo(
     () => buildOrderDetailView(snapshot.orders[0], snapshot.auditEvents),
     [snapshot.auditEvents, snapshot.orders],
@@ -343,10 +355,14 @@ export function App({
   );
   const selectedAuditEvent = auditExplorerEvents[0] ?? null;
   const selectedWorkflowRun = useMemo(
-    () =>
-      workflowRunInspection.items.find((item) => item.key === selectedWorkflowRunKey) ??
-      workflowRunInspection.items[0] ??
-      null,
+    () => {
+      if (selectedWorkflowRunKey) {
+        return (
+          workflowRunInspection.items.find((item) => item.key === selectedWorkflowRunKey) ?? null
+        );
+      }
+      return workflowRunInspection.items[0] ?? null;
+    },
     [selectedWorkflowRunKey, workflowRunInspection.items],
   );
   const workflowSimulationDecisionContext = {
@@ -1212,15 +1228,91 @@ export function App({
                 <p className="eyebrow">Approval inbox</p>
                 <h2>Simulation ticket review</h2>
               </div>
-              <StatusPill tone="warning" label={`${pendingApprovalTickets.length} pending`} />
+              <StatusPill
+                tone={pendingApprovalTickets.length > 0 ? "warning" : "neutral"}
+                label={`${pendingApprovalTickets.length} pending`}
+              />
             </div>
             <div className="approval-inbox-list" aria-label="Simulation approval inbox">
-              {pendingApprovalTickets.length === 0 ? (
-                <p className="empty-state">No pending simulation approvals</p>
+              {approvalInboxTickets.length === 0 ? (
+                <p className="empty-state">No simulation approval records</p>
               ) : (
-                pendingApprovalTickets.map((ticket) => {
+                approvalInboxTickets.map((ticket) => {
                   const formState = approvalFormState(approvalForms, ticket.ticket_id);
                   const canApproveSimulation = snapshot.operatorSession.can_approve_simulation;
+                  const attribution = ticket.decision_attribution;
+
+                  if (attribution) {
+                    return (
+                      <article className="approval-ticket-card" key={ticket.ticket_id}>
+                        <div className="panel-heading">
+                          <div>
+                            <p className="eyebrow">
+                              {ticket.status === "pending"
+                                ? "Pending durable simulation approval"
+                                : "Durable simulation decision"}
+                            </p>
+                            <h3>{safeApprovalInboxText(ticket.ticket_id)}</h3>
+                          </div>
+                          <StatusPill tone={approvalTone(ticket.status)} label={ticket.status} />
+                        </div>
+                        <dl className="approval-ticket-facts">
+                          <PostureItem label="Order intent" value={attribution.order_intent_id} />
+                          <PostureItem label="Symbol" value={ticket.symbol} />
+                          <PostureItem label="Side" value={ticket.side} />
+                          <PostureItem label="Quantity" value={`${ticket.quantity}`} />
+                          <PostureItem label="Risk" value={attribution.risk_decision_id} />
+                          <PostureItem label="Expires" value={ticket.expires_at} />
+                        </dl>
+                        <DecisionAttributionFacts attribution={attribution} />
+                        <a
+                          className="record-lineage-link"
+                          href={`#${sectionId(simulationRunSection)}`}
+                          onClick={() =>
+                            setSelectedWorkflowRunKey(
+                              `${attribution.workflow_id}::${attribution.run_id}`,
+                            )
+                          }
+                        >
+                          Inspect saved run
+                        </a>
+                        <p className="approval-feedback">
+                          {ticket.status === "pending"
+                            ? "Decision actions remain in the saved-run inspector."
+                            : "Recorded decision is read only and journal-backed."}
+                        </p>
+                      </article>
+                    );
+                  }
+
+                  if (ticket.status !== "pending") {
+                    return (
+                      <article className="approval-ticket-card" key={ticket.ticket_id}>
+                        <div className="panel-heading">
+                          <div>
+                            <p className="eyebrow">Historical simulation decision</p>
+                            <h3>{safeApprovalInboxText(ticket.ticket_id)}</h3>
+                          </div>
+                          <StatusPill tone={approvalTone(ticket.status)} label={ticket.status} />
+                        </div>
+                        <dl className="approval-ticket-facts">
+                          <PostureItem label="Order" value={safeApprovalInboxText(ticket.order_id)} />
+                          <PostureItem label="Symbol" value={ticket.symbol} />
+                          <PostureItem label="Side" value={ticket.side} />
+                          <PostureItem label="Quantity" value={`${ticket.quantity}`} />
+                          <PostureItem
+                            label="Risk"
+                            value={safeApprovalInboxText(ticket.risk_decision_id)}
+                          />
+                          <PostureItem label="Expires" value={ticket.expires_at} />
+                        </dl>
+                        <p className="approval-feedback">
+                          Historical ticket is terminal and read only.
+                        </p>
+                      </article>
+                    );
+                  }
+
                   return (
                     <article className="approval-ticket-card" key={ticket.ticket_id}>
                       <div className="panel-heading">
@@ -1640,6 +1732,25 @@ export function App({
                           <div>
                             <h3>{row.label}</h3>
                             <p>{row.detail}</p>
+                            {row.decisionAttribution ? (
+                              <>
+                                <DecisionAttributionFacts
+                                  attribution={row.decisionAttribution}
+                                  compact
+                                />
+                                <a
+                                  className="record-lineage-link"
+                                  href={`#${sectionId(simulationRunSection)}`}
+                                  onClick={() =>
+                                    setSelectedWorkflowRunKey(
+                                      `${row.decisionAttribution?.workflow_id}::${row.decisionAttribution?.run_id}`,
+                                    )
+                                  }
+                                >
+                                  Inspect saved run
+                                </a>
+                              </>
+                            ) : null}
                           </div>
                           <StatusPill tone={row.tone} label={row.status} />
                         </article>
@@ -1710,6 +1821,9 @@ function AuditEventDetail({ event }: { event: AuditEventApiView | null }) {
       <AuditDetailRow label="Ticket" value={event.ticket_id} />
       <AuditDetailRow label="Severity" value={event.severity} />
       <AuditDetailRow label="Summary" value={event.summary} />
+      {event.decision_attribution ? (
+        <DecisionAttributionFacts attribution={event.decision_attribution} />
+      ) : null}
       {event.execution_attribution ? (
         <ExecutionAttributionFacts attribution={event.execution_attribution} />
       ) : null}
@@ -2481,6 +2595,65 @@ function ProtectionPositionCard({
   );
 }
 
+function DecisionAttributionFacts({
+  attribution,
+  compact = false,
+}: {
+  attribution: SimulationDecisionAttributionApiView;
+  compact?: boolean;
+}) {
+  const decisionLabel = attribution.approval_decision
+    ? sentenceCaseIdentifier(attribution.approval_decision)
+    : "Awaiting manual decision";
+
+  return (
+    <div className="decision-attribution" aria-label="Durable decision lineage">
+      <p className="eyebrow">Durable decision lineage</p>
+      <dl className={`detail-facts${compact ? " compact" : ""}`}>
+        <PostureItem
+          label="Workflow"
+          value={`${attribution.workflow_id} version ${attribution.workflow_version}`}
+        />
+        <PostureItem label="Run" value={attribution.run_id} />
+        <PostureItem label="Run status" value={sentenceCaseIdentifier(attribution.run_status)} />
+        <PostureItem label="Signal" value={attribution.signal_id} />
+        <PostureItem label="Order intent" value={attribution.order_intent_id} />
+        <PostureItem label="Risk decision" value={attribution.risk_decision_id} />
+        <PostureItem label="Approval ticket" value={attribution.approval_ticket_id} />
+        {!compact ? (
+          <>
+            <PostureItem label="Decision" value={decisionLabel} />
+            <PostureItem
+              label="Decision ID"
+              value={attribution.approval_decision_id ?? "No decision recorded"}
+            />
+            <PostureItem
+              label="Actor"
+              value={attribution.approval_actor ?? "No decision actor"}
+            />
+            <PostureItem
+              label="Reason"
+              value={attribution.approval_reason ?? "Awaiting operator review"}
+            />
+            <PostureItem
+              label="Decided"
+              value={attribution.approval_decided_at ?? "No decision timestamp"}
+            />
+          </>
+        ) : null}
+        <PostureItem
+          label="Journal"
+          value={`${attribution.journal_references[0]} plus ${Math.max(0, attribution.journal_references.length - 1)} linked`}
+        />
+        <PostureItem
+          label="Provenance"
+          value={attribution.classifications.map(formatIdentifier).join(" / ")}
+        />
+      </dl>
+    </div>
+  );
+}
+
 function ExecutionAttributionFacts({
   attribution,
   compact = false,
@@ -2554,7 +2727,7 @@ function buildSummaryPanels(snapshot: OperationsApiSnapshot): SummaryPanel[] {
     {
       title: "Approval tickets",
       metric: `${pendingTickets} pending`,
-      detail: "Inspection only; no approval action endpoint.",
+      detail: "Manual simulation decisions remain scoped to the saved-run inspector.",
       tone: pendingTickets > 0 ? "warning" : "neutral",
     },
     {
@@ -2576,15 +2749,30 @@ function buildWorkflowRows(snapshot: OperationsApiSnapshot): Record<WorkflowSect
   return {
     Signals: snapshot.signals.map((signal) => ({
       label: `${signal.symbol} ${signal.strategy_id}`,
-      detail: `${formatIdentifier(signal.signal)} from ${formatIdentifier(signal.reason)}`,
+      detail: signal.decision_attribution
+        ? `${formatIdentifier(signal.signal)} from ${formatIdentifier(signal.reason)}; run ${signal.decision_attribution.run_id}`
+        : `${formatIdentifier(signal.signal)} from ${formatIdentifier(signal.reason)}`,
       status: signal.signal,
       tone: signal.signal === "long_bias" ? "info" : "neutral",
+      decisionAttribution: signal.decision_attribution,
+    })),
+    "Risk decisions": snapshot.riskDecisions.map((decision) => ({
+      label: decision.request_id,
+      detail: decision.decision_attribution
+        ? `${decision.symbol} ${formatIdentifier(decision.risk_intent)}; run ${decision.decision_attribution.run_id}`
+        : `${decision.symbol} ${formatIdentifier(decision.risk_intent)}; ${decision.failed_check_names.length} failed checks`,
+      status: decision.result,
+      tone: decision.result === "passed" ? "good" : "critical",
+      decisionAttribution: decision.decision_attribution,
     })),
     "Approval tickets": snapshot.approvalTickets.map((ticket) => ({
       label: ticket.ticket_id,
-      detail: `${ticket.side} ${ticket.quantity} ${ticket.symbol}; risk ${ticket.risk_decision_id}`,
+      detail: ticket.decision_attribution
+        ? `${ticket.side} ${ticket.quantity} ${ticket.symbol}; run ${ticket.decision_attribution.run_id}`
+        : `${ticket.side} ${ticket.quantity} ${ticket.symbol}; risk ${ticket.risk_decision_id}`,
       status: ticket.status,
       tone: approvalTone(ticket.status),
+      decisionAttribution: ticket.decision_attribution,
     })),
     Orders: snapshot.orders.map((order) => ({
       label: order.client_order_id,
@@ -2604,11 +2792,14 @@ function buildWorkflowRows(snapshot: OperationsApiSnapshot): Record<WorkflowSect
     })),
     "Audit events": snapshot.auditEvents.map((event) => ({
       label: event.event_type,
-      detail: event.execution_attribution
+      detail: event.decision_attribution
+        ? `${event.summary}; run ${event.decision_attribution.run_id}`
+        : event.execution_attribution
         ? `${event.summary}; run ${event.execution_attribution.run_id}`
         : event.summary,
       status: `sequence ${event.sequence}`,
       tone: event.event_type.includes("alert") ? "critical" : "info",
+      decisionAttribution: event.decision_attribution,
     })),
     Alerts: snapshot.alerts.map((alert) => ({
       label: alert.title,

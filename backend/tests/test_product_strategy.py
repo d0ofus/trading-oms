@@ -178,7 +178,9 @@ def test_product_signal_round_trip_uses_stable_json_shape() -> None:
         reason="first_5_minute_high_breakout_with_volume_filter",
     )
 
-    assert signal.to_json_dict() == {
+    raw_signal = signal.to_json_dict()
+
+    assert raw_signal == {
         "schema_version": 1,
         "strategy_id": "first-bar-breakout-demo",
         "strategy_type": "first_5_minute_breakout_volume_filter",
@@ -195,6 +197,11 @@ def test_product_signal_round_trip_uses_stable_json_shape() -> None:
         "historical_session_count": 10,
         "reason": "first_5_minute_high_breakout_with_volume_filter",
     }
+    assert ProductBreakoutSignal.from_json_dict(raw_signal) == signal
+
+    raw_signal["unexpected_field"] = "blocked"
+    with pytest.raises(ProductBreakoutStrategyError, match="fields"):
+        ProductBreakoutSignal.from_json_dict(raw_signal)
 
 
 def test_product_strategy_payloads_exclude_order_broker_network_and_secret_fields(

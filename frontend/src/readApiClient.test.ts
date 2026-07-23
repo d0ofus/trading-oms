@@ -8,6 +8,7 @@ import {
   safeFallbackOperationsSnapshot,
   type OperationsApiSnapshot,
   type OperationsProvenanceResource,
+  type SimulationDecisionAttributionApiView,
   type SimulationExecutionAttributionApiView,
 } from "./readApiClient";
 
@@ -434,11 +435,116 @@ describe("read API client", () => {
     const state = await loadOperationsSnapshot(client);
 
     expect(state.status).toBe("loaded");
+    expect(state.snapshot.signals[0]?.decision_attribution).toEqual(projectedDecisionAttribution);
+    expect(state.snapshot.riskDecisions[0]?.decision_attribution).toEqual(
+      projectedDecisionAttribution,
+    );
+    expect(state.snapshot.approvalTickets[0]?.status).toBe("approved");
     expect(state.snapshot.orders[0]?.execution_attribution).toEqual(projectedAttribution);
     expect(state.snapshot.positions[0]?.protection_status).toBe(
       "missing_expected_protection",
     );
     expect(state.snapshot.alerts[0]?.severity).toBe("critical");
+  });
+
+  it("accepts durable pending evidence with explicitly empty downstream stages", async () => {
+    const pendingAttribution: SimulationDecisionAttributionApiView = {
+      ...projectedDecisionAttribution,
+      run_status: "waiting_for_approval",
+      approval_decision_id: null,
+      approval_decision: null,
+      approval_actor: null,
+      approval_reason: null,
+      approval_decided_at: null,
+      approval_decision_journal_reference: null,
+      journal_references: projectedDecisionAttribution.journal_references.slice(0, 4),
+    };
+    const responses: Record<string, unknown> = {
+      ...responseByEndpoint,
+      [READ_API_ENDPOINTS.auditEvents]: lifecycleEnvelope(
+        "audit_events",
+        durableAuditEvents(pendingAttribution),
+      ),
+      [READ_API_ENDPOINTS.signals]: lifecycleEnvelope("signals", [
+        {
+          ...sampleSnapshot.signals[0],
+          signal_id: pendingAttribution.signal_id,
+          signal: "long_entry_candidate",
+          decision_attribution: pendingAttribution,
+        },
+      ]),
+      [READ_API_ENDPOINTS.riskDecisions]: lifecycleEnvelope("risk_decisions", [
+        {
+          ...sampleSnapshot.riskDecisions[0],
+          request_id: pendingAttribution.risk_decision_id,
+          result: "passed",
+          failed_check_names: [],
+          decision_attribution: pendingAttribution,
+        },
+      ]),
+      [READ_API_ENDPOINTS.approvalTickets]: lifecycleEnvelope("approval_tickets", [
+        {
+          ...sampleSnapshot.approvalTickets[0],
+          ticket_id: pendingAttribution.approval_ticket_id,
+          risk_decision_id: pendingAttribution.risk_decision_id,
+          status: "pending",
+          decision_attribution: pendingAttribution,
+        },
+      ]),
+      [READ_API_ENDPOINTS.orders]: lifecycleEnvelope("orders", []),
+      [READ_API_ENDPOINTS.positions]: lifecycleEnvelope("positions", []),
+      [READ_API_ENDPOINTS.alerts]: lifecycleEnvelope("alerts", []),
+    };
+    const client = createReadApiClient({
+      fetchImpl: async (input) => jsonResponse(responses[String(input)]),
+    });
+
+    const state = await loadOperationsSnapshot(client);
+
+    expect(state.status).toBe("loaded");
+    expect(state.snapshot.approvalTickets[0]?.status).toBe("pending");
+    expect(state.snapshot.orders).toEqual([]);
+    expect(state.snapshot.positions).toEqual([]);
+    expect(state.snapshot.alerts).toEqual([]);
+  });
+
+  it("fails closed on partial upstream attribution or fake-broker upstream provenance", async () => {
+    const unsafeResponses: Record<string, unknown> = {
+      ...projectedResponseByEndpoint,
+      [READ_API_ENDPOINTS.signals]: executionEnvelope("signals", [
+        {
+          ...sampleSnapshot.signals[0],
+          signal_id: projectedDecisionAttribution.signal_id,
+          signal: "long_entry_candidate",
+        },
+      ]),
+    };
+    const client = createReadApiClient({
+      fetchImpl: async (input) => jsonResponse(unsafeResponses[String(input)]),
+    });
+
+    const state = await loadOperationsSnapshot(client);
+
+    expect(state.status).toBe("error");
+    expect(state.snapshot).toEqual(safeFallbackOperationsSnapshot);
+  });
+
+  it("fails closed when durable audit rows omit a manifest reference", async () => {
+    const incompleteResponses: Record<string, unknown> = {
+      ...projectedResponseByEndpoint,
+      [READ_API_ENDPOINTS.auditEvents]: lifecycleEnvelope(
+        "audit_events",
+        durableAuditEvents(projectedDecisionAttribution, projectedAttribution).slice(1),
+      ),
+    };
+    const client = createReadApiClient({
+      fetchImpl: async (input) => jsonResponse(incompleteResponses[String(input)]),
+    });
+
+    const state = await loadOperationsSnapshot(client);
+
+    expect(state.status).toBe("error");
+    expect(state.snapshot).toEqual(safeFallbackOperationsSnapshot);
   });
 
   it("exposes no action, broker-network, credential, or secret affordance keys", () => {
@@ -538,8 +644,15 @@ const projectedAttribution: SimulationExecutionAttributionApiView = {
   expected_protection_kind: "stop_loss",
   risk_increasing_actions_blocked: true,
   alert_id: "alert-001",
-  journal_references: ["journal_sequence:1", "journal_sequence:2"],
-  execution_journal_references: ["journal_sequence:2"],
+  journal_references: [
+    "journal_sequence:1",
+    "journal_sequence:2",
+    "journal_sequence:3",
+    "journal_sequence:4",
+    "journal_sequence:5",
+    "journal_sequence:6",
+  ],
+  execution_journal_references: ["journal_sequence:6"],
   evidence_source: "schema_v4_sqlite_digest_bound_jsonl",
   classifications: [
     "simulated",
@@ -551,32 +664,79 @@ const projectedAttribution: SimulationExecutionAttributionApiView = {
   externally_verified: false,
 };
 
+const projectedDecisionAttribution: SimulationDecisionAttributionApiView = {
+  schema_version: 1,
+  workflow_id: projectedAttribution.workflow_id,
+  workflow_version: projectedAttribution.workflow_version,
+  run_id: projectedAttribution.run_id,
+  run_status: "executed_protection_missing",
+  signal_id: "journal_sequence:1",
+  order_intent_id: projectedAttribution.order_intent_id,
+  risk_decision_id: projectedAttribution.risk_decision_id,
+  approval_ticket_id: projectedAttribution.approval_ticket_id,
+  approval_decision_id: projectedAttribution.approval_decision_id,
+  approval_decision: "approved",
+  approval_actor: "approver-operator-001",
+  approval_reason: "operator_reviewed_simulation_evidence",
+  approval_decided_at: "2026-07-08T00:02:30Z",
+  signal_journal_reference: "journal_sequence:1",
+  order_intent_journal_reference: "journal_sequence:2",
+  risk_journal_reference: "journal_sequence:3",
+  approval_ticket_journal_reference: "journal_sequence:4",
+  approval_decision_journal_reference: "journal_sequence:5",
+  journal_references: projectedAttribution.journal_references,
+  evidence_source: "schema_v4_sqlite_digest_bound_jsonl",
+  classifications: ["simulated", "local_only", "externally_unverified"],
+  broker_derived: false,
+  externally_verified: false,
+};
+
 const projectedResponseByEndpoint: Record<string, unknown> = {
   ...responseByEndpoint,
-  [READ_API_ENDPOINTS.auditEvents]: projectedEnvelope("audit_events", [
+  [READ_API_ENDPOINTS.auditEvents]: lifecycleEnvelope(
+    "audit_events",
+    durableAuditEvents(projectedDecisionAttribution, projectedAttribution),
+  ),
+  [READ_API_ENDPOINTS.signals]: lifecycleEnvelope("signals", [
     {
-      ...sampleSnapshot.auditEvents[0],
-      sequence: 2,
-      run_id: projectedAttribution.run_id,
-      order_id: projectedAttribution.order_id,
-      ticket_id: projectedAttribution.approval_ticket_id,
-      execution_attribution: projectedAttribution,
+      ...sampleSnapshot.signals[0],
+      signal_id: projectedDecisionAttribution.signal_id,
+      signal: "long_entry_candidate",
+      decision_attribution: projectedDecisionAttribution,
     },
   ]),
-  [READ_API_ENDPOINTS.orders]: projectedEnvelope("orders", [
+  [READ_API_ENDPOINTS.riskDecisions]: lifecycleEnvelope("risk_decisions", [
+    {
+      ...sampleSnapshot.riskDecisions[0],
+      request_id: projectedDecisionAttribution.risk_decision_id,
+      result: "passed",
+      failed_check_names: [],
+      decision_attribution: projectedDecisionAttribution,
+    },
+  ]),
+  [READ_API_ENDPOINTS.approvalTickets]: lifecycleEnvelope("approval_tickets", [
+    {
+      ...sampleSnapshot.approvalTickets[0],
+      ticket_id: projectedDecisionAttribution.approval_ticket_id,
+      risk_decision_id: projectedDecisionAttribution.risk_decision_id,
+      status: "approved",
+      decision_attribution: projectedDecisionAttribution,
+    },
+  ]),
+  [READ_API_ENDPOINTS.orders]: executionEnvelope("orders", [
     {
       ...sampleSnapshot.orders[0],
       execution_attribution: projectedAttribution,
     },
   ]),
-  [READ_API_ENDPOINTS.positions]: projectedEnvelope("positions", [
+  [READ_API_ENDPOINTS.positions]: executionEnvelope("positions", [
     {
       ...sampleSnapshot.positions[0],
       protection_status: projectedAttribution.protection_status,
       execution_attribution: projectedAttribution,
     },
   ]),
-  [READ_API_ENDPOINTS.alerts]: projectedEnvelope("alerts", [
+  [READ_API_ENDPOINTS.alerts]: executionEnvelope("alerts", [
     {
       ...sampleSnapshot.alerts[0],
       severity: "critical",
@@ -585,7 +745,7 @@ const projectedResponseByEndpoint: Record<string, unknown> = {
   ]),
 };
 
-function projectedEnvelope(resource: OperationsProvenanceResource, data: unknown) {
+function executionEnvelope(resource: OperationsProvenanceResource, data: unknown) {
   return {
     schema_version: 1,
     resource,
@@ -600,4 +760,45 @@ function projectedEnvelope(resource: OperationsProvenanceResource, data: unknown
     },
     data,
   };
+}
+
+function lifecycleEnvelope(resource: OperationsProvenanceResource, data: unknown) {
+  return {
+    schema_version: 1,
+    resource,
+    provenance: {
+      schema_version: 1,
+      resource,
+      source: "durable_saved_workflow_simulation",
+      classifications: projectedDecisionAttribution.classifications,
+      broker_derived: false,
+      externally_verified: false,
+      summary: "Validated local saved-workflow simulation lifecycle evidence",
+    },
+    data,
+  };
+}
+
+function durableAuditEvents(
+  decisionAttribution: SimulationDecisionAttributionApiView,
+  executionAttribution: SimulationExecutionAttributionApiView | null = null,
+) {
+  const eventTypes = [
+    "strategy.signal.generated",
+    "order_intent.proposed",
+    "risk.decision.evaluated",
+    "approval.ticket.created",
+    "approval.ticket.decided",
+    "workflow_simulation.execution_completed",
+  ];
+  return decisionAttribution.journal_references.map((reference, index) => ({
+    ...sampleSnapshot.auditEvents[0],
+    sequence: Number(reference.slice("journal_sequence:".length)),
+    event_type: eventTypes[index] ?? "workflow_simulation.evidence_recorded",
+    run_id: decisionAttribution.run_id,
+    order_id: sampleSnapshot.approvalTickets[0].order_id,
+    ticket_id: decisionAttribution.approval_ticket_id,
+    decision_attribution: decisionAttribution,
+    execution_attribution: executionAttribution,
+  }));
 }
