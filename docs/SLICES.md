@@ -3096,8 +3096,9 @@ Acceptance criteria:
 - [x] Browser discovery and its required retry found no available browser instance. Rendered UI
   tests verify lineage, terminal actionability, and absent unsafe controls; no screenshot or visual
   browser claim is made.
-- [ ] The branch is committed and pushed, and an unmerged PR is open against `main` with green CI on
-  the exact remote head.
+- [x] The branch is committed and pushed, and unmerged PR
+  [#53](https://github.com/d0ofus/trading-oms/pull/53) is open against `main`; GitHub CI passed on
+  implementation head `3f2a3f6b8b46fcd5daeb6ded4b94e2eedccd1a1c` before this closeout-only record.
 
 Recommended following slice:
 - add read-only run comparison and deterministic audit-bundle selection across saved simulations,

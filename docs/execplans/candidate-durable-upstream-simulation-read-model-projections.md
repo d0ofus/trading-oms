@@ -231,3 +231,6 @@ Implementation evidence:
 - P0/P1 review found and fixed two issues before completion: manifest audit coverage is now exact in
   the client, and representative terminal tickets are visible but non-actionable. No remaining
   P0/P1 finding is known.
+- Unmerged PR [#53](https://github.com/d0ofus/trading-oms/pull/53) is open against `main`. GitHub CI
+  passed on implementation head `3f2a3f6b8b46fcd5daeb6ded4b94e2eedccd1a1c`; the documentation-only
+  closeout commit is rechecked separately so delivery evidence is bound to the final remote head.
