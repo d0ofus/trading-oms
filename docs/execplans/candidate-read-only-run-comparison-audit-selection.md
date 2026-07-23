@@ -295,3 +295,6 @@ journal, workflow, run, decision, execution, or external state migration is requ
   visual browser inspection is claimed.
 - P0/P1 self-review is clear for trading safety, secrets/private values, false attribution,
   determinism, audit integrity, mutation surfaces, and scope creep.
+- Unmerged PR [#54](https://github.com/d0ofus/trading-oms/pull/54) targets `main`; GitHub CI passed
+  on implementation head `f360715da497ed9ddf766d0db410c52ef1dbde6a` before the documentation-only
+  closeout record.
