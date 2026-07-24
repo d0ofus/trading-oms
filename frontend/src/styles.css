@@ -48,6 +48,7 @@ a {
 .provenance-section h2,
 .operational-controls-section h2,
 .approval-inbox-section h2,
+.run-comparison-section h2,
 .builder-section h2,
 .builder-node h3,
 .flow-node-ledger h3,
@@ -258,6 +259,7 @@ dd {
 .summary-panel,
 .builder-section,
 .run-detail-section,
+.run-comparison-section,
 .audit-explorer-section,
 .detail-section,
 .protection-monitor-section,
@@ -1301,6 +1303,10 @@ dd {
   overflow: hidden;
 }
 
+.run-comparison-section {
+  overflow: hidden;
+}
+
 .audit-explorer-section {
   overflow: hidden;
 }
@@ -1669,6 +1675,308 @@ dd {
   padding: 16px;
 }
 
+.run-comparison-panel {
+  display: grid;
+  min-width: 0;
+}
+
+.run-comparison-selectors,
+.audit-selection-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px;
+}
+
+.run-comparison-selectors label,
+.audit-selection-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #4d5852;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.run-comparison-selectors select,
+.audit-selection-controls select {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid #c7d0c9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2923;
+  font: inherit;
+  font-size: 0.86rem;
+  padding: 8px 10px;
+}
+
+.run-comparison-selectors select:focus,
+.audit-selection-controls select:focus {
+  border-color: #4f7d68;
+  outline: 2px solid #d9ebe1;
+  outline-offset: 1px;
+}
+
+.run-comparison-selectors button,
+.audit-selection-controls button,
+.audit-bundle-ready a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  border: 1px solid #35677f;
+  border-radius: 6px;
+  background: #35677f;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 8px 12px;
+}
+
+.run-comparison-selectors button:hover:not(:disabled),
+.run-comparison-selectors button:focus-visible,
+.audit-selection-controls button:hover:not(:disabled),
+.audit-selection-controls button:focus-visible,
+.audit-bundle-ready a:hover,
+.audit-bundle-ready a:focus-visible {
+  outline: 2px solid #bfdce8;
+  outline-offset: 2px;
+}
+
+.run-comparison-selectors button:disabled,
+.audit-selection-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.status-spinner {
+  animation: status-spin 1s linear infinite;
+  vertical-align: text-bottom;
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.comparison-evidence {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid #e0e5df;
+  padding: 16px;
+}
+
+.comparison-summary {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.comparison-summary h3,
+.comparison-summary p,
+.comparison-journal-provenance h4,
+.comparison-journal-provenance p,
+.audit-bundle-ready p {
+  margin: 0;
+}
+
+.comparison-summary h3 {
+  color: #1f2923;
+  font-size: 1rem;
+}
+
+.comparison-counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.comparison-count,
+.comparison-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid #ccd4cb;
+  border-radius: 999px;
+  background: #f5f7f8;
+  color: #52606b;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+.comparison-added {
+  border-color: #8fc9a0;
+  background: #eaf7ee;
+  color: #26623c;
+}
+
+.comparison-removed {
+  border-color: #e4a59e;
+  background: #fff0ee;
+  color: #91382f;
+}
+
+.comparison-changed {
+  border-color: #e2c274;
+  background: #fff8e2;
+  color: #75520b;
+}
+
+.comparison-unchanged {
+  border-color: #b6c3cd;
+  background: #f1f5f7;
+  color: #475a67;
+}
+
+.comparison-selector-facts,
+.audit-selection-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+
+.comparison-selector-facts > div,
+.audit-selection-facts > div {
+  min-width: 0;
+  border-left: 3px solid #5d8b76;
+  background: #f5f9f6;
+  padding: 9px 11px;
+}
+
+.comparison-selector-facts dd,
+.audit-selection-facts dd {
+  font-size: 0.79rem;
+  overflow-wrap: anywhere;
+}
+
+.comparison-table {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #d9dfda;
+  border-radius: 7px;
+}
+
+.comparison-table-heading,
+.comparison-table-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(100px, 0.45fr) minmax(180px, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  border-bottom: 1px solid #e6eae5;
+  padding: 8px 12px;
+}
+
+.comparison-table-heading {
+  background: #edf2ee;
+  color: #52605a;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.comparison-table-row:last-child {
+  border-bottom: 0;
+}
+
+.comparison-table-row strong,
+.comparison-table-row > span:last-child {
+  min-width: 0;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.comparison-table-row > span:last-child {
+  color: #68736c;
+}
+
+.comparison-journal-provenance {
+  display: grid;
+  gap: 10px;
+}
+
+.comparison-journal-provenance > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.comparison-journal-provenance > div > div {
+  min-width: 0;
+  border-left: 3px solid #7d8fa0;
+  background: #f3f6f8;
+  padding: 10px 12px;
+}
+
+.comparison-journal-provenance code,
+.comparison-journal-provenance p {
+  display: block;
+  margin-top: 5px;
+  color: #4d5c66;
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.audit-selection-band {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #d8e1e5;
+  background: #f7fafb;
+  padding-bottom: 16px;
+}
+
+.audit-selection-band > .section-heading {
+  padding-bottom: 12px;
+}
+
+.audit-selection-band h3 {
+  margin: 0;
+  color: #22343e;
+  font-size: 0.95rem;
+}
+
+.audit-selection-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.audit-selection-facts,
+.audit-selection-band > p,
+.audit-bundle-ready {
+  margin-right: 16px;
+  margin-left: 16px;
+}
+
+.audit-bundle-ready {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.5fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-left: 3px solid #2f7a46;
+  background: #eaf6ed;
+  color: #245a35;
+  padding: 12px;
+}
+
+.audit-bundle-ready a {
+  border-color: #2f6a44;
+  background: #2f6a44;
+}
+
 .run-inspector-toolbar {
   display: flex;
   align-items: end;
@@ -1899,6 +2207,30 @@ dd {
     align-items: stretch;
     grid-template-columns: 1fr;
   }
+
+  .run-comparison-selectors {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .run-comparison-selectors button {
+    grid-column: 1 / -1;
+  }
+
+  .audit-selection-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .audit-selection-controls button {
+    grid-column: 1 / -1;
+  }
+
+  .audit-bundle-ready {
+    grid-template-columns: 1fr;
+  }
+
+  .audit-bundle-ready a {
+    justify-self: start;
+  }
 }
 
 @media (max-width: 620px) {
@@ -1938,6 +2270,40 @@ dd {
 
   .run-history-row .status-pill {
     justify-self: start;
+  }
+
+  .run-comparison-selectors,
+  .audit-selection-controls,
+  .comparison-selector-facts,
+  .audit-selection-facts,
+  .comparison-journal-provenance > div {
+    grid-template-columns: 1fr;
+  }
+
+  .run-comparison-selectors button,
+  .audit-selection-controls button {
+    grid-column: auto;
+  }
+
+  .comparison-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .comparison-counts {
+    justify-content: flex-start;
+  }
+
+  .comparison-table-heading {
+    display: none;
+  }
+
+  .comparison-table-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .comparison-table-row > span:last-child {
+    grid-column: 1 / -1;
   }
 
   .flow-palette-list {

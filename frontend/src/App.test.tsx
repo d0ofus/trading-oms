@@ -30,6 +30,7 @@ describe("App", () => {
     expect(text).toContain("Operator access");
     expect(text).toContain("Visual builder");
     expect(text).toContain("Simulation run detail");
+    expect(text).toContain("Run comparison");
     expect(text).toContain("Approval inbox");
     expect(text).toContain("Audit explorer");
     expect(text).toContain("Order detail");
@@ -197,6 +198,12 @@ describe("App", () => {
     expect(text).toContain("journal_sequence:72");
     expect(text).toContain("workflow-run-backend-001");
     expect(html).toContain('name="workflowSimulationRun"');
+    expect(html).toContain('aria-label="Left comparison run"');
+    expect(html).toContain('aria-label="Right comparison run"');
+    expect(text).toContain("Simulation run comparison");
+    expect(text).toContain("Compare committed evidence");
+    expect(text).toContain("Choose two committed run slots, then compare");
+    expect(text).not.toContain("Prepare audit bundle");
     expect(text).not.toContain("Fake broker filled");
     expect(text).not.toContain("Protection monitored");
     expect(text).not.toContain("Manual simulation approval recorded");
@@ -218,8 +225,13 @@ describe("App", () => {
     );
 
     expect(loadingText).toContain("Loading saved workflow simulation runs");
+    expect(loadingText).toContain("Loading comparison sources");
     expect(emptyText).toContain("No saved workflow simulation runs");
+    expect(emptyText).toContain(
+      "No committed saved simulation runs are available for comparison",
+    );
     expect(errorText).toContain("Workflow simulation run history is unavailable");
+    expect(errorText).toContain("Saved-run comparison sources are unavailable");
     expect(`${loadingText} ${emptyText} ${errorText}`).not.toContain("Fake broker filled");
     expect(`${loadingText} ${emptyText} ${errorText}`).not.toContain("Protection monitored");
   });

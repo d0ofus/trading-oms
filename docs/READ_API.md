@@ -23,6 +23,7 @@ The backend exposes:
 - `GET /api/live-readiness-evidence`
 - `GET /api/paper-trading`
 - `GET /api/operational-controls`
+- `GET /api/simulation-run-comparison`
 - `GET /api/audit-export-bundle`
 
 The operations section routes from `/api/emergency-stop` through
@@ -44,6 +45,18 @@ generic HTTP 503 from all seven views without partial data.
 read-model snapshot, workflow definitions, workflow simulation run records, and journal records. It
 recursively scans the bundle and fails closed if secret-shaped or live-routing-shaped content is
 present.
+
+`GET /api/simulation-run-comparison` requires exact left and right workflow/run query selectors.
+It returns eleven ordered durable evidence sections, deterministic change classifications,
+complete journal provenance, and a comparison SHA-256. Missing, corrupt, duplicate, mixed-source,
+cross-run, contradictory, or otherwise unavailable evidence returns a generic failure without
+partial records or representative fallback.
+
+`GET /api/audit-export-bundle` also accepts an all-or-none selected-run query containing
+`workflow_id`, `run_id`, `expected_manifest_sha256`, and `journal_scope`. Scope is either
+`complete_run_manifest` or `single_journal_event`; the latter also requires `journal_sequence`.
+The selected bundle contains exactly one committed run and the exact requested manifest records.
+A stale manifest digest returns generic HTTP 409.
 
 `GET /api/audit-events` includes optional audit filter metadata fields:
 
@@ -76,6 +89,8 @@ present.
   `live_trading_authorized: false`.
 - Audit export responses include local JSON review data only and do not upload, deliver, submit,
   transmit, route, or connect anything.
+- Saved-run comparison and selected audit export are `GET`-only and add no approval, execution,
+  retry, repair, deletion, or journal-rewrite action.
 - No broker SDK, socket, network client, or transport behavior is introduced.
 
 ## Current Limitations
@@ -91,8 +106,8 @@ present.
 - Approval ticket read models are visible for inspection; simulation-only approval decision
   endpoints are documented separately in `docs/SIMULATION_APPROVAL_API.md`.
 - Orders are visible for inspection only; no order submission, cancellation, or broker route exists.
-- The audit export endpoint uses current in-process stores; SQLite-backed export orchestration is
-  future work.
+- Parameterless audit export uses current in-process stores. Exact selected-run export uses
+  committed SQLite plus digest-bound JSONL evidence and never falls back to representative rows.
 - Operational controls are safe local read-model data only; production observability, backup
   execution, restore execution, audit-retention execution, and controlled paper rollout remain
   future approved work.

@@ -41,9 +41,23 @@ The frontend audit explorer redacts secret-shaped audit text before rendering. T
 depth; upstream code must still avoid putting secrets into journal records, read models, logs, docs,
 screenshots, tests, or alert payloads.
 
+## Saved-Run Comparison And Export Selection
+
+The separate `Run comparison` section consumes the same committed lifecycle boundary but does not
+change audit history. It compares exactly two saved runs, displays deterministic section counts
+and journal provenance, then permits an explicit local audit-bundle request for the left or right
+run.
+
+The operator may select the complete committed manifest or one exact sequence from it. The request
+includes the source-manifest SHA-256, and the returned selection binds exact journal references and
+record digests. Changing a selector or scope invalidates the prior result. No upload, external
+delivery, deletion, repair, retry, or journal rewrite is available.
+
 ## Current Limitations
 
 - The explorer uses representative data until any committed saved-workflow run exists; it then
   uses only the validated durable lifecycle projection.
 - The filters are client-side.
 - Slice 040's SQLite journal index is not yet wired as the backend data source.
+- Saved-run comparison/export reads the committed run manifest directly; it does not add indexed
+  arbitrary-range audit search.

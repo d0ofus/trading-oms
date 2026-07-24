@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -42,6 +43,15 @@ from trading_oms_backend.simulation_approval_service import (
 from trading_oms_backend.simulation_execution_projections import (
     SimulationExecutionProjectionError,
     project_simulation_executions,
+)
+from trading_oms_backend.simulation_run_comparison import (
+    AuditExportSelectionConflictError,
+    AuditExportSelectionError,
+    SimulationRunComparisonError,
+    SimulationRunNotFoundError,
+    SimulationRunSelector,
+    build_simulation_run_comparison,
+    select_simulation_run_audit_evidence,
 )
 from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionConflictError,
@@ -304,31 +314,155 @@ def get_live_readiness_evidence(request: Request) -> dict[str, Any]:
     return _operations_read_model().to_api_envelope("live_readiness_evidence")
 
 
+@app.get("/api/simulation-run-comparison")
+def get_simulation_run_comparison(
+    request: Request,
+    left_workflow_id: str,
+    left_run_id: str,
+    right_workflow_id: str,
+    right_run_id: str,
+) -> dict[str, Any]:
+    _authorize_request(
+        request,
+        permission=VIEW_OPERATIONS_PERMISSION,
+        resource="simulation_run_comparison",
+        action="view",
+    )
+    try:
+        left = SimulationRunSelector(left_workflow_id, left_run_id)
+        right = SimulationRunSelector(right_workflow_id, right_run_id)
+    except SimulationRunComparisonError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="simulation run comparison selection is invalid",
+        ) from exc
+    try:
+        sources = get_workflow_simulation_runner().list_projection_sources()
+        comparison = build_simulation_run_comparison(
+            sources,
+            left=left,
+            right=right,
+        )
+    except SimulationRunNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="simulation run comparison evidence is unavailable",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="simulation run comparison evidence is unavailable",
+        ) from exc
+    return comparison.to_json_dict()
+
+
 @app.get("/api/audit-export-bundle")
-def get_audit_export_bundle(request: Request) -> dict[str, Any]:
+def get_audit_export_bundle(
+    request: Request,
+    workflow_id: str | None = None,
+    run_id: str | None = None,
+    expected_manifest_sha256: str | None = None,
+    journal_scope: str | None = None,
+    journal_sequence: int | None = None,
+) -> dict[str, Any]:
     _authorize_request(
         request,
         permission=VIEW_OPERATIONS_PERMISSION,
         resource="audit_export_bundle",
         action="view",
     )
+    selection_values = (
+        workflow_id,
+        run_id,
+        expected_manifest_sha256,
+        journal_scope,
+        journal_sequence,
+    )
+    selected_mode = any(value is not None for value in selection_values)
+    if selected_mode and any(
+        value is None
+        for value in (
+            workflow_id,
+            run_id,
+            expected_manifest_sha256,
+            journal_scope,
+        )
+    ):
+        raise HTTPException(status_code=400, detail="audit export selection is invalid")
+    if not selected_mode:
+        try:
+            workflows = get_workflow_definition_store().list_workflows()
+            runner = get_workflow_simulation_runner()
+            runs = tuple(
+                run for workflow in workflows for run in runner.list_runs(workflow.workflow_id)
+            )
+            bundle = build_audit_export_bundle(
+                export_id="audit-export-local-review",
+                generated_at="2026-07-08T13:46:00Z",
+                review_reference="local-human-review",
+                operations_read_model=_operations_read_model(),
+                workflow_definitions=workflows,
+                workflow_simulation_runs=runs,
+                journal_records=runner.journal_records(),
+            )
+        except AuditExportError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return bundle.to_json_dict()
+
     try:
-        workflows = get_workflow_definition_store().list_workflows()
+        selector = SimulationRunSelector(str(workflow_id), str(run_id))
+    except SimulationRunComparisonError as exc:
+        raise HTTPException(status_code=400, detail="audit export selection is invalid") from exc
+    try:
         runner = get_workflow_simulation_runner()
-        runs = tuple(
-            run for workflow in workflows for run in runner.list_runs(workflow.workflow_id)
+        sources = runner.list_projection_sources()
+        selected = select_simulation_run_audit_evidence(
+            sources,
+            selector=selector,
+            expected_manifest_sha256=str(expected_manifest_sha256),
+            journal_scope=str(journal_scope),
+            journal_sequence=journal_sequence,
+        )
+        operations = project_simulation_executions(
+            _operations_read_model(),
+            (selected.source,),
+        )
+        selected_sequences = {record.sequence for record in selected.journal_records}
+        operations = replace(
+            operations,
+            audit_events=tuple(
+                event for event in operations.audit_events if event.sequence in selected_sequences
+            ),
         )
         bundle = build_audit_export_bundle(
-            export_id="audit-export-local-review",
+            export_id=f"audit-export-{selected.selection.selection_sha256[:20]}",
             generated_at="2026-07-08T13:46:00Z",
-            review_reference="local-human-review",
-            operations_read_model=_operations_read_model(),
-            workflow_definitions=workflows,
-            workflow_simulation_runs=runs,
-            journal_records=runner.journal_records(),
+            review_reference="saved-simulation-run-review",
+            operations_read_model=operations,
+            workflow_definitions=(),
+            workflow_simulation_runs=(selected.source.run,),
+            journal_records=selected.journal_records,
+            selection=selected.selection,
         )
-    except AuditExportError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except AuditExportSelectionConflictError as exc:
+        raise HTTPException(status_code=409, detail="audit export selection is stale") from exc
+    except AuditExportSelectionError as exc:
+        raise HTTPException(status_code=400, detail="audit export selection is invalid") from exc
+    except SimulationRunNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="audit export selection evidence is unavailable",
+        ) from exc
+    except (AuditExportError, SimulationRunComparisonError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="audit export selection evidence is unavailable",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="audit export selection evidence is unavailable",
+        ) from exc
     return bundle.to_json_dict()
 
 
