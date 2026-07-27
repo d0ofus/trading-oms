@@ -3161,3 +3161,36 @@ Acceptance criteria:
 Recommended following slice:
 - reassess the highest-value remaining non-broker operator gap after human review;
 - keep Candidate 063 and every broker/external/live capability separately gated.
+
+---
+
+## Documentation-only candidate - Candidate 063 entry-gate audit
+
+status: `ready_for_human_review`
+
+Gate: Candidate 063 remains blocked; review evidence assessment only
+
+branch: `candidate-slice-063-entry-gate-audit`
+
+Goal:
+Audit every Candidate 063 prerequisite against the exact authoritative post-PR-54 baseline and
+publish a durable fail-closed decision without adding broker behavior.
+
+Completed:
+- [x] PR 54 and the authoritative `main` commit and tree are recorded.
+- [x] The immutable Candidate 062 plan, packet, digest, guide, and pending response template are
+  audited.
+- [x] Every Candidate 063 entry criterion is classified against current evidence.
+- [x] All eight open blocking P0/P1 findings and fourteen unresolved evidence categories remain
+  explicit.
+- [x] The smallest safe next action requires attributable independent architecture,
+  trading-safety, and security reviews against the unchanged packet.
+- [x] Candidate 063 remains blocked.
+- [x] No IBKR dependency, connector, broker contact, or paper lab is added.
+
+Non-goals:
+- Candidate 063 implementation or an IBKR SDK dependency;
+- broker connectivity, authentication, requests, callbacks, or a paper lab;
+- credentials, account identifiers, private values, deployment, or production rollout;
+- live trading or any relaxation of its prohibition;
+- fabricated, waived, self-approved, or unattributed external review evidence.
