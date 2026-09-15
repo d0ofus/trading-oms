@@ -257,6 +257,8 @@ def test_read_model_json_shapes_are_stable() -> None:
         ],
         "can_view_operations": True,
         "can_approve_simulation": False,
+        "can_author_strategy": False,
+        "can_operate_strategy": False,
         "can_administer_system": True,
         "approval_role_required": "approver",
         "role_separation": "admin_approver_separated",

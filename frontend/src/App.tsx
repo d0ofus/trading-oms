@@ -1,3 +1,4 @@
+import { VisualSimulationWorkflowCanvas as TypedStrategyCanvas } from "./TypedStrategyCanvas";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -159,6 +160,7 @@ const defaultWorkflowMetadata: WorkflowPersistenceMetadata = {
   description: "Validated visual simulation workflow",
 };
 
+const typedBuilderSection = "Typed strategy builder" as const;
 const visualBuilderSection = "Visual builder" as const;
 const simulationRunSection = "Simulation run detail" as const;
 const simulationRunComparisonSection = "Run comparison" as const;
@@ -189,6 +191,7 @@ type WorkflowSection = (typeof workflowSections)[number];
 const shellSections = [
   dataProvenanceSection,
   visualBuilderSection,
+  typedBuilderSection,
   simulationRunSection,
   simulationRunComparisonSection,
   approvalInboxSection,
@@ -1139,6 +1142,15 @@ export function App({
                 <p>{panel.detail}</p>
               </article>
             ))}
+          </section>
+
+          <section className="builder-section" id={sectionId(typedBuilderSection)}>
+            <div className="builder-heading"><div>
+              <p className="eyebrow">Typed strategy builder</p>
+              <h2>Opening breakout simulation</h2>
+              <p>Versioned tick replay with human arming and simulated fills.</p>
+            </div></div>
+            <TypedStrategyCanvas />
           </section>
 
           <section className="builder-section" id={sectionId("Visual builder")}>

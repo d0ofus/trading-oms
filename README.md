@@ -9,6 +9,12 @@ Initial safety foundation with a backend/frontend scaffold, safe configuration, 
 No concrete IBKR application-protocol connector, authenticated broker session, production strategy
 engine, real alert delivery, production deployment, or live order submission exists.
 
+The additive [typed strategy builder](docs/TYPED_STRATEGY_SIMULATION.md) supports a bounded
+opening-breakout tick simulation with versioned saves, explicit human arming, Decimal sizing,
+protective-stop monitoring, and restart-safe execution evidence. Its workflow storage, run APIs,
+and UI are separate from the existing saved-workflow approval/execution path. See the
+[integration review](docs/TYPED_STRATEGY_INTEGRATION_REVIEW.md) for retained behavior and checks.
+
 ## Safety posture
 
 - No live trading.
