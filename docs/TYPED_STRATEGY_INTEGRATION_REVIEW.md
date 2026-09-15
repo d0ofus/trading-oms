@@ -52,6 +52,7 @@ independent safety review. No SDK, credentials, order transport, external alert 
 or changes to Candidate 062/063 review packets were added. Existing v1 paths and their tests remain
 in place. Typed results use separate storage and do not feed v1 comparison/projections.
 
-Recommended next step: inspect the local integration diff and exercise the two builders in a
-browser, then publish a review branch when authorized. No GitHub push or main merge is performed
-as part of this integration.
+On 2026-09-15 the user authorized publishing this integration and consolidating the project on
+main. The follow-up [publication and consolidation plan](execplans/publish-and-consolidate-main.md)
+covers checked PR merge, verified backups, branch cleanup and the canonical working directory.
+Browser review remains a follow-up check; no deployment or additional trading slice is included.
