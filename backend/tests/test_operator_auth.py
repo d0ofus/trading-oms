@@ -33,10 +33,13 @@ def test_default_local_operator_has_view_and_admin_permissions_without_approval(
         "roles": ["admin"],
         "permissions": [
             "view_operations",
+            "author_strategy",
             "administer_system",
         ],
         "can_view_operations": True,
         "can_approve_simulation": False,
+        "can_author_strategy": True,
+        "can_operate_strategy": False,
         "can_administer_system": True,
         "approval_role_required": "approver",
         "role_separation": "admin_approver_separated",
@@ -78,6 +81,14 @@ def test_operator_identity_from_headers_derives_viewer_permissions() -> None:
     assert identity.can_view_operations is True
     assert identity.can_approve_simulation is False
     assert identity.can_administer_system is False
+
+
+def test_admin_cannot_combine_with_typed_strategy_execution_role() -> None:
+    with pytest.raises(OperatorAuthError, match="separated"):
+        operator_identity_from_headers(
+            {"x-operator-roles": "admin,strategy_operator"},
+            settings=Settings(app_env="development"),
+        )
 
 
 def test_operator_identity_rejects_unknown_roles_secret_shapes_and_production_local_auth() -> None:

@@ -13,6 +13,8 @@ AUTHZ_DECISION_EVENT_TYPE = "authz.decision.evaluated"
 
 VIEW_OPERATIONS_PERMISSION = "view_operations"
 APPROVE_SIMULATION_PERMISSION = "approve_simulation"
+AUTHOR_STRATEGY_PERMISSION = "author_strategy"
+OPERATE_STRATEGY_PERMISSION = "operate_strategy"
 ADMINISTER_SYSTEM_PERMISSION = "administer_system"
 APPROVAL_ROLE_REQUIRED = "approver"
 ROLE_SEPARATION_POLICY = "admin_approver_separated"
@@ -20,6 +22,8 @@ ROLE_SEPARATION_POLICY = "admin_approver_separated"
 VALID_PERMISSIONS = (
     VIEW_OPERATIONS_PERMISSION,
     APPROVE_SIMULATION_PERMISSION,
+    AUTHOR_STRATEGY_PERMISSION,
+    OPERATE_STRATEGY_PERMISSION,
     ADMINISTER_SYSTEM_PERMISSION,
 )
 ROLE_PERMISSIONS = {
@@ -28,8 +32,17 @@ ROLE_PERMISSIONS = {
         VIEW_OPERATIONS_PERMISSION,
         APPROVE_SIMULATION_PERMISSION,
     ),
+    "strategy_author": (
+        VIEW_OPERATIONS_PERMISSION,
+        AUTHOR_STRATEGY_PERMISSION,
+    ),
+    "strategy_operator": (
+        VIEW_OPERATIONS_PERMISSION,
+        OPERATE_STRATEGY_PERMISSION,
+    ),
     "admin": (
         VIEW_OPERATIONS_PERMISSION,
+        AUTHOR_STRATEGY_PERMISSION,
         ADMINISTER_SYSTEM_PERMISSION,
     ),
 }
@@ -91,6 +104,14 @@ class OperatorIdentity:
     def can_administer_system(self) -> bool:
         return ADMINISTER_SYSTEM_PERMISSION in self.permissions
 
+    @property
+    def can_author_strategy(self) -> bool:
+        return AUTHOR_STRATEGY_PERMISSION in self.permissions
+
+    @property
+    def can_operate_strategy(self) -> bool:
+        return OPERATE_STRATEGY_PERMISSION in self.permissions
+
     def has_permission(self, permission: str) -> bool:
         return permission in self.permissions
 
@@ -105,6 +126,8 @@ class OperatorIdentity:
             "can_view_operations": self.can_view_operations,
             "can_approve_simulation": self.can_approve_simulation,
             "can_administer_system": self.can_administer_system,
+            "can_author_strategy": self.can_author_strategy,
+            "can_operate_strategy": self.can_operate_strategy,
             "approval_role_required": APPROVAL_ROLE_REQUIRED,
             "role_separation": ROLE_SEPARATION_POLICY,
         }
@@ -255,6 +278,10 @@ def required_role_for_permission(permission: str) -> str:
         return APPROVAL_ROLE_REQUIRED
     if permission == ADMINISTER_SYSTEM_PERMISSION:
         return "admin"
+    if permission == AUTHOR_STRATEGY_PERMISSION:
+        return "strategy_author"
+    if permission == OPERATE_STRATEGY_PERMISSION:
+        return "strategy_operator"
     return "viewer_or_higher"
 
 
@@ -286,6 +313,8 @@ def _validated_role_tuple(roles: tuple[str, ...]) -> tuple[str, ...]:
             raise OperatorAuthError(f"unknown operator role: {role}")
     if "admin" in roles and "approver" in roles:
         raise OperatorAuthError("admin and approver roles must remain separated")
+    if "admin" in roles and "strategy_operator" in roles:
+        raise OperatorAuthError("admin and strategy_operator roles must remain separated")
     return roles
 
 

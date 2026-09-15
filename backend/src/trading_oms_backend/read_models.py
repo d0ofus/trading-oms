@@ -11,6 +11,8 @@ from trading_oms_backend.operator_auth import (
     ADMINISTER_SYSTEM_PERMISSION,
     APPROVAL_ROLE_REQUIRED,
     APPROVE_SIMULATION_PERMISSION,
+    AUTHOR_STRATEGY_PERMISSION,
+    OPERATE_STRATEGY_PERMISSION,
     ROLE_SEPARATION_POLICY,
     VIEW_OPERATIONS_PERMISSION,
     OperatorIdentity,
@@ -172,6 +174,8 @@ class OperatorSessionReadModel:
             if permission not in {
                 VIEW_OPERATIONS_PERMISSION,
                 APPROVE_SIMULATION_PERMISSION,
+                AUTHOR_STRATEGY_PERMISSION,
+                OPERATE_STRATEGY_PERMISSION,
                 ADMINISTER_SYSTEM_PERMISSION,
             }:
                 raise ReadModelError("permissions must be known operator permissions")
@@ -202,6 +206,14 @@ class OperatorSessionReadModel:
         return APPROVE_SIMULATION_PERMISSION in self.permissions
 
     @property
+    def can_author_strategy(self) -> bool:
+        return AUTHOR_STRATEGY_PERMISSION in self.permissions
+
+    @property
+    def can_operate_strategy(self) -> bool:
+        return OPERATE_STRATEGY_PERMISSION in self.permissions
+
+    @property
     def can_administer_system(self) -> bool:
         return ADMINISTER_SYSTEM_PERMISSION in self.permissions
 
@@ -215,6 +227,8 @@ class OperatorSessionReadModel:
             "permissions": list(self.permissions),
             "can_view_operations": self.can_view_operations,
             "can_approve_simulation": self.can_approve_simulation,
+            "can_author_strategy": self.can_author_strategy,
+            "can_operate_strategy": self.can_operate_strategy,
             "can_administer_system": self.can_administer_system,
             "approval_role_required": self.approval_role_required,
             "role_separation": self.role_separation,

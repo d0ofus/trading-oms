@@ -53,6 +53,8 @@ from trading_oms_backend.simulation_run_comparison import (
     build_simulation_run_comparison,
     select_simulation_run_audit_evidence,
 )
+from trading_oms_backend.typed_strategy_api import disarm_for_emergency
+from trading_oms_backend.typed_strategy_api import router as typed_strategy_router
 from trading_oms_backend.workflow_definitions import (
     WorkflowDefinitionConflictError,
     WorkflowDefinitionError,
@@ -70,6 +72,7 @@ from trading_oms_backend.workflow_simulation_runs import (
 )
 
 app = FastAPI(title="Trading OMS", version="0.1.0")
+app.include_router(typed_strategy_router)
 
 
 class ApprovalDecisionBody(BaseModel):
@@ -960,8 +963,12 @@ def _apply_emergency_stop_change(
         )
         if action == "activate":
             record = get_emergency_stop_service().activate(request)
+            disarm_for_emergency(actor=identity.operator_id, timestamp=change.requested_at)
         else:
             record = get_emergency_stop_service().deactivate(request)
+            disarm_for_emergency(
+                actor=identity.operator_id, timestamp=change.requested_at, active=False
+            )
     except EmergencyStopError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return record.to_json_dict()

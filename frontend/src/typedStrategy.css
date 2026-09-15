@@ -1,0 +1,229 @@
+
+.typed-strategy-workspace.typed-builder {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 3fr) minmax(210px, 0.85fr);
+  gap: 1rem;
+  width: 100%;
+}
+.typed-strategy-workspace .node-palette,
+.typed-strategy-workspace .property-inspector,
+.typed-strategy-workspace .run-arming-panel,
+.typed-strategy-workspace .dsl-preview-inline,
+.typed-strategy-workspace .flow-validation,
+.typed-strategy-workspace .builder-actions {
+  border: 1px solid var(--line, #d5ddd9);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 1rem;
+}
+.typed-strategy-workspace .node-palette,
+.typed-strategy-workspace .property-inspector {
+  align-self: start;
+  max-height: 760px;
+  overflow: auto;
+}
+.typed-strategy-workspace .node-palette section {
+  margin-block: 1rem;
+}
+.typed-strategy-workspace .node-palette h3,
+.typed-strategy-workspace .node-palette h4,
+.typed-strategy-workspace .property-inspector h3,
+.typed-strategy-workspace .property-inspector h4 {
+  margin-block: 0 0.55rem;
+}
+.typed-strategy-workspace .node-palette button,
+.typed-strategy-workspace .builder-actions button,
+.typed-strategy-workspace .property-inspector button {
+  width: 100%;
+  border: 1px solid #9bb1a7;
+  border-radius: 9px;
+  background: #f6faf8;
+  color: #17382d;
+  cursor: pointer;
+  font: inherit;
+  margin-block: 0.25rem;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+}
+.typed-strategy-workspace .node-palette button:hover,
+.typed-strategy-workspace .builder-actions button:hover:not(:disabled) {
+  border-color: #28654f;
+  background: #eaf5f0;
+}
+.typed-strategy-workspace .builder-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.typed-strategy-workspace .typed-canvas-column {
+  display: grid;
+  gap: 0.8rem;
+  min-width: 0;
+}
+.typed-strategy-workspace .typed-react-flow-frame {
+  height: 570px;
+  min-height: 570px;
+}
+.typed-strategy-workspace .typed-flow-node {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 190px;
+  border: 1px solid #9cafaa;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(19, 54, 43, 0.08);
+  padding: 0.75rem;
+}
+.typed-strategy-workspace .typed-flow-node.selected {
+  border-color: #1f6e51;
+  box-shadow: 0 0 0 3px rgba(31, 110, 81, 0.16);
+}
+.typed-strategy-workspace .typed-flow-node small {
+  color: #567067;
+  line-height: 1.35;
+}
+.typed-strategy-workspace .typed-flow-node .react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: #26664f;
+  border: 2px solid white;
+}
+.typed-strategy-workspace .node-run-overlay {
+  border-radius: 999px;
+  background: #eef6f2;
+  color: #245642;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.45rem;
+}
+.typed-strategy-workspace .flow-validation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 1rem;
+  align-items: baseline;
+}
+.typed-strategy-workspace .flow-validation-valid {
+  border-color: #8ec2a9;
+  background: #f0faf5;
+}
+.typed-strategy-workspace .flow-validation-invalid {
+  border-color: #d5a28f;
+  background: #fff6f2;
+}
+.typed-strategy-workspace .flow-validation ul {
+  flex-basis: 100%;
+  margin: 0.4rem 0 0;
+}
+.typed-strategy-workspace .property-inspector {
+  display: grid;
+  gap: 0.8rem;
+}
+.typed-strategy-workspace .property-inspector label,
+.typed-strategy-workspace .run-input-grid label {
+  display: grid;
+  gap: 0.35rem;
+}
+.typed-strategy-workspace .property-inspector input,
+.typed-strategy-workspace .property-inspector select,
+.typed-strategy-workspace .run-input-grid input,
+.typed-strategy-workspace .run-input-grid select {
+  min-width: 0;
+  border: 1px solid #afbeb8;
+  border-radius: 8px;
+  background: white;
+  font: inherit;
+  padding: 0.55rem;
+}
+.typed-strategy-workspace .port-inspector {
+  display: grid;
+  gap: 0.3rem;
+}
+.typed-strategy-workspace .port-inspector span {
+  border-radius: 6px;
+  background: #edf4f1;
+  color: #31594a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  padding: 0.3rem 0.45rem;
+}
+.typed-strategy-workspace .danger-outline {
+  border-color: #bd7963 !important;
+  color: #793721 !important;
+}
+.typed-strategy-workspace .builder-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.typed-strategy-workspace .builder-actions button {
+  width: auto;
+  text-align: center;
+}
+.typed-strategy-workspace .run-arming-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+.typed-strategy-workspace .run-input-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.typed-strategy-workspace .formula-line,
+.typed-strategy-workspace .run-status-line {
+  border-radius: 9px;
+  background: #f0f5f3;
+  margin: 0;
+  padding: 0.7rem;
+}
+.typed-strategy-workspace .dataset-fixture-row,
+.typed-strategy-workspace .config-field-stack {
+  display: grid;
+  gap: 0.55rem;
+}
+.typed-strategy-workspace .dataset-fixture-row {
+  align-items: center;
+  grid-template-columns: minmax(12rem, max-content) minmax(0, 1fr);
+  margin-top: 0.8rem;
+}
+.typed-strategy-workspace .dataset-fixture-row span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.typed-strategy-workspace .run-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.typed-strategy-workspace .run-summary-grid span {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid #d9e2de;
+  border-radius: 9px;
+  padding: 0.65rem;
+}
+.typed-strategy-workspace .dsl-preview-inline pre {
+  max-height: 360px;
+  overflow: auto;
+}
+@media (max-width: 1050px) {
+.typed-strategy-workspace.typed-builder {
+    grid-template-columns: 1fr;
+  }
+.typed-strategy-workspace .node-palette,
+.typed-strategy-workspace .property-inspector {
+    max-height: none;
+  }
+.typed-strategy-workspace .run-input-grid,
+.typed-strategy-workspace .run-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 680px) {
+.typed-strategy-workspace .run-input-grid,
+.typed-strategy-workspace .run-summary-grid {
+    grid-template-columns: 1fr;
+  }
+.typed-strategy-workspace .builder-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

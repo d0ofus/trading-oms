@@ -29,6 +29,9 @@ describe("App", () => {
     expect(text).toContain("Trading OMS");
     expect(text).toContain("Operator access");
     expect(text).toContain("Visual builder");
+    expect(text).toContain("Typed strategy builder");
+    expect(text).toContain("Opening breakout simulation");
+    expect(text).toContain("Load saved workflow");
     expect(text).toContain("Simulation run detail");
     expect(text).toContain("Run comparison");
     expect(text).toContain("Approval inbox");
