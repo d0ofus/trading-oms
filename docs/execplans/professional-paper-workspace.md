@@ -221,6 +221,10 @@ the existing review JSON/digest attributes. No historical content, expected hash
 behavior was changed. An autocrlf-enabled checkout of the two files produced bytes identical to
 the verified local files, and all 26 tests in the two affected historical evidence suites passed
 (6.83 seconds). The verified source/build fingerprint remains unchanged.
+The same checkout probe found that automatic CRLF conversion would fail Prettier's LF format
+gate. Frontend TypeScript, TSX and CSS now explicitly use LF as well; copied representative
+files are checked with Prettier after an autocrlf-enabled checkout. This also changes no source
+content or runtime behavior.
 
 **External acceptance remains outstanding.** No real Gateway API login, paper order, Telegram
 message, external outage test or actual unattended session was performed by implementation.

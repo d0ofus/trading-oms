@@ -53,6 +53,7 @@ Final Windows verification completed on 2026-09-16 at 16:42 Sydney time. `./scri
 The recorded source/build fingerprint is `c9a2d95c6cd7b475f1be39d6d1fee066359e102cdb05468a9afd8cfc9ca89075`. The local gate record explicitly has `paper_trials: false`. Initial failures and their fixes remain in the ExecPlan. These results were obtained on Windows; remote CI results are separate evidence.
 
 The first remote CI run passed Ubuntu and exposed three historical evidence hash failures on Windows with `core.autocrlf=true`. The corrective change pins the review-packet generator and Candidate 062 plan to LF in `.gitattributes`; it preserves historical content and expected hashes. An autocrlf-enabled checkout now produces identical bytes, and all 26 affected historical evidence tests passed in 6.83 seconds. Production code and the verified source/build fingerprint are unchanged by this checkout-only correction.
+The checkout probe also reproduced Prettier rejecting automatically converted CRLF frontend files. TypeScript, TSX and CSS now have explicit LF attributes; representative copied files pass Prettier with autocrlf enabled. Source content remains unchanged.
 
 Nonblocking warnings remain: Starlette deprecates its current HTTPX TestClient integration; the main frontend JavaScript bundle is 588.07 kB before gzip; pip-audit recommends artifact hashes in addition to the fully pinned dependency versions. The official SDK and Gateway downloads already have explicit SHA256 checks.
 
