@@ -1,2 +1,4 @@
 review/**/*.json text eol=lf
 review/**/*.sha256 text eol=lf
+backend/src/trading_oms_backend/independent_review_packet.py text eol=lf
+docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md text eol=lf

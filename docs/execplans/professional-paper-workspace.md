@@ -214,6 +214,14 @@ patched Protobuf runtime, verified production bundle and Windows platform checks
 Install/login to the selected Gateway and enable the local paper API before connection trials.
 The preflight did not log in or submit any broker order.
 
+The first pushed CI run passed Ubuntu but found three historical byte-identity failures on a
+fresh Windows checkout. Git's automatic CRLF conversion changed the review packet generator and
+Candidate 062 plan bytes. Two explicit LF attributes now preserve those hashed files, alongside
+the existing review JSON/digest attributes. No historical content, expected hash or runtime
+behavior was changed. An autocrlf-enabled checkout of the two files produced bytes identical to
+the verified local files, and all 26 tests in the two affected historical evidence suites passed
+(6.83 seconds). The verified source/build fingerprint remains unchanged.
+
 **External acceptance remains outstanding.** No real Gateway API login, paper order, Telegram
 message, external outage test or actual unattended session was performed by implementation.
 The verified Gateway installer was downloaded and signature/hash checked, not installed or
