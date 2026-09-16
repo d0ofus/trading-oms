@@ -8,7 +8,10 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -34,5 +37,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
+      - name: Install isolated verification browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
       - name: Run verification
+        if: runner.os != 'Windows'
         run: make verify
+
+      - name: Run Windows verification
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\scripts\verify.ps1

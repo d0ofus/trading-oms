@@ -1,0 +1,24 @@
+{
+  "checked_on": "2026-09-16",
+  "python": "3.12",
+  "node": "24",
+  "ibkr_api": {
+    "version": "10.50.2",
+    "url": "https://interactivebrokers.github.io/downloads/twsapi_macunix.1050.02.zip",
+    "sha256": "673129e5cba58c4d77bc40647265f84ea42f605eccf88fa4c1221d62d12454f3",
+    "protobuf": "5.29.6",
+    "packaging_override": "setup.py dependency pin only: protobuf 5.29.5 to 5.29.6 for CVE-2026-0994. SDK protocol sources are unmodified."
+  },
+  "ib_gateway": {
+    "selected_build": "10.51.1a",
+    "windows_file_version": "1.051.1.1",
+    "built_at": "2026-09-09 14:24:11",
+    "url": "https://download2.interactivebrokers.com/installers/ibgateway/latest-standalone/ibgateway-latest-standalone-windows-x64.exe",
+    "sha256": "1c8541446d6a46d3bdd8f6ef7e3c6cc797f831548c0b19aaf03612cd08f4ea8d",
+    "authenticode_status": "Valid",
+    "publisher": "Interactive Brokers Group, Inc.",
+    "minimum_protocol": 220,
+    "qualification": "Vendor version-range check and local SDK boundary tests only; actual paper handshake and execution qualification remain outstanding.",
+    "mutable_url_policy": "Reject a different checksum. Retain the verified offline installer; qualify updates explicitly."
+  }
+}

@@ -1,5 +1,18 @@
 # Security Baseline
 
+## Current professional paper workspace
+
+The operator-approved [professional workspace ExecPlan](execplans/professional-paper-workspace.md)
+adds the isolated `workspace` runtime. Its current controls and trial gate are documented in the
+[paper operator guide](PAPER_OPERATOR_GUIDE.md). It uses a loopback-only authenticated API,
+transient broker account identities, Windows Credential Manager, durable risk/outbox state,
+restart disarming and verified reconciliation. Live trading remains excluded.
+
+Candidate 061/062/063 sections below are retained historical evidence. Their review outcomes
+are not upgraded by this implementation; no independent review is claimed. The new internal
+paper gate was explicitly selected by the operator and supersedes the earlier rollout process
+for this implementation only.
+
 ## Secrets
 
 Never commit:

@@ -24,20 +24,25 @@ test:
 	@$(NPM) --prefix $(FRONTEND_DIR) run test
 
 test-integration:
-	@echo "test-integration: placeholder until integration tests exist"
+	@$(PYTHON) -m pytest $(PYTEST_ARGS) $(BACKEND_DIR)/tests/test_workspace_api.py
 
 test-replay:
-	@echo "test-replay: placeholder until replay engine exists"
+	@$(PYTHON) -m pytest $(PYTEST_ARGS) $(BACKEND_DIR)/tests/test_workspace_market.py
 
 test-chaos:
-	@$(PYTHON) -m pytest $(PYTEST_ARGS) $(BACKEND_DIR)/tests/test_resilience.py
+	@$(PYTHON) -m pytest $(PYTEST_ARGS) $(BACKEND_DIR)/tests/test_resilience.py $(BACKEND_DIR)/tests/test_workspace_chaos.py $(BACKEND_DIR)/tests/test_workspace_protection.py
 
 test-e2e:
-	@echo "test-e2e: placeholder until e2e tests exist"
+	@$(NPM) --prefix $(FRONTEND_DIR) run build
+	@$(NPM) --prefix $(FRONTEND_DIR) run test:e2e
 
 security-check:
-	@echo "security-check: minimal scaffold checks"
 	@$(PYTHON) scripts/verify_repo.py
+	@$(PYTHON) scripts/secret_scan.py
+	@$(PYTHON) -m pip_audit --disable-pip --no-deps -r backend/requirements-lock.txt
+	@$(NPM) --prefix $(FRONTEND_DIR) audit --audit-level=low
 
-verify: format lint typecheck test test-integration test-replay test-chaos test-e2e security-check
+verify: format lint typecheck test test-e2e security-check
+	@$(NPM) --prefix $(FRONTEND_DIR) run format:check
+	@$(PYTHON) -m trading_oms_backend.workspace.verification
 	@echo "verify: ok"

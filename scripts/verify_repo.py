@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,6 +69,10 @@ FORBIDDEN_TEXT = [
 SKIPPED_DIRECTORY_NAMES = {
     ".git",
     ".tmp",
+    "node_modules",
+    ".venv",
+    "__pycache__",
+    "dist",
 }
 
 
@@ -102,7 +107,11 @@ def main() -> None:
                 fail(f"{rel} is missing required text: {needle}")
 
     scan_exts = {".md", ".toml", ".example", ".yml", ".yaml", ".py", ".ps1", ""}
-    for path in ROOT.rglob("*"):
+    paths = []
+    for directory, children, files in os.walk(ROOT):
+        children[:] = [name for name in children if name not in SKIPPED_DIRECTORY_NAMES]
+        paths.extend(Path(directory) / name for name in files)
+    for path in paths:
         if _should_skip_path(path):
             continue
         if not path.is_file() or path.suffix not in scan_exts:

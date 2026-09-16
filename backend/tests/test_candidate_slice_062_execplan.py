@@ -153,8 +153,13 @@ def test_candidate_slice_062_adds_no_sdk_or_connector_runtime_surface() -> None:
         assert package not in dependencies
 
     sources = "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted(BACKEND_SOURCE.rglob("*.py"))
+        path.read_text(encoding="utf-8")
+        for path in sorted(BACKEND_SOURCE.rglob("*.py"))
+        if "workspace" not in path.relative_to(BACKEND_SOURCE).parts
     ).casefold()
+    # Candidate 062's preserved modules remain transport-free. The subsequently
+    # authorized professional workspace has its own paper-boundary tests and gate;
+    # it must not retroactively change the historical review evidence.
     forbidden_source = [
         "from ibapi",
         "import ibapi",

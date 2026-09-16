@@ -1,18 +1,23 @@
 [project]
 name = "trading-oms-backend"
 version = "0.1.0"
-description = "Minimal safety-first Trading OMS backend skeleton."
+description = "Local strategy workspace and durable paper-only trading operations service."
 requires-python = ">=3.12"
 dependencies = [
-  "fastapi>=0.115,<1",
+  "fastapi==0.139.0",
+  "exchange-calendars==4.13.2",
+  "tzdata==2026.4",
+  "httpx==0.28.1",
+  "uvicorn==0.51.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "httpx>=0.27,<1",
-  "pytest>=8,<9",
-  "ruff>=0.8,<1",
-  "uvicorn>=0.34,<1",
+  "pip-audit==2.10.1",
+  "httpx==0.28.1",
+  "pytest==9.1.1",
+  "ruff==0.15.20",
+  "uvicorn==0.51.0",
 ]
 
 [tool.pytest.ini_options]

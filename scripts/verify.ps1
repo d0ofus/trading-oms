@@ -19,7 +19,7 @@ function New-PytestBaseTemp {
   Join-Path ([System.IO.Path]::GetTempPath()) ("trading-oms-pytest-" + [System.Guid]::NewGuid().ToString("N"))
 }
 
-Write-Host "Running scaffold verification..."
+Write-Host "Running offline application verification. Broker order submission is disabled in tests."
 
 $python = Get-Command python -ErrorAction SilentlyContinue
 if (-not $python) {
@@ -39,10 +39,14 @@ Invoke-Checked python -m compileall -q backend/src backend/tests
 Invoke-Checked python -m pytest "-p" no:cacheprovider --basetemp (New-PytestBaseTemp) backend/tests
 Invoke-Checked npm.cmd --prefix frontend run lint
 Invoke-Checked npm.cmd --prefix frontend run typecheck
+Invoke-Checked npm.cmd --prefix frontend run format:check
 Invoke-Checked npm.cmd --prefix frontend run test
 
-Write-Host "test-integration: placeholder until integration tests exist"
-Write-Host "test-replay: placeholder until replay engine exists"
-Invoke-Checked python -m pytest "-p" no:cacheprovider --basetemp (New-PytestBaseTemp) backend/tests/test_resilience.py
-Write-Host "test-e2e: placeholder until e2e tests exist"
+Write-Host "Backend gate includes API integration, deterministic replay, resilience, execution and crash/recovery tests."
+Invoke-Checked npm.cmd --prefix frontend run build
+Invoke-Checked npm.cmd --prefix frontend run test:e2e
+Invoke-Checked python scripts/secret_scan.py
+Invoke-Checked python -m pip_audit --disable-pip --no-deps -r backend/requirements-lock.txt
+Invoke-Checked npm.cmd --prefix frontend audit --audit-level=low
+Invoke-Checked python -m trading_oms_backend.workspace.verification
 Write-Host "verify: ok"
