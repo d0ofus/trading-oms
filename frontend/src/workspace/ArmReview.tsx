@@ -34,6 +34,7 @@ export function ArmReview({
     profileId: string,
     version: number,
     unattended: boolean,
+    sessionDate = preview?.session_date,
   ) {
     if (!preview) return;
     setBusy(true);
@@ -44,6 +45,7 @@ export function ArmReview({
           profile_id: profileId,
           profile_version: version,
           unattended,
+          session_date: sessionDate,
         }),
       );
     } catch (error) {
@@ -65,6 +67,23 @@ export function ArmReview({
       {preview && (
         <>
           <div className="ws-form-grid">
+            <label>
+              Trading date (New York)
+              <input
+                type="date"
+                value={preview.session_date ?? ""}
+                disabled={busy}
+                onChange={(e) => {
+                  if (e.target.value)
+                    void review(
+                      preview.limits.id,
+                      preview.limits.version,
+                      preview.authorization === "unattended_paper_session",
+                      e.target.value,
+                    );
+                }}
+              />
+            </label>
             <label>
               Risk profile
               <select
@@ -121,6 +140,9 @@ export function ArmReview({
               </strong>
             </div>
             <div>
+              <span>Session starts</span>
+              <strong>{exchangeTime(preview.valid_from ?? undefined)}</strong>
+              <small>{localTime(preview.valid_from ?? undefined)}</small>
               <span>New-entry cutoff</span>
               <strong>{exchangeTime(preview.entry_cutoff)}</strong>
               <small>{localTime(preview.entry_cutoff)}</small>
@@ -142,6 +164,18 @@ export function ArmReview({
               </small>
             </div>
           </div>
+          <ul className="ws-run-windows">
+            {preview.runs.map((run) => (
+              <li key={run.id}>
+                <strong>{run.symbol}</strong>:{" "}
+                {run.trading_hours === "extended"
+                  ? "Regular + pre/post-market"
+                  : "Regular hours only"}
+                {" · "}
+                {exchangeTime(run.valid_from)} to {exchangeTime(run.expires_at)}
+              </li>
+            ))}
+          </ul>
           {preview.summaries?.map((version) => (
             <details key={version.run_id}>
               <summary>
@@ -184,6 +218,7 @@ export function ArmReview({
                   await api("/runs/arm", "POST", {
                     ids: preview.runs.map((r) => r.id),
                     mutation_id: mutationId(),
+                    session_date: preview.session_date,
                     profile_id: preview.limits.id,
                     profile_version: preview.limits.version,
                     unattended:

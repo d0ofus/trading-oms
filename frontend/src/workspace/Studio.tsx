@@ -818,7 +818,9 @@ export function Studio({
           <>
             <div className="ws-editor-heading">
               <div className="ws-strategy-name">
+                <label htmlFor="strategy-name">Strategy name</label>
                 <input
+                  id="strategy-name"
                   aria-label="Strategy name"
                   value={active.name}
                   maxLength={100}
@@ -951,11 +953,34 @@ export function Studio({
                       <div>
                         <h3>Market & session</h3>
                         <p>
-                          Regular US exchange hours. Session boundaries adjust
-                          for holidays and early closes.
+                          Choose execution hours. Opening-range and
+                          relative-volume inputs remain anchored to the regular
+                          session.
                         </p>
                         <div className="ws-form-grid">
                           {setting("symbol", "Stock or ETF symbol")}
+                          {active.document.schema_version >= 4 ? (
+                            setting("trading_hours", "Execution hours", [
+                              ["regular", "Regular hours only"],
+                              ["extended", "Regular + pre/post-market"],
+                            ])
+                          ) : (
+                            <button
+                              onClick={() =>
+                                update({
+                                  ...active.document,
+                                  schema_version: 4,
+                                  settings: {
+                                    ...active.document.settings,
+                                    trading_hours: "regular",
+                                    stop_limit_offset: "0.10",
+                                  },
+                                })
+                              }
+                            >
+                              Enable session settings in this draft
+                            </button>
+                          )}
                           {setting("timeframe", "Candle interval", [
                             [5, "5 seconds"],
                             [60, "1 minute"],
@@ -1033,6 +1058,22 @@ export function Studio({
                           the strategy needs one.
                         </p>
                         {rules("protection")}
+                        {active.document.settings.trading_hours ===
+                          "extended" && (
+                          <>
+                            {setting(
+                              "stop_limit_offset",
+                              "Protective limit below stop trigger",
+                              undefined,
+                              "USD",
+                            )}
+                            <p className="ws-banner warning">
+                              Extended hours use broker-held stop-limit
+                              protection. A triggered stop-limit can remain
+                              unfilled. Extended sessions require supervision.
+                            </p>
+                          </>
+                        )}
                       </div>
                     </section>
                     <section className="ws-config-section">
@@ -1057,8 +1098,8 @@ export function Studio({
                       <div>
                         <h3>Execution limits</h3>
                         <p>
-                          Entries stop 15 minutes before exchange close. Every
-                          entry passes account-wide risk checks.
+                          Entries stop 15 minutes before the selected session
+                          ends. Every entry passes account-wide risk checks.
                         </p>
                         <div className="ws-form-grid">
                           {setting(

@@ -28,6 +28,8 @@ In Gateway's API settings, enable socket clients, use **4002**, restrict connect
 
 After read-only connection/data/reconciliation checks pass, you must manually disable Gateway's API read-only mode before a supervised execution test. This does not arm a strategy. Never connect a live account or use its endpoint.
 
+If Gateway rejects a setup request with code 321, inspect **Activity > View incident**. New incidents identify API read-only rejections when Gateway provides that reason. Some setup requests may be refused by that setting even though no order is being submitted. Keep entries disarmed, change the paper Gateway setting only when ready for supervised testing, then **Recheck recovery** and reconcile before marking the incident resolved. Code 2119 is an informational data-connection status; it no longer permanently blocks arming by itself.
+
 ## 3. Start and complete setup
 
 ```powershell
@@ -49,12 +51,18 @@ In **Settings**:
 
 In **Strategy Studio**, duplicate a template, name it and configure the six guided sections. Switch to Canvas to inspect or edit the same graph. Blocks can be added with buttons and connected through input selectors without dragging. Resolve validation issues, inspect the exact explanation and publish a version.
 
+Use the visible **Strategy name** field above the editor. Comparison and arithmetic controls are labelled **Operation** and use full option names. Regular hours remain the default. **Market & session > Execution hours** enables supervised pre/post-market execution with broker-held stop-limit protection; review its protective-limit offset and risk in the guided form before publishing.
+
 In **Testing**, import recorded tick CSV (`timestamp,price,size`, with timezone-aware ISO timestamps). Intrabar replay requires actual ticks; OHLCV bars are not converted into invented ticks. The synthetic practice dataset is clearly labelled and does not count as broker evidence. A within-session tick gap longer than 15 seconds blocks replay until the capture is repaired. Inspect trades, open positions and limitations; then prepare a paper run from the immutable version.
 
 ## 5. Supervised one-share execution
 
 Do this during regular US exchange hours with at least 15 minutes before close. Keep Gateway visible. In **Trading Desk**, select the prepared run and open **Review & arm**. Check the strategy/version, resolved symbol, exact entry/exit rules, session times, one-share limits, protection and all server readiness checks. Arming is your explicit authorization to submit paper orders when a fresh signal occurs.
 
+The arming review also allows a future New York trading date, up to seven calendar days ahead. Authorization can be granted before the session opens; execution still waits for its approved window and current inputs. For an acknowledgement/cancellation test without a strategy signal, use **Settings > Paper connection test** during an eligible regular or pre/post-market session. At fully closed times, use its read-only connection/data check. Follow the [exact test and recovery procedure](docs/PAPER_OPERATOR_GUIDE.md#quick-paper-connection-test).
+
 Watch the entry acknowledgement, fill, broker-held GTC stop and reconciliation. Inspect the order's execution timeline. Use **Disarm strategy** to stop entries; use **Close owned position** for a deliberate exit. A requested cancellation or close remains pending until confirmed. Verify the account is flat and no sell order remains active.
 
 Continue with the recovery and acceptance steps in the [operator guide](docs/PAPER_OPERATOR_GUIDE.md). Do not infer readiness for unattended use from a successful build or one fill.
+
+To remove an unused prepared run, select it in Trading Desk and choose **Remove run**. Removal of a working entry waits for cancellation and flat reconciliation; positions and uncertain orders block it. History remains available. After upgrading this build, deliberately stop the old launcher only after disarming and reconciling, then run `scripts/start-paper.ps1` again and refresh the browser. Re-running the launcher while the old process is still active only reopens that process.

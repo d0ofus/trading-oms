@@ -295,7 +295,12 @@ class Store:
                 from .graph import number
 
                 run = self.read(db, "run", run_id)
-                if not run or not run.get("armed") or run["expires_at"] <= now():
+                if (
+                    not run
+                    or not run.get("armed")
+                    or run.get("valid_from", "") > now()
+                    or run["expires_at"] <= now()
+                ):
                     raise Conflict("A current session authorization is required.")
                 existing = [
                     json.loads(r[0])

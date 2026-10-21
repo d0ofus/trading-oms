@@ -6,6 +6,8 @@ The current application has five workspaces: Trading Desk, Strategy Studio, Test
 
 The paper service uses the official asynchronous IBKR API behind an adapter, a single engine owner, Decimal calculations, exchange sessions, durable order identities and an append-only SQLite event ledger. It blocks entries on stale data, unknown orders, missing protection, emergency stop, expired authorization or failed reconciliation. Application restart restores monitoring with new entries disarmed.
 
+Runs can be armed for a selected future exchange date. Strategies default to regular hours, with an explicit supervised pre/post-market option and broker-held stop-limit protection. Settings includes a reviewed one-share acknowledgement/cancellation test that needs fresh quotes but no price-crossing signal. Flat runs can be removed from Active runs while preserving audit history. See the [flexible-session implementation plan](docs/execplans/paper-diagnostics-and-flexible-sessions.md) and [current operator guide](docs/PAPER_OPERATOR_GUIDE.md).
+
 ## Start here
 
 Read [Windows setup and first paper test](GETTING_STARTED_WINDOWS.md), followed by the [operator guide](docs/PAPER_OPERATOR_GUIDE.md). The [implementation plan](docs/execplans/professional-paper-workspace.md) records scope and evidence; [dependency pins](docs/PAPER_DEPENDENCIES.json) record the SDK and selected Gateway artifact.

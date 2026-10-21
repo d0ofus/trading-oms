@@ -6,6 +6,7 @@ from decimal import Decimal
 from functools import lru_cache
 
 from .graph import Compiled, GraphError, number
+from .sessions import candle_bounds
 
 
 @lru_cache(maxsize=1)
@@ -112,7 +113,7 @@ class Market:
         bounds = session_bounds(stamp)
         if not bounds:
             return
-        opened, _ = bounds
+        opened, regular_close = bounds
         stamp = stamp.replace(second=0, microsecond=0)
         self.session_seed_until = stamp
         by_day: dict[str, dict[int, dict]] = {}
@@ -138,7 +139,7 @@ class Market:
             self.history_volumes.append(cumulative)
         self.history_volumes = self.history_volumes[-10:]
         today = by_day.get(opened.date().isoformat(), {})
-        elapsed = max(0, int((stamp - opened).total_seconds() // 60))
+        elapsed = max(0, int((min(stamp, regular_close) - opened).total_seconds() // 60))
         self.day = opened.date()
         self.day_complete = set(today) == set(range(elapsed))
         self.volume = sum((number(b["volume"]) for b in today.values()), Decimal(0))
@@ -162,7 +163,9 @@ class Market:
             fine_bars if timeframe == 5 else minute_bars, key=lambda b: int(b["timestamp"])
         ):
             time = datetime.fromtimestamp(int(bar["timestamp"]), UTC)
-            window = session_bounds(time)
+            window = candle_bounds(
+                time, self.graph.document["settings"].get("trading_hours") == "extended"
+            )
             if not window or not window[0] <= time < window[1]:
                 continue
             start = window[0] + timedelta(
@@ -207,11 +210,14 @@ class Market:
             raise GraphError("Out-of-order observations require data recovery.")
         if self.closed_until is not None and stamp < self.closed_until:
             raise GraphError("A late trade belongs to an already completed candle. Repair history.")
-        bounds = session_bounds(stamp)
+        bounds = candle_bounds(
+            stamp, self.graph.document["settings"].get("trading_hours") == "extended"
+        )
         if not bounds or not bounds[0] <= stamp < bounds[1]:
             return None
         opened, closed = bounds
-        seconds = int((stamp - opened).total_seconds())
+        regular_open, regular_close = session_bounds(stamp)
+        seconds = int((stamp - regular_open).total_seconds())
         new_day = opened.date() != self.day
         if new_day:
             if self.day_complete and self.minute_volumes:
@@ -228,10 +234,12 @@ class Market:
             self.session_seed_until = None
             self.bar_seed_until = None
         minute = seconds // 60
-        if minute > self.last_minute:
+        if regular_open <= stamp < regular_close and minute > self.last_minute:
             self.minute_volumes[minute] = self.volume
             self.last_minute = minute
-        if self.session_seed_until is None or stamp >= self.session_seed_until:
+        if regular_open <= stamp < regular_close and (
+            self.session_seed_until is None or stamp >= self.session_seed_until
+        ):
             self.volume += size
             self.low = price if self.low is None else min(price, self.low)
             if seconds < 300:
@@ -242,7 +250,9 @@ class Market:
                     window[0] = price if window[0] is None else max(price, window[0])
                     window[1] = price if window[1] is None else min(price, window[1])
         timeframe = self.graph.document["settings"]["timeframe"]
-        start = opened + timedelta(seconds=seconds // timeframe * timeframe)
+        start = opened + timedelta(
+            seconds=int((stamp - opened).total_seconds()) // timeframe * timeframe
+        )
         transitioned = self.current is not None and self.current.start != start
         if transitioned:
             self._finish_candle(self.current)
@@ -265,14 +275,19 @@ class Market:
         return self.context(end, True)
 
     def context(self, stamp, transitioned=False):
-        bounds = session_bounds(stamp)
+        bounds = candle_bounds(
+            stamp, self.graph.document["settings"].get("trading_hours") == "extended"
+        )
         if not bounds:
             return None
         opened, closed = bounds
-        seconds = int((stamp - opened).total_seconds())
+        regular_open, _ = session_bounds(stamp)
+        seconds = int((stamp - regular_open).total_seconds())
         minute = seconds // 60
         timeframe = self.graph.document["settings"]["timeframe"]
-        start = opened + timedelta(seconds=seconds // timeframe * timeframe)
+        start = opened + timedelta(
+            seconds=int((stamp - opened).total_seconds()) // timeframe * timeframe
+        )
         history = self.history_volumes
         relative = None
         if self.day_complete and len(history) == 10 and all(minute in h for h in history):
@@ -282,11 +297,11 @@ class Market:
             )
         context = {
             "last": self.last_price,
-            "session_volume": self.volume if self.day_complete else None,
+            "session_volume": self.volume if self.day_complete and seconds >= 0 else None,
             "relative_volume": relative,
             "opening_high": self.range_high if self.day_complete and seconds >= 300 else None,
             "opening_low": self.range_low if self.day_complete and seconds >= 300 else None,
-            "session_low": self.low if self.day_complete else None,
+            "session_low": self.low if self.day_complete and seconds >= 0 else None,
             "minutes_from_open": seconds / 60,
             "minutes_to_close": (closed - stamp).total_seconds() / 60,
             "since_entry": (stamp - self.last_entry).total_seconds() if self.last_entry else 1e12,
@@ -369,7 +384,7 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
     target_required = any(n["kind"] == "target" for n in graph.ordered)
     for sequence, raw in enumerate(ticks):
         stamp, price, size = parse_tick(raw)
-        bounds = session_bounds(stamp)
+        bounds = candle_bounds(stamp, settings.get("trading_hours") == "extended")
         if (
             previous_stamp
             and bounds
@@ -403,9 +418,15 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
             contexts.append(current)
         evaluated = [(context, *evaluate_step(state, context)) for context in contexts]
         if position:
+            extended = settings.get("trading_hours") == "extended"
+            if price <= position["stop"]:
+                position["stop_triggered"] = True
+            stop_fills = position.get("stop_triggered") and (
+                not extended or price >= position["stop"] - number(settings["stop_limit_offset"])
+            )
             reason = (
                 "protective_stop"
-                if price <= position["stop"]
+                if stop_fills
                 else "target"
                 if position["target"] is not None and price >= position["target"]
                 else "session_exit"
@@ -446,10 +467,20 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
             if target_required and target is None or target is not None and target <= limit:
                 continue
             try:
-                quantity = size_entry(settings, profile, limit, stop, Decimal(5000))
+                risk_stop = stop
+                if stop is not None and settings.get("trading_hours") == "extended":
+                    risk_stop = stop - number(settings["stop_limit_offset"])
+                quantity = size_entry(settings, profile, limit, risk_stop, Decimal(5000))
             except Conflict:
                 continue
-            intent = {"quantity": quantity, "limit": limit, "stop": stop, "target": target}
+            intent = {
+                "quantity": quantity,
+                "limit": limit,
+                "stop": stop,
+                "target": target,
+                "outside_rth": settings.get("trading_hours") == "extended",
+                "stop_limit": risk_stop if settings.get("trading_hours") == "extended" else None,
+            }
             durable = oms.entry(intent)
             pending = {**intent, **durable, "at": stamp}
             signals.append(

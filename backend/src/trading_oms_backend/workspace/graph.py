@@ -310,12 +310,21 @@ class Compiled:
             elif kind == "constant":
                 expression = str(params["value"])
             elif kind == "math":
-                operator = {"add": "+", "subtract": "−", "multiply": "×", "divide": "÷"}[
-                    params["op"]
-                ]
+                operator = {
+                    "add": "plus",
+                    "subtract": "minus",
+                    "multiply": "multiplied by",
+                    "divide": "divided by",
+                }[params["op"]]
                 expression = f"({a} {operator} {b})"
             elif kind == "compare":
-                operator = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}[params["op"]]
+                operator = {
+                    "gt": "greater than",
+                    "gte": "greater than or equal to",
+                    "lt": "less than",
+                    "lte": "less than or equal to",
+                    "eq": "equal to",
+                }[params["op"]]
                 expression = f"{a} {operator} {b}"
             elif kind == "cross":
                 expression = f"{a} crosses {params['direction']} {b}"
@@ -352,8 +361,15 @@ class Compiled:
                 "node": "settings",
                 "kind": "session",
                 "text": (
-                    "Entries end 15 minutes before the exchange close. "
-                    f"Start the session exit {settings['exit_before_close']} minutes before close."
+                    "Entries end 15 minutes before the selected execution session ends. "
+                    f"Start the session exit {settings['exit_before_close']} "
+                    "minutes before that end. "
+                    + (
+                        "Regular + pre/post-market; broker-held stop-limit protection may "
+                        "trigger without filling."
+                        if settings.get("trading_hours") == "extended"
+                        else "Regular hours only."
+                    )
                 ),
             }
         )
@@ -381,8 +397,8 @@ class Compiled:
 def compile_graph(raw: dict) -> Compiled:
     if not isinstance(raw, dict) or set(raw) - {"nodes", "edges", "settings", "schema_version"}:
         raise GraphError("Unsupported strategy document.")
-    if raw.get("schema_version") != 3:
-        raise GraphError("Strategy schema version must be 3.")
+    if raw.get("schema_version") not in (3, 4):
+        raise GraphError("Strategy schema version must be 3 or 4.")
     nodes, edges = raw.get("nodes"), raw.get("edges")
     if (
         not isinstance(nodes, list)
@@ -393,9 +409,18 @@ def compile_graph(raw: dict) -> Compiled:
         raise GraphError("Use between 1 and 100 blocks and at most 200 connections.")
     if not isinstance(raw.get("settings", {}), dict):
         raise GraphError("Strategy settings must be named fields.")
-    settings = {**DEFAULT_SETTINGS, **raw.get("settings", {})}
-    if set(settings) != set(DEFAULT_SETTINGS):
+    defaults = dict(DEFAULT_SETTINGS)
+    if raw["schema_version"] == 4:
+        defaults.update(trading_hours="regular", stop_limit_offset="0.10")
+    settings = {**defaults, **raw.get("settings", {})}
+    if set(settings) != set(defaults):
         raise GraphError("Unsupported strategy setting.")
+    if raw["schema_version"] == 4:
+        if settings["trading_hours"] not in {"regular", "extended"}:
+            raise GraphError("Select regular or regular + pre/post-market execution.")
+        if not 0 < number(settings["stop_limit_offset"]) <= 10:
+            raise GraphError("Stop-limit offset must be positive and at most $10.")
+        settings["stop_limit_offset"] = str(number(settings["stop_limit_offset"]))
     if not re.fullmatch(r"[A-Z][A-Z0-9. -]{0,14}", str(settings["symbol"])):
         raise GraphError("Choose a supported US equity symbol.")
     if (
@@ -501,7 +526,7 @@ def compile_graph(raw: dict) -> Compiled:
             raise GraphError("Circular connections cannot execute.")
         ordered.extend(remaining.pop(key) for key in available)
     document = {
-        "schema_version": 3,
+        "schema_version": raw["schema_version"],
         "settings": settings,
         "nodes": list(lookup.values()),
         "edges": edges,
@@ -595,8 +620,12 @@ def templates() -> list[dict]:
             "name": name,
             "description": description,
             "document": {
-                "schema_version": 3,
-                "settings": dict(DEFAULT_SETTINGS),
+                "schema_version": 4,
+                "settings": {
+                    **DEFAULT_SETTINGS,
+                    "trading_hours": "regular",
+                    "stop_limit_offset": "0.10",
+                },
                 "nodes": nodes,
                 "edges": edges,
             },

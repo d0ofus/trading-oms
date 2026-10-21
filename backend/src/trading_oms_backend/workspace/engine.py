@@ -13,9 +13,12 @@ from decimal import ROUND_DOWN, Decimal
 
 from .acceptance import observe_session
 from .broker import PaperGateway
+from .diagnostics import broker_diagnostic, exception_diagnostic
 from .graph import GraphError, compile_graph, number
-from .market import Market, calendar, session_bounds
+from .market import Market, calendar
 from .oms import OrderLedger
+from .operations import OperatorActions
+from .paper_test import PaperConnectionTest
 from .power import SleepGuard
 from .protection import ProtectionController, order_ids
 from .qualification import profiles, qualification_checks
@@ -34,7 +37,7 @@ def check(code, title, passed, detail, remedy="/settings"):
     }
 
 
-class Engine(ProtectionController, OrderLedger):
+class Engine(PaperConnectionTest, OperatorActions, ProtectionController, OrderLedger):
     """Single execution owner. HTTP and SDK threads never reduce trading state."""
 
     def __init__(self, store: Store, broker_factory=PaperGateway):
@@ -65,6 +68,7 @@ class Engine(ProtectionController, OrderLedger):
         self.server_version = None
         self.last_loop = time.monotonic()
         self._next_health_write = 0.0
+        self._health_failed_at = None
         self.daily_pnl = None
         self.pnl_at = 0.0
         self._resume_attestation = False
@@ -76,6 +80,15 @@ class Engine(ProtectionController, OrderLedger):
         self.code_verified = verified()
         self._recovered_context = False
         self.sleep_guard = SleepGuard()
+        self._fault_at = time.monotonic()
+        self._legacy_fault_restart = bool(store.get("incident", "engine_fault"))
+        if type(self.broker) is PaperGateway and not store.get("migration", "flexible_sessions_v1"):
+            from .recovery import backup_bundle
+
+            if store.events(limit=1):
+                backup = backup_bundle(store, store.directory / "backups")
+                store.event("migration.backup.created", {"file": backup.name})
+            store.put("migration", "flexible_sessions_v1", {"at": now(), "additive": True})
         profiles(store)
         self._restore()
 
@@ -85,6 +98,8 @@ class Engine(ProtectionController, OrderLedger):
             rows = db.execute("SELECT id,payload FROM documents WHERE kind='run'").fetchall()
             for row in rows:
                 run = json.loads(row["payload"])
+                if run.get("archived"):
+                    continue
                 run.update(
                     armed=False,
                     state="paused",
@@ -143,10 +158,14 @@ class Engine(ProtectionController, OrderLedger):
             ) from exc
 
     def _loop(self):
+        batch = []
         while not self.stopping.is_set():
+            operation = "observe"
             try:
-                batch = []
-                for _ in range(100):
+                # Preserve remaining callbacks when one reducer operation fails.
+                # Never replay the failed observation: reconciliation establishes
+                # its outcome before another risk-increasing decision is allowed.
+                for _ in range(100 if not batch else 0):
                     try:
                         observation = self.observations.get_nowait()
                     except queue.Empty:
@@ -156,10 +175,13 @@ class Engine(ProtectionController, OrderLedger):
                 ticks = [item for item in batch if item["type"] in {"tick", "quote"}]
                 capture = self.store.capture_batch(ticks) if ticks else None
                 self._batch_runs = self.store.list("run") if ticks else None
-                for observation in batch:
+                while batch:
+                    observation = batch.pop(0)
+                    operation = "observe:" + observation["type"]
                     if observation["type"] in {"tick", "quote"}:
                         observation["capture"] = capture
                     self.observe(observation)
+                    self._operation_succeeded(operation)
                 self._batch_runs = None
                 try:
                     future, method, kwargs = self.commands.get(timeout=0.025)
@@ -167,7 +189,9 @@ class Engine(ProtectionController, OrderLedger):
                     future = None
                 if future is not None and future.set_running_or_notify_cancel():
                     try:
+                        operation = method
                         future.set_result(getattr(self, method)(**kwargs))
+                        self._operation_succeeded(method)
                     except (ValueError, KeyError) as exc:
                         future.set_exception(exc)
                     except Exception:
@@ -177,32 +201,55 @@ class Engine(ProtectionController, OrderLedger):
                             )
                         )
                         raise
+                operation = "maintain"
                 self.maintain()
+                self._operation_succeeded(operation)
                 self.last_loop = time.monotonic()
-            except Exception:
+            except Exception as exc:
                 self.reconciled = False
+                self._fault_at = time.monotonic()
                 self.last_fault = (
                     "An engine operation failed. New entries are blocked; inspect recovery."
                 )
                 try:
-                    self.incident("engine_fault", self.last_fault)
+                    self.incident(
+                        "engine_fault",
+                        self.last_fault,
+                        diagnostic=exception_diagnostic(exc, operation),
+                    )
                 except Exception:
                     self.stopping.set()
         self.sleep_guard.set(False)
 
-    def incident(self, code, detail):
+    def incident(self, code, detail, *, severity="critical", diagnostic=None):
         previous = self.store.get("incident", code)
+        if previous and not previous.get("resolved"):
+            previous.update(
+                last_seen=now(),
+                occurrences=previous.get("occurrences", 1) + 1,
+                severity=severity,
+                detail=detail,
+                recovery={},
+            )
+            if diagnostic:
+                previous["diagnostic"] = diagnostic
+            self.store.put("incident", code, previous)
+            return
         if not previous or previous.get("resolved"):
             item = {
                 "id": code,
-                "severity": "critical",
+                "severity": severity,
                 "detail": detail,
                 "timestamp": now(),
                 "resolved": False,
+                "diagnostic": diagnostic or {},
+                "occurrences": 1,
             }
             with self.store.transaction() as db:
                 self.store.write(db, "incident", code, item)
                 self.store.append(db, "incident.raised", item)
+                if severity != "critical":
+                    return
                 notification_id = uuid.uuid4().hex
                 self.store.write(
                     db,
@@ -319,7 +366,9 @@ class Engine(ProtectionController, OrderLedger):
         sessions = cal.sessions_in_range((stamp - timedelta(days=24)).date().isoformat(), day)
         jobs = []
         for session in sessions[-12:]:
-            end = min(cal.session_close(session).to_pydatetime() + timedelta(seconds=1), stamp)
+            from .sessions import candle_bounds
+
+            end = min(candle_bounds(cal.session_open(session).to_pydatetime(), True)[1], stamp)
             jobs.append((conid, end.strftime("%Y%m%d-%H:%M:%S"), 60))
         jobs.append((conid, "", 5))
         self.history_jobs.extend(jobs)
@@ -349,6 +398,8 @@ class Engine(ProtectionController, OrderLedger):
 
     def maintain(self):
         clock = time.monotonic()
+        self._finish_removals()
+        self._maintain_paper_tests()
         if self.reconcile_inflight and clock > self.reconcile_deadline:
             self._connection_lost("Reconciliation timed out; reconnecting for a fresh snapshot.")
             self.broker.disconnect()
@@ -390,18 +441,23 @@ class Engine(ProtectionController, OrderLedger):
                     for run in active_runs:
                         if run.get("armed") and run.get("unattended"):
                             self.disarm(run["id"], "Unattended monitoring failed.")
-            temporary = self.store.directory / "engine-health.pending"
-            temporary.write_text(
-                json.dumps(
-                    {
-                        "timestamp": time.time(),
-                        "pid": os.getpid(),
-                        "armed": any(r.get("armed") for r in self.store.list("run")),
-                    }
-                ),
-                encoding="utf-8",
+            from .health_file import publish_health
+
+            published = publish_health(
+                self.store.directory,
+                {
+                    "timestamp": time.time(),
+                    "pid": os.getpid(),
+                    "armed": any(r.get("armed") for r in self.store.list("run")),
+                },
             )
-            os.replace(temporary, self.store.directory / "engine-health.json")
+            if published:
+                self._health_failed_at = None
+            else:
+                self._health_failed_at = self._health_failed_at or clock
+                self._next_health_write = clock + 0.25
+                if clock - self._health_failed_at > 5:
+                    raise OSError("Heartbeat publication failed beyond its bounded retry interval.")
         if self.broker.overflow.is_set():
             self.reconciled = False
             self.incident(
@@ -428,10 +484,20 @@ class Engine(ProtectionController, OrderLedger):
                     if not self.history_bars.get(conid):
                         self._queue_history(conid)
         for conid, data in self.data.items():
-            if data.get("warm") and (
-                not data.get("received_at")
-                or (datetime.now(UTC) - datetime.fromisoformat(data["received_at"])).total_seconds()
-                > 15
+            from .sessions import candle_bounds
+
+            data_window = candle_bounds(datetime.now(UTC), True)
+            if (
+                data_window
+                and data_window[0] <= datetime.now(UTC) < data_window[1]
+                and data.get("warm")
+                and (
+                    not data.get("received_at")
+                    or (
+                        datetime.now(UTC) - datetime.fromisoformat(data["received_at"])
+                    ).total_seconds()
+                    > 15
+                )
             ):
                 self._data_gap(conid, "Last-trade observations are stale.")
         if self.connected and self.heartbeat_at and clock - self.heartbeat_at > 30:
@@ -619,10 +685,24 @@ class Engine(ProtectionController, OrderLedger):
                     self.pending_subscriptions.update(self.data)
                 if self.attested:
                     self.begin_reconcile()
-            elif code not in {2104, 2106, 2107, 2108, 2158, 2109}:
+            elif code in {2104, 2106}:
+                previous = self.store.get("incident", "broker_2119")
+                if previous and not previous.get("resolved"):
+                    previous.update(
+                        resolved=True,
+                        severity="information",
+                        recovery={"broker_code": code},
+                        reviewed_at=now(),
+                    )
+                    self.store.put("incident", "broker_2119", previous)
+                    self.store.event("incident.recovered", {"id": "broker_2119", "code": code})
+            elif code not in {2107, 2108, 2158, 2109}:
+                diagnostic = event.get("diagnostic") or broker_diagnostic(code)
                 self.incident(
                     f"broker_{code}",
-                    f"Gateway code {code}: inspect diagnostics. Affected actions are blocked.",
+                    diagnostic["detail"],
+                    severity="information" if code == 2119 else "critical",
+                    diagnostic={**diagnostic, "request": event["request"]},
                 )
         elif kind == "contract":
             self.contracts[event["conid"]] = {
@@ -812,6 +892,7 @@ class Engine(ProtectionController, OrderLedger):
         self.reconciled_at = time.monotonic()
         self.last_fault = " ".join(dict.fromkeys(issues)) or None
         if self.reconciled:
+            self._reconciliation_recovery()
             with self.store.transaction() as db:
                 for order in self.store.orders():
                     position = owned.get(order["run_id"])
@@ -838,8 +919,19 @@ class Engine(ProtectionController, OrderLedger):
         for run in self.store.list("run"):
             position = owned.get(run["id"])
             if position and position["quantity"] > 0:
+                if run.get("archived"):
+                    run.update(
+                        archived=False, removal_pending=False, armed=False, late_fill_recovery=True
+                    )
+                    self.incident(
+                        "late_archived_fill",
+                        "A removed run received a late execution. Monitor its position and "
+                        "protection.",
+                    )
                 run.update(
-                    state="position_open" if position.get("protected") else "recovery_required",
+                    state="position_open"
+                    if position.get("protected") and not run.get("late_fill_recovery")
+                    else "recovery_required",
                     position=str(position["quantity"]),
                     protected=position.get("protected", False),
                 )
@@ -851,8 +943,24 @@ class Engine(ProtectionController, OrderLedger):
                     state="armed" if run.get("armed") else "completed",
                 )
                 self.store.put("run", run["id"], run)
-            if run.get("armed") and self.reconciled and not (position and position["quantity"] > 0):
-                run.update(state="armed", blocking_reason=None)
+            pending_entry = any(
+                o["run_id"] == run["id"]
+                and o["payload"].get("purpose", "entry") == "entry"
+                and o["state"] not in {"filled", "cancelled", "rejected"}
+                for o in self.store.orders()
+            )
+            if (
+                run.get("armed")
+                and self.reconciled
+                and not pending_entry
+                and not (position and position["quantity"] > 0)
+            ):
+                waiting = run.get("valid_from", "") > now()
+                ready = self.data.get(run["conid"], {}).get("warm")
+                run.update(
+                    state="waiting_session" if waiting else "armed" if ready else "waiting_data",
+                    blocking_reason=None,
+                )
                 self.store.put("run", run["id"], run)
             if not position or position["quantity"] == 0:
                 if self.store.get("exit_request", run["id"]):
@@ -871,6 +979,8 @@ class Engine(ProtectionController, OrderLedger):
             evidence = self.store.get("qualification", "broker_evidence") or {}
             for position in owned.values():
                 key = position["run_id"]
+                if (self.store.get("run", key) or {}).get("diagnostic_test"):
+                    continue
                 trial = self.store.get("paper_trial", key) or {}
                 if position["quantity"] > 0 and position.get("protected"):
                     trial["protection_observed"] = True
@@ -894,7 +1004,11 @@ class Engine(ProtectionController, OrderLedger):
             self.store.put("qualification", "broker_evidence", evidence)
 
     def readiness(self):
-        critical = [i for i in self.store.list("incident") if not i.get("resolved")]
+        critical = [
+            i
+            for i in self.store.list("incident")
+            if not i.get("resolved") and i.get("severity", "critical") == "critical"
+        ]
         return [
             check(
                 "sdk_compatibility",
@@ -959,7 +1073,10 @@ class Engine(ProtectionController, OrderLedger):
         ]
 
     def review_incident(self, identity):
-        incident = self.store.get("incident", identity)
+        incident = self.incident_detail(identity)
+        if not incident["can_resolve"]:
+            raise Conflict(incident["remediation"])
+        incident = {k: v for k, v in incident.items() if k not in {"can_resolve", "remediation"}}
         if not incident:
             raise ValueError("Incident not found.")
         if not self.reconciled or not self.connected or not self.attested:
@@ -1006,6 +1123,7 @@ class Engine(ProtectionController, OrderLedger):
             and any(
                 r.get("armed")
                 and r.get("expires_at", "") > now()
+                and self._session_permission(r)
                 and self.data.get(r["conid"], {}).get("warm")
                 for r in self.store.list("run")
             ),
@@ -1087,7 +1205,9 @@ class Engine(ProtectionController, OrderLedger):
         self.subscribe(conid)
         return run
 
-    def arm_preview(self, ids, profile_id="smoke", profile_version=1, unattended=False):
+    def arm_preview(
+        self, ids, profile_id="smoke", profile_version=1, unattended=False, session_date=None
+    ):
         if not isinstance(ids, list) or not 1 <= len(ids) <= 5 or len(set(ids)) != len(ids):
             raise ValueError("Select one to five distinct runs.")
         checks = self.readiness()
@@ -1096,22 +1216,78 @@ class Engine(ProtectionController, OrderLedger):
             raise ValueError("Select a published risk profile.")
         checks.extend(qualification_checks(self.store, profile, unattended, self.code_verified))
         selected = []
-        bounds = session_bounds(datetime.now(UTC))
-        window = bool(bounds and bounds[0] <= datetime.now(UTC) < bounds[1] - timedelta(minutes=15))
+        from .sessions import NY, execution_bounds, next_session_day
+
+        stamp = datetime.now(UTC)
+        if session_date is None:
+            hours = []
+            for key in ids:
+                item = self.store.get("run", key)
+                if not item:
+                    raise ValueError("A selected run no longer exists.")
+                settings = self.store.version(item["strategy_id"], item["version"])["document"][
+                    "settings"
+                ]
+                hours.append(settings.get("trading_hours", "regular"))
+            session_date = next_session_day(
+                stamp, "extended" if all(h == "extended" for h in hours) else "regular"
+            )
+        try:
+            selected_day = datetime.fromisoformat(session_date).date()
+        except ValueError as exc:
+            raise ValueError("Select an exchange date.") from exc
+        delta = (selected_day - stamp.astimezone(NY).date()).days
         checks.append(
             check(
-                "session",
-                "Regular trading session",
-                window,
-                "Arm during the exchange session, before the last 15 minutes.",
+                "session_date",
+                "Selected exchange date",
+                0 <= delta <= 7,
+                "Choose an exchange session within the next seven days.",
                 "/desk",
             )
         )
+        windows = []
         active = [r for r in self.store.list("run") if r.get("armed") and r["id"] not in ids]
         for key in ids:
             run = self.store.get("run", key)
             if not run:
                 raise ValueError("A selected run no longer exists.")
+            if run.get("archived") or run.get("removal_pending") or run.get("diagnostic_test"):
+                raise Conflict("Select an active strategy run.")
+            run = dict(run)
+            settings = self.store.version(run["strategy_id"], run["version"])["document"][
+                "settings"
+            ]
+            hours = settings.get("trading_hours", "regular")
+            bounds = execution_bounds(session_date, hours, self.contracts.get(run["conid"]))
+            deferred = bool(bounds and stamp < bounds[0])
+            run.update(
+                trading_hours=hours,
+                session_date=session_date,
+                valid_from=bounds[0].isoformat() if bounds else None,
+                expires_at=bounds[1].isoformat() if bounds else None,
+            )
+            if bounds:
+                windows.append(bounds)
+            checks.append(
+                check(
+                    "session_" + key,
+                    f"{run['symbol']} execution window",
+                    bounds and stamp < bounds[1] - timedelta(minutes=15),
+                    "Select a supported broker session; extended hours need a current "
+                    "contract schedule.",
+                    "/settings",
+                )
+            )
+            checks.append(
+                check(
+                    "extended_qualification_" + key,
+                    "Extended-hours supervision",
+                    hours != "extended" or not unattended,
+                    "Extended hours currently require a supervised paper session.",
+                    "/desk",
+                )
+            )
             selected.append(run)
             data = self.data.get(run["conid"], {})
             fresh = (
@@ -1125,8 +1301,9 @@ class Engine(ProtectionController, OrderLedger):
                 check(
                     "data_" + key,
                     f"{run['symbol']} data and warm-up",
-                    data.get("live") and data.get("warm") and fresh,
-                    "Resolve the symbol, enable live subscriptions, and finish historical warm-up.",
+                    deferred or (data.get("live") and data.get("warm") and fresh),
+                    "Before opening, data checks are deferred. Fresh data and complete "
+                    "warm-up remain mandatory at submission.",
                     "/settings",
                 )
             )
@@ -1135,7 +1312,8 @@ class Engine(ProtectionController, OrderLedger):
                 check(
                     "indicators_" + key,
                     f"{run['symbol']} strategy inputs ready",
-                    evaluated.get("entry") is not None and evaluated.get("stop") is not None,
+                    deferred
+                    or (evaluated.get("entry") is not None and evaluated.get("stop") is not None),
                     "Wait for required calculations and the protective stop to warm up.",
                     "/studio",
                 )
@@ -1169,10 +1347,13 @@ class Engine(ProtectionController, OrderLedger):
                 "/settings",
             )
         )
+        bounds = (min(w[0] for w in windows), max(w[1] for w in windows)) if windows else None
         return {
             "eligible": all(c["passed"] for c in checks),
             "checks": checks,
             "runs": selected,
+            "session_date": session_date,
+            "valid_from": bounds[0].isoformat() if bounds else None,
             "expires_at": bounds[1].isoformat() if bounds else None,
             "entry_cutoff": (bounds[1] - timedelta(minutes=15)).isoformat() if bounds else None,
             "limits": profile,
@@ -1185,7 +1366,15 @@ class Engine(ProtectionController, OrderLedger):
             else "supervised_paper_session",
         }
 
-    def arm(self, ids, mutation_id, profile_id="smoke", profile_version=1, unattended=False):
+    def arm(
+        self,
+        ids,
+        mutation_id,
+        profile_id="smoke",
+        profile_version=1,
+        unattended=False,
+        session_date=None,
+    ):
         prior = self.store.get("mutation", mutation_id)
         if prior:
             if (
@@ -1193,10 +1382,11 @@ class Engine(ProtectionController, OrderLedger):
                 or prior.get("profile_id", "smoke") != profile_id
                 or prior.get("profile_version", 1) != profile_version
                 or prior.get("unattended", False) != unattended
+                or prior.get("requested_session_date") != session_date
             ):
                 raise Conflict("This action identifier was already used for a different selection.")
             return prior["result"]
-        preview = self.arm_preview(ids, profile_id, profile_version, unattended)
+        preview = self.arm_preview(ids, profile_id, profile_version, unattended, session_date)
         if not preview["eligible"]:
             raise Conflict(
                 "The selected runs are blocked. Resolve the readiness checks and review again."
@@ -1207,8 +1397,8 @@ class Engine(ProtectionController, OrderLedger):
                     raise Conflict("Emergency stop became active. Review the session again.")
                 run.update(
                     armed=True,
-                    state="armed",
-                    expires_at=preview["expires_at"],
+                    state="waiting_session" if run["valid_from"] > now() else "armed",
+                    expires_at=run["expires_at"],
                     authorized_at=now(),
                     authorization_id=mutation_id,
                     epoch=self.broker.epoch,
@@ -1216,9 +1406,10 @@ class Engine(ProtectionController, OrderLedger):
                     limits=preview["limits"],
                     unattended=unattended,
                     entries=run.get("entries", 0)
-                    if run.get("session_date") == datetime.now(UTC).date().isoformat()
+                    if self.store.get("run", run["id"]).get("session_date")
+                    == preview["session_date"]
                     else 0,
-                    session_date=datetime.now(UTC).date().isoformat(),
+                    session_date=preview["session_date"],
                 )
                 self.store.write(db, "run", run["id"], run)
                 self.store.append(
@@ -1241,6 +1432,7 @@ class Engine(ProtectionController, OrderLedger):
                     "profile_id": profile_id,
                     "profile_version": profile_version,
                     "unattended": unattended,
+                    "requested_session_date": session_date,
                     "result": {"armed": ids},
                 },
             )
@@ -1359,7 +1551,7 @@ class Engine(ProtectionController, OrderLedger):
         if not self.data[conid].get("warm"):
             return
         for run in getattr(self, "_batch_runs", None) or self.store.list("run"):
-            if run["conid"] != conid:
+            if run["conid"] != conid or run.get("archived") or run.get("diagnostic_test"):
                 continue
             state = self._runtime(run)
             if (
@@ -1398,7 +1590,7 @@ class Engine(ProtectionController, OrderLedger):
                 or context["minutes_to_close"] <= graph.document["settings"]["exit_before_close"]
             ):
                 self._request_exit(run["id"])
-        elif run.get("armed") and signal:
+        elif run.get("armed") and signal and self._session_permission(run):
             state["last_bar"] = context["bar_start"]
             run["last_signal"] = now()
             self.store.put("run", run["id"], run)
@@ -1427,6 +1619,16 @@ class Engine(ProtectionController, OrderLedger):
         for run in self.store.list("run"):
             if not run.get("armed") and self.owned().get(run["id"], {}).get("quantity", 0) <= 0:
                 continue
+            if run.get("diagnostic_test"):
+                bounds = self._run_bounds(run, stamp)
+                position = self.owned().get(run["id"], {}).get("quantity", 0)
+                if position > 0 and (
+                    self.store.get("exit_request", run["id"])
+                    or bounds
+                    and stamp >= bounds[1] - timedelta(minutes=5)
+                ):
+                    self._request_exit(run["id"])
+                continue
             data = self.data.get(run["conid"], {})
             state = self._runtime(run)
             context = (
@@ -1443,7 +1645,7 @@ class Engine(ProtectionController, OrderLedger):
                     }
                 )
                 self._evaluate_context(run, state, context, capture)
-            bounds = session_bounds(stamp)
+            bounds = self._run_bounds(run, stamp)
             if (
                 bounds
                 and bounds[0] <= stamp
@@ -1462,12 +1664,18 @@ class Engine(ProtectionController, OrderLedger):
     def _enter(self, run, result, context, capture):
         if (
             not all(c["passed"] for c in self.readiness())
-            or not self.data[run["conid"]].get("warm")
+            or (not run.get("diagnostic_test") and not self.data[run["conid"]].get("warm"))
             or not self.data[run["conid"]].get("live")
         ):
             raise Conflict("Connection, reconciliation, data or incident readiness blocks entries.")
         if context["minutes_to_close"] <= 15 or run["expires_at"] <= now():
             raise Conflict("The entry session has ended.")
+        if run.get("valid_from"):
+            bounds = self._run_bounds(run)
+            if not self._session_permission(run) or datetime.now(UTC) >= bounds[1] - timedelta(
+                minutes=15
+            ):
+                raise Conflict("The selected execution session is not open for new entries.")
         graph = self._runtime(run)["graph"]
         settings = graph.document["settings"]
         profile = run.get(
@@ -1493,6 +1701,12 @@ class Engine(ProtectionController, OrderLedger):
         ):
             raise Conflict("Current bid and ask quotes are required.")
         limit = number(quotes["ask"]["price"])
+        if run.get("diagnostic_test"):
+            limit = number(result["test_limit"])
+            if limit >= number(quotes["bid"]["price"]):
+                raise Conflict(
+                    "The reviewed test price is no longer below bid. Refresh the preview."
+                )
         contract = self.contracts[run["conid"]]
         increments = self.market_rules.get(contract.get("market_rule"), [])
         if not increments:
@@ -1515,12 +1729,30 @@ class Engine(ProtectionController, OrderLedger):
         stop = (stop / tick).to_integral_value(rounding=ROUND_DOWN) * tick
         if not Decimal(0) < stop < limit:
             raise Conflict("The protective stop must be positive and below the entry limit.")
+        extended = settings.get("trading_hours") == "extended"
+        protective_limit = stop
+        if extended:
+            protective_limit = stop - number(settings["stop_limit_offset"])
+            tick = increment(protective_limit)
+            if tick <= 0 or protective_limit <= 0:
+                raise Conflict(
+                    "The protective stop-limit price must be positive with a valid increment."
+                )
+            protective_limit = (protective_limit / tick).to_integral_value(
+                rounding=ROUND_DOWN
+            ) * tick
+            if not 0 < protective_limit < stop:
+                raise Conflict("The protective limit must be below the stop trigger.")
         reserved_funds = sum(
             (number(r["notional"]) for r in self.store.list("reservation") if r.get("active")),
             Decimal(0),
         )
         quantity = size_entry(
-            settings, profile, limit, stop, number(self.facts["AvailableFunds"]) - reserved_funds
+            settings,
+            profile,
+            limit,
+            protective_limit,
+            number(self.facts["AvailableFunds"]) - reserved_funds,
         )
         target = result["target"]
         if target is None and any(node["kind"] == "target" for node in graph.ordered):
@@ -1554,6 +1786,8 @@ class Engine(ProtectionController, OrderLedger):
         key = uuid.uuid4().hex
         payload = {
             "purpose": "entry",
+            "outside_rth": extended,
+            "stop_limit": str(protective_limit) if extended else None,
             "conid": run["conid"],
             "symbol": run["symbol"],
             "quantity": quantity,
@@ -1577,7 +1811,7 @@ class Engine(ProtectionController, OrderLedger):
             self.next_id,
             {
                 "symbol": run["symbol"],
-                "risk": str(quantity * (limit - stop)),
+                "risk": str(quantity * (limit - protective_limit)),
                 "notional": str(quantity * limit),
             },
         )
@@ -1611,6 +1845,21 @@ class Engine(ProtectionController, OrderLedger):
         if not self.reconciled or not self.attested or time.monotonic() - self.reconciled_at >= 30:
             raise Conflict("Reconcile the paper account before closing an owned position.")
         self.store.put("exit_request", key, {"requested_at": now()})
+        run = self.store.get("run", key) or {}
+        if run.get("valid_from"):
+            from .sessions import NY, execution_bounds
+
+            stamp = datetime.now(UTC)
+            bounds = execution_bounds(
+                stamp.astimezone(NY).date().isoformat(),
+                run.get("trading_hours", "regular"),
+                self.contracts.get(position["conid"]),
+            )
+            if not bounds or not bounds[0] <= stamp < bounds[1]:
+                raise Conflict(
+                    "The selected broker session is closed. "
+                    "Exit remains pending; protection is retained."
+                )
         if any(
             o["run_id"] == key
             and o["payload"].get("purpose") == "exit"
@@ -1628,6 +1877,7 @@ class Engine(ProtectionController, OrderLedger):
         identity = uuid.uuid4().hex
         payload = {
             "purpose": "exit",
+            "outside_rth": run.get("trading_hours") == "extended",
             "entry_id": position["entry_id"],
             "conid": position["conid"],
             "symbol": position["symbol"],

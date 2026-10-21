@@ -46,7 +46,10 @@ def test_restart_never_inherits_attestation():
         gateway._require_paper()
 
 
-def test_bracket_transmission_and_gtd_are_exact_and_live_context_stops_all_orders(monkeypatch):
+@pytest.mark.parametrize("extended", [False, True])
+def test_bracket_transmission_and_gtd_are_exact_and_live_context_stops_all_orders(
+    monkeypatch, extended
+):
     module = types.ModuleType("ibapi.order")
     module.Order = type("Order", (), {})
     monkeypatch.setitem(sys.modules, "ibapi.order", module)
@@ -67,6 +70,8 @@ def test_bracket_transmission_and_gtd_are_exact_and_live_context_stops_all_order
         "limit": "100",
         "stop": "99",
         "target": "102",
+        "outside_rth": extended,
+        "stop_limit": "98.90" if extended else None,
         "expires_at": (datetime.now(UTC) + timedelta(seconds=30)).isoformat(),
     }
     gateway.submit_bracket(intent)
@@ -76,6 +81,10 @@ def test_bracket_transmission_and_gtd_are_exact_and_live_context_stops_all_order
     assert sent[-1].tif == "GTC"
     assert sent[-1].ocaType == 2
     assert sent[-1].parentId == 100
+    assert all(order.outsideRth is extended for order in sent)
+    assert sent[-1].orderType == ("STP LMT" if extended else "STP")
+    if extended:
+        assert sent[-1].lmtPrice == 98.9
     gateway._accounts = ("U000000",)
     for action in (gateway.submit_bracket, gateway.submit_exit, gateway.submit_protection):
         with pytest.raises(ValueError):

@@ -109,6 +109,11 @@ with tempfile.TemporaryDirectory(
     engine = app.state.engine
     engine.code_verified = False  # Stable fixture; never claim a real release gate.
     engine.broker = OfflineBroker(engine.observations)
+    engine.incident(
+        "broker_2119",
+        "Synthetic browser fixture: Gateway is connecting to a market-data service.",
+        severity="information",
+    )
     engine.contracts[100] = {
         "conid": 100,
         "symbol": "AAPL",

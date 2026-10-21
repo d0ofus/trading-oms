@@ -119,7 +119,13 @@ class ProtectionController:
                 and p.get("own_account") is True
                 and p.get("reference") == "oms-" + intent["id"]
                 and p.get("conid") == position["conid"]
-                and p.get("order_type") == "STP"
+                and p.get("order_type")
+                == ("STP LMT" if entry["payload"].get("outside_rth") else "STP")
+                and bool(p.get("outside_rth")) == bool(entry["payload"].get("outside_rth"))
+                and (
+                    not entry["payload"].get("outside_rth")
+                    or number(p.get("limit") or 0) == number(entry["payload"]["stop_limit"])
+                )
                 and p.get("action") == "SELL"
                 and number(p.get("quantity", 0)) - number(p.get("filled", 0))
                 == position["quantity"]
@@ -174,6 +180,8 @@ class ProtectionController:
             "symbol": position["symbol"],
             "quantity": int(position["quantity"]),
             "stop": entry["payload"]["stop"],
+            "outside_rth": bool(entry["payload"].get("outside_rth")),
+            "stop_limit": entry["payload"].get("stop_limit"),
         }
         self.store.event(
             "protection.repair.risk_checked",
@@ -258,13 +266,18 @@ class ProtectionController:
                 and observed.get("own_account") is True
                 and observed.get("reference") == "oms-" + intent["id"]
                 and observed.get("conid") == payload["conid"]
+                and bool(observed.get("outside_rth")) == bool(payload.get("outside_rth"))
             )
             prior = self.store.get("broker_order", str(key)) or {}
             if prior.get("permanent_id") and observed.get("permanent_id"):
                 valid = valid and prior["permanent_id"] == observed["permanent_id"]
             if key == intent["broker_id"]:
                 purpose = payload.get("purpose", "entry")
-                expected_type = "STP" if purpose == "protection" else "LMT"
+                expected_type = (
+                    ("STP LMT" if payload.get("outside_rth") else "STP")
+                    if purpose == "protection"
+                    else "LMT"
+                )
                 expected_action = "BUY" if purpose == "entry" else "SELL"
                 valid = (
                     valid
@@ -277,6 +290,10 @@ class ProtectionController:
                 )
                 price = "stop" if purpose == "protection" else "limit"
                 valid = valid and number(observed.get(price) or 0) == number(payload[price])
+                if purpose == "protection" and payload.get("outside_rth"):
+                    valid = valid and number(observed.get("limit") or 0) == number(
+                        payload["stop_limit"]
+                    )
                 if purpose == "entry":
                     valid = (
                         valid
@@ -297,7 +314,8 @@ class ProtectionController:
                 valid = (
                     valid
                     and observed.get("action") == "SELL"
-                    and observed.get("order_type") == ("STP" if stop else "LMT")
+                    and observed.get("order_type")
+                    == (("STP LMT" if payload.get("outside_rth") else "STP") if stop else "LMT")
                     and observed.get("parent_id") == intent["broker_id"]
                     and observed.get("tif") == "GTC"
                     and observed.get("oca_type") == 2
@@ -306,6 +324,10 @@ class ProtectionController:
                     and number(observed.get("stop" if stop else "limit") or 0)
                     == number(payload["stop" if stop else "target"])
                 )
+                if stop and payload.get("outside_rth"):
+                    valid = valid and number(observed.get("limit") or 0) == number(
+                        payload["stop_limit"]
+                    )
             if not valid:
                 issues.append("Broker order identity or payload differs from the durable intent.")
         for order in orders:

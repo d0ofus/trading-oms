@@ -4,7 +4,11 @@ This guide applies to the professional workspace in `workspace/`. Historical sim
 
 ## Session operation
 
-The session is the current regular XNYS exchange session, including holidays and early closes. Times appear in America/New_York and your browser's local timezone. New entries stop 15 minutes before close. The published exit setting starts a serialized close at least five minutes before close. Authorization ends at the exchange close. There are no extended-hours entries.
+Arming selects one New York exchange date, up to seven calendar days ahead. The default is the next eligible session. You can authorize a future session while the market is closed once Gateway, paper verification, reconciliation, risk and incident checks pass. Data/indicator checks deferred before that session opens remain mandatory at entry. The desk distinguishes waiting for the session, waiting for data, and waiting for a signal. Restart always requires fresh arming.
+
+Strategies default to regular XNYS hours, including holidays and early closes. In Strategy Studio, **Market & session > Execution hours** can select **Regular + pre/post-market**. This uses the broker's contract schedule intersected with 04:00-20:00 America/New_York on exchange trading days; no overnight venue is enabled. Missing or discontinuous broker schedules block extended execution. New entries stop 15 minutes before the selected broker session ends. The published exit setting starts a serialized close at least five minutes before that end. Times appear in New York and your browser's local timezone.
+
+Extended sessions are supervised only and use broker-held GTC stop-limit protection with `outsideRth` on the entry, protection, target and explicit exits. Configure the protective limit offset under **Protective stop & profit target**. A stop-limit can trigger without filling when price gaps through its limit; planned risk is sized to the protective limit and is not a maximum-loss guarantee. Regular-hour versions continue to use stop orders. Old schema-3 versions retain their hashes and regular-hours behavior; **Enable session settings in this draft** upgrades only the editable draft. Publish and prepare a new run to use changed execution settings.
 
 The default smoke profile allows one run and one share. After a protected paper entry, deliberate close and successful reconciliation, the operator may accept supervised expansion. Qualified limits are five distinct symbols/runs, ten shares and $1,000 notional per run, $10 planned stop risk per run, $50 reserved stop risk and $5,000 gross exposure account-wide, a $100 daily loss stop and five entries per run/session. Strategy and custom profile limits may be tighter. Profiles are immutable versions.
 
@@ -24,10 +28,30 @@ Entry requires a false-to-true condition after warm-up, at most once per candle.
 
 Replay shares the graph evaluator, signal transitions, Decimal sizing, durable outbox and broker-observation reducer with paper execution. Its broker double uses next-trade fills and a fixed simulated quote spread, with no fee/liquidity model. It is not a broker simulator qualification. Dataset-end positions remain open, and missing intervals are not fabricated. Synthetic practice data is labelled separately. Replay state and orders are stored only under the simulation directory.
 
+## Quick paper connection test
+
+This is an explicit one-shot diagnostic, separate from price-crossing strategy evaluation. It does not require moving prices or historical indicator warm-up. It still requires current bid/ask observations, real-time entitlement, a verified build, paper attestation, reconciliation, current account facts and a clear emergency/incident gate.
+
+1. After a disarmed restart into this build, connect and verify the paper Gateway in Settings. Resolve and subscribe to a symbol. Keep API access on localhost port 4002. Broker credentials remain in Gateway.
+2. Open **Settings > Paper connection test** (also linked from Testing). Select the symbol and execution hours, then **Check connection & data**. This operation submits no order and works when the market is closed. A fresh quote can repeat an unchanged price; an old quote is not fresh.
+3. During an eligible broker session, choose **Review paper order test**. The preview shows BUY 1 share below bid by the greater of 1% or ten broker increments, a $1 stop distance, and a $0.10 stop-limit offset in extended hours. Prices are rounded down to valid increments. Limits still apply. Disarm other runs and finish outstanding orders/positions first.
+4. Review and click **Submit paper test** within 15 seconds, or refresh the preview. Final readiness and price checks run again. A closed session supports connection/data checks only; it cannot submit a held overnight entry.
+5. Monitor acknowledgement, cancellation and reconciliation. The application requests cancellation five seconds after acknowledgement; the broker entry deadline is 30 seconds. A cancellation request is not confirmation. `Cancelled verified` requires a flat reconciled result and released reservation. An unknown dispatch is never retried automatically.
+6. If filled, open Trading Desk, verify the exact position and protection, and use **Close owned position**. A session-end exit is also retained. Monitoring and protection continue after disarming. This diagnostic does not satisfy the normal strategy-fill/protection qualification gate.
+
+## Strategy naming and removing runs
+
+**Strategy name** is the labelled field at the top of Strategy Studio. It autosaves with the draft. **Operation** uses full descriptions such as **Greater than or equal to**; internal graph codes are unchanged.
+
+To remove a prepared run, select its row in **Trading Desk > Active runs**, then **Remove run** in the details drawer. An unused flat run can be removed immediately. A working entry is disarmed and cancelled; removal stays pending until fresh reconciliation proves the run flat, every order/child terminal, and capacity released. Positions and uncertain orders block removal. Use Close owned position or recovery first. **Run history** retains removed runs and the audit ledger is never erased. A late fill reactivates the run for recovery.
+
 ## Interruptions and operator recovery
 
 | Situation | Service behavior | Operator action |
 |---|---|---|
+| 2119 data service connecting | Informational status; a recovered 2104/2106 observation resolves it. Freshness still independently gates entries | Check data readiness; this message alone is no longer a permanent critical blocker |
+| 321 request validation | A genuine broker rejection, with allowlisted reason details when recognized; generic historic text cannot be reconstructed | Open Activity > View incident. If the detail identifies Read-Only API, disarm, disable Read-Only API in the paper Gateway, then Recheck recovery. Otherwise inspect Gateway and repeat the affected setup operation. Mark resolved only after recovery checks pass |
+| Engine fault | New entries blocked; preserve exception type, failed operation and code frames without arguments/locals | Repeat the failed operation successfully, allow 30 healthy seconds and reconcile. Legacy faults with no diagnostic detail need a new process and successful setup recheck. Then Mark resolved |
 | Temporary Gateway disconnect | Pause entries; bounded reconnect; restore data, repair history and reconcile; never resend unknown dispatch | Watch recovery status. Unchanged valid session authorization can resume only after all checks pass |
 | 1100 / 1101 / 1102 / 1300 | Treat lost connectivity/data as a recovery boundary; restore subscriptions as required | Inspect incidents and wait for fresh data/reconciliation; a changed port does not authorize another endpoint |
 | Application restart | Restore emergency state and order monitoring; all new entries disarmed | Verify paper context, reconcile and review a fresh session authorization |
@@ -49,7 +73,7 @@ Telegram credentials and the Healthchecks URL are stored only in Windows Credent
 
 Healthchecks receives an empty heartbeat every 30 seconds while the engine is healthy. Configure its external period to one minute and grace to two minutes. Explicit notification tests must pass within 24 hours before unattended arming, alongside a current heartbeat, fresh watchdog and validated restore. A failed monitoring channel disarms unattended entries while preserving positions/protection. Telegram delivery uses a durable retry queue; failed watchdog delivery remains queued for recovery.
 
-Daily backups contain a SQLite snapshot, committed market-data captures and SHA256 manifest. Settings can create a backup and validate restoration into a separate directory. Captures used by decisions and historical ledgers are retained; archive closed-session state/backups deliberately and monitor disk capacity. No automatic deletion of decision evidence occurs.
+The first restart into the flexible-session build backs up existing paper state before additive compatibility updates. Daily backups contain a SQLite snapshot, committed market-data captures and SHA256 manifest. Settings can create a backup and validate restoration into a separate directory. Captures used by decisions and historical ledgers are retained; archive closed-session state/backups deliberately and monitor disk capacity. No automatic deletion of decision evidence occurs.
 
 ```powershell
 .\scripts\restore-paper.ps1 -Backup '<backup zip path>' -RecoveryDirectory '<new empty recovery directory>'

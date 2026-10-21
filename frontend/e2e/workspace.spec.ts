@@ -16,6 +16,8 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
         mask: [
           page.locator(".ws-footer"),
           page.locator(".ws-save-state"),
+          page.getByLabel("Trading date (New York)"),
+          page.locator(".ws-run-windows"),
           page.locator(".ws-arm-summary > div:nth-child(2)"),
           page.locator(".ws-arm-summary > div:nth-child(3)"),
         ],
@@ -46,6 +48,26 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
   await expect(page.getByLabel("Strategy name")).toHaveValue(
     "Moving average crossover",
   );
+  await expect(page.getByText("Strategy name", { exact: true })).toBeVisible();
+  await page.locator("#rule-exit_rule summary").click();
+  await expect(
+    page.getByRole("combobox", { name: "Operation", exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "Less than", exact: true }).first(),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("combobox", { name: "Execution hours", exact: true }),
+  ).toHaveValue("regular");
+  await page
+    .getByRole("combobox", { name: "Execution hours", exact: true })
+    .selectOption("extended");
+  await expect(
+    page.getByText(/triggered stop-limit can remain/).first(),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Execution hours", exact: true })
+    .selectOption("regular");
   await page.getByLabel("Strategy name").fill("Morning crossover");
   await expect(page.getByText(/^Saved ·/)).toHaveCount(0);
   await expect(page.locator(".ws-save-state")).toContainText("Saved");
@@ -139,6 +161,7 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
     page.getByRole("button", { name: "Arm selected paper session" }),
   ).toBeDisabled();
   await expect(page.getByRole("dialog")).toContainText("Gateway handshake");
+  await expect(page.getByLabel("Trading date (New York)")).toBeVisible();
   await page.screenshot({
     path: "test-results/arming-blocked.png",
     fullPage: true,
@@ -250,5 +273,53 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
     page.getByText("Morning crossover", { exact: true }).first(),
   ).toBeVisible();
   await page.unroute("**/api/paper/session");
+  await page.getByText("Morning crossover", { exact: true }).first().click();
+  await page.getByRole("button", { name: "Remove run", exact: true }).click();
+  await expect(
+    page.getByText("Removed from Active runs. Audit history is preserved."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Close run details" }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Select Morning crossover AAPL" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Run history" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Testing", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Paper connection test", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Check connection & data" }).click();
+  await expect(
+    page.getByText("Connection and data results", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Review paper order test" }),
+  ).toBeDisabled();
+  expect(
+    (await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze())
+      .violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: "test-results/paper-diagnostics.png",
+    fullPage: true,
+  });
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
+  await page.getByRole("button", { name: "View incident" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Broker 2119");
+  await expect(
+    page.getByRole("button", { name: "Mark resolved" }),
+  ).toBeDisabled();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Rechecking does not submit or resend orders.",
+  );
+  expect(
+    (await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze())
+      .violations,
+  ).toEqual([]);
+  await page
+    .getByRole("dialog")
+    .screenshot({ path: "test-results/incident-recovery.png" });
+  await page.keyboard.press("Escape");
   expect(errors).toEqual([]);
 });

@@ -11,6 +11,55 @@ def test_exchange_holidays_and_early_close():
     assert bounds[1].hour == 18  # 13:00 New York, not a hard-coded 16:00.
 
 
+def test_extended_candles_do_not_pollute_regular_opening_range_or_session_volume():
+    document = templates()[0]["document"]
+    document["settings"]["trading_hours"] = "extended"
+    market = Market(compile_graph(document))
+    before_open = datetime(2026, 9, 17, 13, 29, tzinfo=UTC)
+    value = market.accept(before_open, Decimal(500), Decimal(999))
+    assert value["price"] == 500 and value["session_volume"] is None
+    assert value["range"] is None and value["relative_volume"] is None
+    opened = before_open + timedelta(minutes=1)
+    for second in range(301):
+        value = market.accept(opened + timedelta(seconds=second), Decimal(100), Decimal(1))
+    assert value["range"] == 100 and value["session_volume"] == 301
+    assert market.closed[0].close == 500
+    regular = templates()[0]["document"]
+    assert Market(compile_graph(regular)).accept(before_open, Decimal(500), Decimal(999)) is None
+
+
+def test_extended_replay_stop_limit_remains_open_after_gap_below_its_limit():
+    document = templates()[1]["document"]
+    document["settings"].update(trading_hours="extended")
+    document["nodes"] = [n for n in document["nodes"] if n["id"] not in {"exit", "exit_rule"}]
+    document["edges"] = [e for e in document["edges"] if e["target"] not in {"exit", "exit_rule"}]
+    for node in document["nodes"]:
+        if node["id"] == "sma_fast":
+            node["params"]["period"] = 2
+        if node["id"] == "sma_slow":
+            node["params"]["period"] = 3
+    start = datetime(2026, 9, 17, 8, tzinfo=UTC)
+    ticks = [
+        {
+            "timestamp": (start + timedelta(seconds=i)).isoformat(),
+            "price": str([105, 103, 100, 101, 108][min(i // 60, 4)]),
+            "size": "10",
+        }
+        for i in range(0, 251, 10)
+    ]
+    ticks.append(
+        {"timestamp": (start + timedelta(seconds=260)).isoformat(), "price": "106", "size": "1"}
+    )
+    result = replay(compile_graph(document), ticks)
+    assert result["open_position"] and not result["trades"]
+    ticks.append(
+        {"timestamp": (start + timedelta(seconds=270)).isoformat(), "price": "106.95", "size": "1"}
+    )
+    result = replay(compile_graph(document), ticks)
+    assert result["trades"][0]["reason"] == "protective_stop"
+    assert result["trades"][0]["exit"] == "106.95"
+
+
 def test_completed_candle_evaluation_does_not_read_next_candle():
     document = templates()[1]["document"]
     document["settings"]["evaluation"] = "bar_close"

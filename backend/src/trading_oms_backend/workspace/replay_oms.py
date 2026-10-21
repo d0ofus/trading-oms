@@ -48,8 +48,9 @@ class ReplayOMS(OrderLedger):
             "symbol": self.symbol,
             "capture": self.capture,
         }
-        quantity, limit, stop = payload["quantity"], payload["limit"], payload["stop"]
-        for field in ("limit", "stop", "target"):
+        quantity, limit = payload["quantity"], payload["limit"]
+        stop = payload.get("stop_limit") or payload["stop"]
+        for field in ("limit", "stop", "target", "stop_limit"):
             if payload.get(field) is not None:
                 payload[field] = str(payload[field])
         order = self.store.reserve_order(

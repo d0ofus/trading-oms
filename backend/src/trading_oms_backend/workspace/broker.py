@@ -115,8 +115,14 @@ class PaperGateway:
                 adapter.emit("disconnected")
 
             def error(self, reqId, errorTime, errorCode, errorString, advancedOrderRejectJson=""):
-                # Do not forward free-form broker messages or reject JSON.
-                adapter.emit("broker_error", request=reqId, code=errorCode)
+                from .diagnostics import broker_diagnostic
+
+                adapter.emit(
+                    "broker_error",
+                    request=reqId,
+                    code=errorCode,
+                    diagnostic=broker_diagnostic(errorCode, errorString),
+                )
 
             def contractDetails(self, reqId, details):
                 contract = details.contract
@@ -147,6 +153,8 @@ class PaperGateway:
                     name=details.longName,
                     min_tick=str(details.minTick),
                     market_rule=int(rule) if rule else None,
+                    trading_hours=details.tradingHours,
+                    time_zone=details.timeZoneId,
                 )
                 if rule:
                     self.reqMarketRule(int(rule))
@@ -200,9 +208,10 @@ class PaperGateway:
                     reference=order.orderRef
                     if re.fullmatch(r"oms-[a-f0-9]{32}", order.orderRef or "")
                     else "external",
-                    limit=str(order.lmtPrice) if order.orderType == "LMT" else None,
+                    limit=str(order.lmtPrice) if order.orderType in {"LMT", "STP LMT"} else None,
                     status=orderState.status,
-                    stop=str(order.auxPrice) if order.orderType == "STP" else None,
+                    stop=str(order.auxPrice) if order.orderType in {"STP", "STP LMT"} else None,
+                    outside_rth=order.outsideRth,
                     tif=order.tif,
                     oca_type=order.ocaType,
                     oca_group=order.ocaGroup
@@ -468,7 +477,7 @@ class PaperGateway:
             "3600 S" if seconds == 5 else "1 D",
             "5 secs" if seconds == 5 else "1 min",
             "TRADES",
-            1,
+            0,
             2,
             False,
             [],
@@ -496,7 +505,7 @@ class PaperGateway:
             Decimal(quantity),
         )
         order.orderType, order.lmtPrice = "LMT", float(Decimal(intent["limit"]))
-        order.tif, order.outsideRth, order.transmit = "DAY", False, True
+        order.tif, order.outsideRth, order.transmit = "DAY", bool(intent.get("outside_rth")), True
         order.account, order.orderRef = self._accounts[0], "oms-" + intent["id"]
         order.ocaGroup, order.ocaType = "oms-" + intent["entry_id"], 2
         self.client.placeOrder(order.orderId, self._contracts[intent["conid"]], order)
@@ -520,9 +529,21 @@ class PaperGateway:
         if contract is None or contract.secType != "STK" or contract.currency != "USD":
             raise ValueError("Resolve the supported equity contract first.")
         order = Order()
-        order.orderId, order.action, order.orderType = intent["broker_id"], "SELL", "STP"
+        extended = bool(intent.get("outside_rth"))
+        protective_limit = Decimal(intent.get("stop_limit") or intent["stop"])
+        if extended and not 0 < protective_limit < stop:
+            raise ValueError(
+                "Extended protection requires a positive stop-limit price below its trigger."
+            )
+        order.orderId, order.action, order.orderType = (
+            intent["broker_id"],
+            "SELL",
+            "STP LMT" if extended else "STP",
+        )
+        if extended:
+            order.lmtPrice = float(protective_limit)
         order.totalQuantity, order.auxPrice = Decimal(quantity), float(stop)
-        order.tif, order.outsideRth, order.transmit = "GTC", False, True
+        order.tif, order.outsideRth, order.transmit = "GTC", extended, True
         order.account, order.orderRef = self._accounts[0], "oms-" + intent["id"]
         order.ocaGroup, order.ocaType = "oms-" + intent["entry_id"], 2
         self.client.placeOrder(order.orderId, contract, order)
@@ -538,6 +559,12 @@ class PaperGateway:
         if type(quantity) is not int or not 1 <= quantity <= 10:
             raise ValueError("Paper orders require 1–10 whole shares.")
         limit, stop = Decimal(intent["limit"]), Decimal(intent["stop"])
+        extended = bool(intent.get("outside_rth"))
+        protective_limit = Decimal(intent.get("stop_limit") or intent["stop"])
+        if extended and (
+            not 0 < protective_limit < stop or quantity * (limit - protective_limit) > 10
+        ):
+            raise ValueError("Extended bracket requires qualified stop-limit protection.")
         if not 0 < stop < limit or quantity * limit > 1000 or quantity * (limit - stop) > 10:
             raise ValueError("Paper order exceeds its protection or risk limits.")
         base = intent["broker_id"]
@@ -547,7 +574,7 @@ class PaperGateway:
         deadline = datetime.fromisoformat(intent["expires_at"])
         if not 0 < (deadline - datetime.now(UTC)).total_seconds() <= 31:
             raise ValueError("The durable entry deadline has expired.")
-        parent.tif, parent.transmit, parent.outsideRth = "GTD", False, False
+        parent.tif, parent.transmit, parent.outsideRth = "GTD", False, extended
         parent.goodTillDate = deadline.astimezone(UTC).strftime("%Y%m%d-%H:%M:%S")
         parent.account = self._accounts[0]
         parent.orderRef = "oms-" + intent["id"]
@@ -560,11 +587,17 @@ class PaperGateway:
             profit.orderId, profit.orderType, profit.lmtPrice = base + 1, "LMT", float(target)
             children.append(profit)
         protection = Order()
-        protection.orderId, protection.orderType, protection.auxPrice = base + 2, "STP", float(stop)
+        protection.orderId, protection.orderType, protection.auxPrice = (
+            base + 2,
+            "STP LMT" if extended else "STP",
+            float(stop),
+        )
+        if extended:
+            protection.lmtPrice = float(protective_limit)
         children.append(protection)
         for child in children:
             child.action, child.totalQuantity, child.parentId = "SELL", Decimal(quantity), base
-            child.tif, child.outsideRth, child.transmit = "GTC", False, child is protection
+            child.tif, child.outsideRth, child.transmit = "GTC", extended, child is protection
             child.account, child.orderRef = self._accounts[0], parent.orderRef
             child.ocaGroup, child.ocaType = parent.orderRef, 2
         # Durable dispatch is owned by the caller. An exception at ANY point is

@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { IncidentRecovery } from "./IncidentRecovery";
+import { ConnectionTest } from "./ConnectionTest";
 import { AuditSearch } from "./AuditSearch";
 import { ReplayCompare } from "./ReplayCompare";
 import { useForm } from "react-hook-form";
@@ -217,7 +219,9 @@ export function Workspace() {
   }
   const current = nav.find((item) => item.path === path) ?? nav[0];
   const critical =
-    snapshot?.incidents.filter((incident) => !incident.resolved) ?? [];
+    snapshot?.incidents.filter(
+      (incident) => !incident.resolved && incident.severity === "critical",
+    ) ?? [];
   const dataFresh =
     !!snapshot?.data.length &&
     snapshot.data.every(
@@ -369,7 +373,7 @@ export function Workspace() {
             </div>
             <div className="ws-session-label">
               <span className="ws-dot" />
-              US regular session · Exchange calendar
+              US equities · Exchange calendar
             </div>
           </div>
           {network === "offline" && auth && (
@@ -433,6 +437,7 @@ export function Workspace() {
             <Settings snapshot={snapshot} refresh={refresh} notify={notify} />
           ) : path === "/testing" ? (
             <Testing
+              navigate={navigate}
               notify={notify}
               createRun={(version) => void createRun(version)}
             />
@@ -532,7 +537,8 @@ function Desk({
   const [strategy, setStrategy] = useState("");
   const [closeRun, setCloseRun] = useState<Run | null>(null);
   const [checksExpanded, setChecksExpanded] = useState(false);
-  const runs = snapshot?.runs ?? [];
+  const runs = (snapshot?.runs ?? []).filter((item) => !item.archived);
+  const archivedRuns = (snapshot?.runs ?? []).filter((item) => item.archived);
   useEffect(() => {
     preference("desk.selected", selected);
     preference("desk.detail", detail);
@@ -564,7 +570,7 @@ function Desk({
       setBusy(false);
     }
   }
-  const run = runs.find((item) => item.id === detail);
+  const run = snapshot?.runs.find((item) => item.id === detail);
   const blocking = snapshot?.checks.filter((check) => !check.passed) ?? [];
   const positionCount =
     snapshot?.positions.filter((position) => Number(position.quantity) > 0)
@@ -971,6 +977,34 @@ function Desk({
           {run.blocking_reason && (
             <div className="ws-banner warning">{run.blocking_reason}</div>
           )}
+          {!run.archived && (
+            <button
+              disabled={busy || run.removal_pending}
+              onClick={async () => {
+                try {
+                  const removal = await api<{
+                    eligible: boolean;
+                    reason: string | null;
+                  }>(`/runs/${run.id}/removal-preview`);
+                  if (!removal.eligible) {
+                    notify(removal.reason ?? "Removal is blocked.", true);
+                    return;
+                  }
+                  await action(`/runs/${run.id}/remove`);
+                  setSelected((items) => items.filter((id) => id !== run.id));
+                } catch (error) {
+                  notify((error as Error).message, true);
+                }
+              }}
+            >
+              {run.removal_pending
+                ? "Removal pending: awaiting broker confirmation"
+                : "Remove run"}
+            </button>
+          )}
+          {run.archived && (
+            <p>Removed from Active runs. Audit history is preserved.</p>
+          )}
           <h3>Current rule values</h3>
           <p className="ws-muted">
             Last evaluated values. A missing value means the input has not
@@ -1005,6 +1039,20 @@ function Desk({
           </button>
         </aside>
       )}
+      <Panel
+        title="Run history"
+        caption="Removed runs retain their executions and audit evidence."
+      >
+        {archivedRuns.length ? (
+          archivedRuns.map((item) => (
+            <button key={item.id} onClick={() => setDetail(item.id)}>
+              {item.name} ? {item.symbol} ? View removed run
+            </button>
+          ))
+        ) : (
+          <p className="ws-muted">No removed runs.</p>
+        )}
+      </Panel>
       <OrderInspector
         identity={orderIdentity}
         close={() => setOrderIdentity(null)}
@@ -1194,6 +1242,7 @@ function Settings({
         </div>
         <Cable size={36} />
       </div>
+      <ConnectionTest snapshot={snapshot} refresh={refresh} notify={notify} />
       <div className="ws-settings-grid">
         <Panel
           title="1. Connect Gateway"
@@ -1497,9 +1546,11 @@ function Settings({
 }
 
 function Testing({
+  navigate,
   notify,
   createRun,
 }: {
+  navigate: (path: string) => void;
   notify: (message: string, error?: boolean) => void;
   createRun: (version: Version) => void;
 }) {
@@ -1615,6 +1666,9 @@ function Testing({
           Replay uses the same executable graph with simulated fills. Results
           are separate from actual paper-broker qualification.
         </span>
+        <button onClick={() => navigate("/settings")}>
+          Paper connection test
+        </button>
       </div>
       <Panel
         title="Run a deterministic replay"
@@ -1897,48 +1951,7 @@ function ActivityView({
   }, []);
   return (
     <>
-      <Panel
-        title="Incidents & recovery"
-        caption="A connected Gateway does not clear a protection or reconciliation problem."
-      >
-        {snapshot?.incidents.some((incident) => !incident.resolved) ? (
-          snapshot.incidents
-            .filter((incident) => !incident.resolved)
-            .map((incident) => (
-              <div className="ws-incident" key={incident.id}>
-                <CircleAlert size={20} />
-                <div>
-                  <strong>{titleCase(incident.id)}</strong>
-                  <p>{incident.detail}</p>
-                  <small>{localTime(incident.timestamp)}</small>
-                </div>
-                <button
-                  onClick={() => {
-                    void api(
-                      `/operations/incidents/${incident.id}/review`,
-                      "POST",
-                    )
-                      .then(async () => {
-                        await refresh();
-                        notify("Incident review completed.");
-                      })
-                      .catch((error: Error) => notify(error.message, true));
-                  }}
-                >
-                  Review resolution
-                </button>
-              </div>
-            ))
-        ) : (
-          <div className="ws-all-clear">
-            <CheckCircle2 size={20} />
-            <div>
-              <strong>No recorded critical incidents</strong>
-              <p>Readiness checks still apply before any new authorization.</p>
-            </div>
-          </div>
-        )}
-      </Panel>
+      <IncidentRecovery snapshot={snapshot} refresh={refresh} notify={notify} />
       <Panel
         title="Audit history"
         caption="Append-only events with resumable streaming. Select a record for details."

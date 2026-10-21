@@ -62,6 +62,11 @@ export type Check = {
   remediation: string;
 };
 export type Run = {
+  archived?: boolean;
+  removal_pending?: boolean;
+  diagnostic_test?: string;
+  trading_hours?: string;
+  valid_from?: string;
   id: string;
   name: string;
   version: number;
@@ -143,6 +148,8 @@ export type Snapshot = {
   timestamp: string;
 };
 export type ArmPreview = {
+  session_date?: string;
+  valid_from?: string | null;
   eligible: boolean;
   checks: Check[];
   runs: Run[];
@@ -259,7 +266,22 @@ export function preference(key: string, value: unknown) {
     /* Browser storage may be unavailable; server drafts remain authoritative. */
   }
 }
+const operationLabels: Record<string, string> = {
+  op: "Operation",
+  gt: "Greater than",
+  gte: "Greater than or equal to",
+  lt: "Less than",
+  lte: "Less than or equal to",
+  eq: "Equal to",
+  add: "Add",
+  subtract: "Subtract",
+  multiply: "Multiply by",
+  divide: "Divide by",
+  above: "Crosses above",
+  below: "Crosses below",
+};
 export const titleCase = (value: string) =>
+  operationLabels[value] ??
   value.replaceAll("_", " ").replace(/^./, (c) => c.toUpperCase());
 export const money = (value: string | number | undefined) =>
   value === undefined
