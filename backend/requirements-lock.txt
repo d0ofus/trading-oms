@@ -1,10 +1,10 @@
 # Tested Python 3.12 dependency set; official IBKR SDK installed separately.
 annotated-doc==0.0.4
 annotated-types==0.7.0
-anyio==4.14.1
+anyio==4.14.2
 boolean-py==5.0
 cachecontrol==0.14.4
-certifi==2026.6.17
+certifi==2026.10.19
 charset-normalizer==3.5.1
 click==8.5.0
 colorama==0.4.6
