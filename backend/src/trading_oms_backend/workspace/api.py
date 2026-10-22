@@ -92,6 +92,15 @@ class Selection(Model):
     profile_id: str = Field(default="smoke", pattern=r"^[a-z0-9_-]{1,40}$")
     profile_version: int | None = Field(default=None, ge=1)
     unattended: bool = False
+    session_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class PaperTestPreview(Contract):
+    trading_hours: str = Field(default="extended", pattern=r"^(regular|extended)$")
+
+
+class PaperTestStart(Model):
+    preview_id: str = Field(pattern=r"^[a-f0-9]{32}$")
 
 
 class PreparationRequest(Run):
@@ -681,6 +690,34 @@ def create_app(
     @app.post("/api/runs/{identity}/disarm")
     def disarm(identity: str):
         return engine.call("disarm", key=identity)
+
+    @app.get("/api/runs/{identity}/removal-preview")
+    def removal_preview(identity: str):
+        return engine.call("removal_preview", key=identity)
+
+    @app.post("/api/runs/{identity}/remove")
+    def remove_run(identity: str):
+        return engine.call("remove_run", key=identity)
+
+    @app.get("/api/paper/diagnostics")
+    def diagnostics(conid: int):
+        return engine.call("connection_diagnostics", conid=conid)
+
+    @app.post("/api/paper/order-tests/preview")
+    def paper_test_preview(body: PaperTestPreview):
+        return engine.call("paper_test_preview", **body.model_dump())
+
+    @app.post("/api/paper/order-tests")
+    def paper_test_start(body: PaperTestStart, request: Request):
+        return engine.call("start_paper_test", actor=request.state.operator_id, **body.model_dump())
+
+    @app.get("/api/operations/incidents/{identity}")
+    def operation_incident_detail(identity: str):
+        return engine.call("incident_detail", identity=identity)
+
+    @app.post("/api/operations/incidents/{identity}/recheck")
+    def incident_recheck(identity: str):
+        return engine.call("recheck_incident", identity=identity)
 
     @app.post("/api/operations/emergency")
     def emergency(body: Emergency):

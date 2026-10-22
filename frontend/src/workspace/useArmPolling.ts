@@ -20,6 +20,9 @@ export function useArmPolling(
   const profile = preview?.limits.id;
   const version = preview?.limits.version;
   const unattended = preview?.authorization === "unattended_paper_session";
+  const sessionDate = preview?.flexible_session
+    ? preview.session_date
+    : undefined;
   const [unavailable, setUnavailable] = useState(false);
   const [revision, recheck] = useState(0);
   const cancelPending = useRef<(() => void) | undefined>(undefined);
@@ -47,6 +50,7 @@ export function useArmPolling(
             profile_id: profile,
             profile_version: version,
             unattended,
+            session_date: sessionDate,
           },
           request.signal,
         );
@@ -77,7 +81,16 @@ export function useArmPolling(
       if (cancelPending.current === cancel) cancelPending.current = undefined;
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [ids, profile, version, unattended, paused, revision, setPreview]);
+  }, [
+    ids,
+    profile,
+    version,
+    unattended,
+    sessionDate,
+    paused,
+    revision,
+    setPreview,
+  ]);
   return {
     unavailable,
     recheck: () => recheck((value) => value + 1),

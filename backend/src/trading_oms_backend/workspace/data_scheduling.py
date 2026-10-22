@@ -336,7 +336,11 @@ class DataScheduling:
                 continue
             try:
                 if scope == "regular":
-                    request = self.broker.history(*key)
+                    request = (
+                        self.broker.history(*key, use_rth=False)
+                        if self.legacy_extended_history(conid)
+                        else self.broker.history(*key)
+                    )
                 else:
                     request = self.broker.history(
                         conid,

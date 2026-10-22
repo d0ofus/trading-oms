@@ -6,10 +6,56 @@ from datetime import datetime
 
 from .automatic_recovery import AutomaticRecovery
 from .incidents import ROUTINE, SERVICE_RECOVERY, incident_summary
-from .store import Conflict
+from .store import Conflict, now
 
 
 class IncidentRecovery(AutomaticRecovery):
+    def recheck_incident(self, identity):
+        item = self.incidents.get(identity)
+        if not self.connected or not self.attested or not self.broker.paper_context:
+            raise Conflict("Connect and verify the paper context before rechecking.")
+        self.broker.heartbeat()
+        self.begin_reconcile()
+        self.store.put(
+            "incident_recheck",
+            item["id"],
+            {
+                "instance": self.process_identity,
+                "epoch": self.broker.epoch,
+                "failure_sequence": item["failure_sequence"],
+                "requested_at": now(),
+            },
+        )
+        self.store.event("incident.recheck.requested", {"id": item["id"]})
+        return self.incident_detail(item["id"])
+
+    def _operation_succeeded(self, operation, observation=None):
+        if not getattr(self, "_fault_retest_pending", False):
+            return
+        for item in self.incidents.open():
+            diagnostic = item.get("diagnostic") or {}
+            if item["code"] != "engine_fault" or diagnostic.get("operation") != operation:
+                continue
+            if diagnostic.get("observation") != observation:
+                continue
+            prior = self.store.get("incident_retest", item["id"]) or {}
+            if prior.get("failure_sequence") == item["failure_sequence"]:
+                continue
+            self.store.put(
+                "incident_retest",
+                item["id"],
+                {
+                    "instance": self.process_identity,
+                    "epoch": self.broker.epoch,
+                    "failure_sequence": item["failure_sequence"],
+                    "at": now(),
+                    "monotonic": time.monotonic(),
+                },
+            )
+            self.store.event(
+                "incident.operation.retested", {"id": item["id"], "operation": operation}
+            )
+
     def _dependency_history_ready(self, conid, regular_only=False):
         if conid in getattr(self, "fx_data", {}):
             required = [
@@ -276,6 +322,27 @@ class IncidentRecovery(AutomaticRecovery):
                 "Unattended monitoring heartbeat",
                 heartbeat.get("passed") and 0 <= age <= 90,
                 "Restore the required unattended monitoring heartbeat.",
+            )
+        if item["code"] == "engine_fault" and (item.get("diagnostic") or {}).get("operation"):
+            retest = self.store.get("incident_retest", item["id"]) or {}
+            add(
+                "operation_retested",
+                "Failed operation successfully repeated",
+                retest.get("instance") == self.process_identity
+                and retest.get("epoch") == self.broker.epoch
+                and retest.get("failure_sequence") == item["failure_sequence"]
+                and time.monotonic() - retest.get("monotonic", time.monotonic()) >= 30,
+                "Repeat the failed operation successfully, allow 30 healthy seconds and reconcile.",
+            )
+        if item["code"] == "broker_321":
+            recheck = self.store.get("incident_recheck", item["id"]) or {}
+            add(
+                "request_rechecked",
+                "Rejected operation rechecked",
+                recheck.get("instance") == self.process_identity
+                and recheck.get("epoch") == self.broker.epoch
+                and recheck.get("failure_sequence") == item["failure_sequence"],
+                "Recheck this request and complete a fresh successful reconciliation.",
             )
         return checks
 

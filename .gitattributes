@@ -5,3 +5,11 @@ docs/execplans/candidate-slice-062-ibkr-paper-connector-execplan.md text eol=lf
 frontend/**/*.ts text eol=lf
 frontend/**/*.tsx text eol=lf
 frontend/**/*.css text eol=lf
+
+# Normalize newly tracked Windows text without rewriting verified working files.
+backend/src/trading_oms_backend/workspace/diagnostics.py text
+backend/src/trading_oms_backend/workspace/operations.py text
+backend/src/trading_oms_backend/workspace/paper_test.py text
+backend/src/trading_oms_backend/workspace/sessions.py text
+docs/PAPER_FLEXIBLE_SESSIONS_REVIEW.md text
+docs/execplans/paper-diagnostics-and-flexible-sessions.md text

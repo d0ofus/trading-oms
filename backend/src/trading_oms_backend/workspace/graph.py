@@ -458,12 +458,21 @@ class Compiled:
             elif kind == "constant":
                 expression = str(params["value"])
             elif kind == "math":
-                operator = {"add": "+", "subtract": "−", "multiply": "×", "divide": "÷"}[
-                    params["op"]
-                ]
+                operator = {
+                    "add": "plus",
+                    "subtract": "minus",
+                    "multiply": "multiplied by",
+                    "divide": "divided by",
+                }[params["op"]]
                 expression = f"({a} {operator} {b})"
             elif kind == "compare":
-                operator = {"gt": ">", "gte": "≥", "lt": "<", "lte": "≤", "eq": "="}[params["op"]]
+                operator = {
+                    "gt": "greater than",
+                    "gte": "greater than or equal to",
+                    "lt": "less than",
+                    "lte": "less than or equal to",
+                    "eq": "equal to",
+                }[params["op"]]
                 expression = f"{a} {operator} {b}"
             elif kind == "cross":
                 expression = f"{a} crosses {params['direction']} {b}"
@@ -500,8 +509,15 @@ class Compiled:
                 "node": "settings",
                 "kind": "session",
                 "text": (
-                    "Entries end 15 minutes before the exchange close. "
-                    f"Start the session exit {settings['exit_before_close']} minutes before close."
+                    "Entries end 15 minutes before the selected execution session ends. "
+                    f"Start the session exit {settings['exit_before_close']} "
+                    "minutes before that end. "
+                    + (
+                        "Regular + pre/post-market; broker-held stop-limit protection may "
+                        "trigger without filling."
+                        if settings.get("trading_hours") == "extended"
+                        else "Regular hours only."
+                    )
                 ),
             }
         )
@@ -559,7 +575,12 @@ def compile_graph(raw: dict) -> Compiled:
     if not isinstance(raw.get("settings", {}), dict):
         raise GraphError("Strategy settings must be named fields.")
     defaults = dict(DEFAULT_SETTINGS)
-    crypto = version == 4 or (
+    stock_session = version == 4 and bool(
+        {"trading_hours", "stop_limit_offset"} & raw.get("settings", {}).keys()
+    )
+    if stock_session and {"instrument_profile", "quantity"} & raw.get("settings", {}).keys():
+        raise GraphError("Schema 4 cannot mix stock and crypto settings.")
+    crypto = (version == 4 and not stock_session) or (
         version == 5 and raw.get("settings", {}).get("instrument_profile") == "paxos_crypto"
     )
     if version == 5:
@@ -569,9 +590,17 @@ def compile_graph(raw: dict) -> Compiled:
     if crypto:
         defaults.pop("shares")
         defaults.update(instrument_profile="paxos_crypto", quantity="0.001", symbol="BTC")
+    if stock_session:
+        defaults.update(trading_hours="regular", stop_limit_offset="0.10")
     settings = {**defaults, **raw.get("settings", {})}
     if set(settings) != set(defaults):
         raise GraphError("Unsupported strategy setting.")
+    if stock_session:
+        if settings["trading_hours"] not in {"regular", "extended"}:
+            raise GraphError("Select regular or regular + pre/post-market execution.")
+        if not 0 < number(settings["stop_limit_offset"]) <= 10:
+            raise GraphError("Stop-limit offset must be positive and at most $10.")
+        settings["stop_limit_offset"] = str(number(settings["stop_limit_offset"]))
     if crypto:
         if settings["instrument_profile"] != "paxos_crypto" or settings["symbol"] not in {
             "BTC",
@@ -727,6 +756,8 @@ def crypto_copy(document, symbol="BTC"):
 
     result = copy.deepcopy(document)
     result["schema_version"] = 5 if document.get("schema_version") == 5 else 4
+    result["settings"].pop("trading_hours", None)
+    result["settings"].pop("stop_limit_offset", None)
     result["settings"].pop("shares", None)
     result["settings"].update(instrument_profile="paxos_crypto", quantity="0.001", symbol=symbol)
     return compile_graph(result).document

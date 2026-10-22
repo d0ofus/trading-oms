@@ -110,12 +110,18 @@ class Market:
         }
 
     def session_bounds(self, stamp):
+        if self.graph.document["settings"].get("trading_hours") == "extended":
+            from .sessions import candle_bounds
+
+            return candle_bounds(stamp, True)
         return session_bounds(stamp, self.session_policy)
 
     def volume_value(self, value):
         return number(value)
 
     def elapsed_seconds(self, stamp, opened):
+        if self.graph.document["settings"].get("trading_hours") == "extended":
+            opened = session_bounds(stamp)[0]
         return int((stamp - opened).total_seconds())
 
     def tradable(self, stamp):
@@ -123,7 +129,13 @@ class Market:
         return bool(bounds and bounds[0] <= stamp < bounds[1])
 
     def expected_minutes(self, stamp, until=None):
-        bounds = self.session_bounds(stamp)
+        bounds = (
+            session_bounds(stamp)
+            if self.graph.document["settings"].get("trading_hours") == "extended"
+            else self.session_bounds(stamp)
+        )
+        if bounds and until:
+            until = max(bounds[0], min(until, bounds[1]))
         return (
             set(range(max(0, int(((until or bounds[1]) - bounds[0]).total_seconds() // 60))))
             if bounds
@@ -161,8 +173,17 @@ class Market:
         by_day: dict[str, dict[int, dict]] = {}
         for bar in minute_bars:
             time = datetime.fromtimestamp(int(bar["timestamp"]), UTC)
-            window = self.session_bounds(time)
-            if window and self.tradable(time) and time + timedelta(minutes=1) <= stamp:
+            window = (
+                session_bounds(time)
+                if self.graph.document["settings"].get("trading_hours") == "extended"
+                else self.session_bounds(time)
+            )
+            if (
+                window
+                and window[0] <= time < window[1]
+                and self.tradable(time)
+                and time + timedelta(minutes=1) <= stamp
+            ):
                 by_day.setdefault(window[0].date().isoformat(), {})[
                     self.elapsed_seconds(time, window[0]) // 60
                 ] = bar
@@ -272,10 +293,16 @@ class Market:
             self.session_seed_until = None
             self.bar_seed_until = None
         minute = seconds // 60
-        if minute > self.last_minute:
+        regular = (
+            session_bounds(stamp)
+            if self.graph.document["settings"].get("trading_hours") == "extended"
+            else bounds
+        )
+        in_regular = regular[0] <= stamp < regular[1]
+        if in_regular and minute > self.last_minute:
             self.minute_volumes[minute] = self.volume
             self.last_minute = minute
-        if self.session_seed_until is None or stamp >= self.session_seed_until:
+        if in_regular and (self.session_seed_until is None or stamp >= self.session_seed_until):
             self.volume = volume_sum([self.volume, size])
             self.low = price if self.low is None else min(price, self.low)
             if seconds < 300:
@@ -332,11 +359,11 @@ class Market:
             )
         context = {
             "last": self.last_price,
-            "session_volume": self.volume if self.day_complete else None,
+            "session_volume": self.volume if self.day_complete and seconds >= 0 else None,
             "relative_volume": relative,
             "opening_high": self.range_high if self.day_complete and seconds >= 300 else None,
             "opening_low": self.range_low if self.day_complete and seconds >= 300 else None,
-            "session_low": self.low if self.day_complete else None,
+            "session_low": self.low if self.day_complete and seconds >= 0 else None,
             "minutes_from_open": seconds / 60,
             "minutes_to_close": (closed - stamp).total_seconds() / 60,
             "since_entry": (stamp - self.last_entry).total_seconds() if self.last_entry else 1e12,
@@ -472,9 +499,15 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
             contexts.append(current)
         evaluated = [(context, *evaluate_step(state, context)) for context in contexts]
         if position:
+            extended = settings.get("trading_hours") == "extended"
+            if price <= position["stop"]:
+                position["stop_triggered"] = True
+            stop_fills = position.get("stop_triggered") and (
+                not extended or price >= position["stop"] - number(settings["stop_limit_offset"])
+            )
             reason = (
                 "protective_stop"
-                if price <= position["stop"]
+                if stop_fills
                 else "target"
                 if position["target"] is not None and price >= position["target"]
                 else "session_exit"
@@ -515,17 +548,27 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
             if target_required and target is None or target is not None and target <= limit:
                 continue
             try:
+                risk_stop = stop
+                if stop is not None and settings.get("trading_hours") == "extended":
+                    risk_stop = stop - number(settings["stop_limit_offset"])
                 quantity = size_entry(
                     settings,
                     profile,
                     limit,
-                    stop,
+                    risk_stop,
                     Decimal(5000),
                     {"size_increment": "0.00000001", "min_size": "0.00000001"},
                 )
             except Conflict:
                 continue
-            intent = {"quantity": quantity, "limit": limit, "stop": stop, "target": target}
+            intent = {
+                "quantity": quantity,
+                "limit": limit,
+                "stop": stop,
+                "target": target,
+                "outside_rth": settings.get("trading_hours") == "extended",
+                "stop_limit": risk_stop if settings.get("trading_hours") == "extended" else None,
+            }
             durable = oms.entry(intent)
             pending = {**intent, **durable, "at": stamp}
             signals.append(

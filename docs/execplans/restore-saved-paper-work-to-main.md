@@ -19,7 +19,7 @@ Integrate the saved local paper-workspace changes with the current GitHub `main`
 
 ## 4. Current state
 
-`main` equals GitHub commit `4abf934`. A stash rooted at `03bef16` contains 44 tracked edits; 187 untracked source, test, documentation, and script files remain. The saved changes include a previous-minute long-only FX paper breakout and other paper-workspace work. Applying them directly to the newer `main` produced broad conflicts. The current checkout's full verification fails because untracked tests expect the saved tracked code.
+`main` and GitHub remain at `4abf934`. The saved 44 tracked edits and 187 additional files are preserved in `7e6248c`; the original stash `206503c1238f10bd4b141847c93cc5cc95b7e49d` remains recoverable. The local integration branch now combines that workspace with upstream main. Schema/compiler and execution-policy conflicts are resolved and the complete offline verification gate passes. Real broker execution qualification remains outstanding.
 
 ## 5. Proposed design
 
@@ -66,3 +66,30 @@ The saved work is large and spans broker, risk, OMS, UI, tests, and migrations; 
 The saved files are preserved in local commit `7e6248c` on `codex/restore-paper-work`; the original stash remains intact. On their original base, formatting, lint, 1,525 backend tests, 190 frontend tests, 28 browser tests, build, and secret scan passed. The full gate stopped at the older lockfile's vulnerable `certifi 2026.6.17`; GitHub `main` has the patched dependency.
 
 Merging `main` produced 18 conflicting files. The newer session feature uses strategy schema 4 for extended stock hours, while the saved workspace uses schema 4 for crypto. Its one-shot paper test cannot publish through the saved compiler, and its old engine fixture does not represent the saved workspace's additional watchdog readiness. The merge was reset to the preserved local commit. GitHub `main` remains unchanged. Before publication, design a compatibility migration for both schema-4 document families, adapt the paper connection test and future-session authorization to the saved broker/risk/OMS architecture, then rerun the full gate and review paper-only dispatch semantics.
+
+
+### Implementation decisions
+
+- Scheduled/extended sessions apply to legacy stock graphs with explicit session settings. Reusable stocks, saved pre-market local protection, FX and crypto retain their versioned policies. The saved authorization transaction handles scheduled approvals; reservation and the final dispatch guard recheck the selected window.
+- Schema 4 stock is selected by stock session fields. Crypto settings mixed with those fields are rejected. Unmarked saved crypto drafts retain their old defaults. Golden publication hashes cover both families and schema 3.
+- Upstream incident inspection/recheck is adapted into the existing scoped IncidentPanel/IncidentRecovery flow. Recovery cannot overwrite episodes. Contextual engine faults require a matching successful operation and 30 healthy seconds; post-failure reconciliation and explicit critical-incident review remain required.
+- Run removal uses existing dependency, cancellation, ownership and reconciliation archival checks. The broker test is explicitly stock-only, binds its preview to process/epoch/context/contract, uses the existing risk reservation/outbox and cannot qualify normal strategy execution.
+- Additional audit findings in Vitest 5.0.1 require patching to 5.0.5. Maintainer advisories GHSA-qxg6-89mg-rqv8 and GHSA-xp26-3454-mjgp identify fixes in 5.0.3 and later. No audit threshold or exclusion changes.
+
+
+### Integration review and corrections
+
+Self-review found missing legacy extended exit flags/session bounds and regular-only historical requests. These are corrected; regression coverage verifies that closed sessions retain pending exits and that accepted extended exits carry the original outside-hours contract. The first completed backend gate reported 1,563 passes and two integration regressions: saved pre-market callbacks must validate the execution plan's outside-hours flag, and archived runs must be rejected before strategy lookup. Both fixes passed a 47-test focused rerun.
+
+The browser walkthrough initially passed 28 of 29 tests; the new legacy fixture ran before a pre-existing test with a global name selector. It now follows the existing serial fixture sequence. The original walkthrough passed after reviewing and updating only the canvas and guided Studio baselines for the visible strategy-name label and readable operation/session explanations. Both images were inspected individually; no layout clipping or order/approval regression was found. Baselines for the other views and snapshot tolerance were retained.
+
+
+### Completed local verification, 22 October 2026
+
+The final `./scripts/verify.ps1` completed with `verify: ok` at 23:35 Sydney time using the isolated `.venv` (Python 3.12.3) and local Node 24.21.0. Results: 1,565 backend tests, 190 frontend unit tests, 29 browser tests, formatting, lint, type checks, build, secret scan and both unchanged-threshold dependency audits passed. `pip check` reported no broken requirements. Locked installation via `npm ci` reported zero vulnerabilities. Earlier failures and their corrections are recorded above; the restored browser test also required newline/format normalization before the final gate.
+
+The final verification record has fingerprint `a2c6dc68f41a9f38a7304dacc582f8cc3192e0494395703449938d18afecf16c` and explicitly retains `paper_trials: false`. Only the two reviewed Studio baselines changed. Existing nonblocking TestClient/calendar deprecations, bundle-size and color-environment notices remain; no check, audit threshold or snapshot tolerance was weakened.
+
+Safety self-review covered adapter paper-account enforcement, session rechecks at authorization/reservation/dispatch, risk and protective-limit sizing, immutable published hashes, one-shot preview identity, duplicate and uncertain-outcome handling, owned exits, cancellation evidence, restart disarming, reconciliation, scoped incident recovery and secret exposure. No outstanding P0/P1 finding remains in this integration review. Automated results do not establish real Gateway fill/protection acceptance.
+
+GitHub main was checked directly after verification and remains `4abf9341af578d5a797e83012191efd8f27c2a20`. This slice creates a local integration commit only. No broker connection, order, service restart or GitHub publication was performed. Publication review and supervised paper qualification are the next slices.

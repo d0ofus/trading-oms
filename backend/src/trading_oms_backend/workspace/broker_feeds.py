@@ -131,6 +131,10 @@ class BrokerFeeds:
             if code in {201, 10318}
             else classify_data_error(code, message)
         )
+        if code == 321:
+            from .diagnostics import broker_diagnostic
+
+            diagnostic["diagnostic"] = broker_diagnostic(code, message)
         if code == 399:
             # 399 is an order-message envelope, not a definite rejection code.
             # Raw text (potentially containing account data) never leaves here.

@@ -193,6 +193,34 @@ export function IncidentPanel({
         <button disabled={checking} onClick={recheck}>
           Recheck recovery
         </button>
+        {detail && (
+          <>
+            <button
+              disabled={busy || checking}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await api(
+                    `/operations/incidents/${detail.id}/recheck`,
+                    "POST",
+                  );
+                  recheck();
+                  await refresh();
+                } catch (error) {
+                  notify((error as Error).message, true);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Recheck broker state
+            </button>
+            <p className="ws-muted">
+              Rechecking requests current broker state. It does not submit or
+              resend orders.
+            </p>
+          </>
+        )}
         {detail ? (
           <>
             <h3>{titleCase(detail.code ?? detail.id)}</h3>

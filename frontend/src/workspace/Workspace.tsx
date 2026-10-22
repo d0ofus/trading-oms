@@ -8,6 +8,7 @@ import { PrepareRun, PreparationForm } from "./PrepareRun";
 import { ContractSearch } from "./ContractSearch";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { AuditHistory } from "./AuditHistory";
+import { ConnectionTestLauncher } from "./ConnectionTest";
 import { ReplayCompare } from "./ReplayCompare";
 import {
   Activity,
@@ -513,6 +514,8 @@ export function Workspace() {
           ) : path === "/testing" ? (
             <Testing
               notify={notify}
+              snapshot={snapshot}
+              refresh={refresh}
               createRun={(version) => void createRun(version)}
             />
           ) : (
@@ -669,6 +672,12 @@ function Desk({
     return () => controller.abort();
   }, [strategy, strategies, showPreparation]);
   const [closeRun, setCloseRun] = useState<Run | null>(null);
+  const [removing, setRemoving] = useState<{
+    run: Run;
+    eligible: boolean;
+    reason: string | null;
+    will_cancel: boolean;
+  } | null>(null);
   const [checksExpanded, setChecksExpanded] = useState(false);
   const [historicalRun, setHistoricalRun] = useState<Run | null>(null);
   const runs =
@@ -1402,8 +1411,60 @@ function Desk({
           <button className="ws-link" onClick={() => navigate("/activity")}>
             Inspect event history <ArrowUpRight size={14} />
           </button>
+          {!run.archived && (
+            <button
+              disabled={busy}
+              onClick={async () => {
+                try {
+                  setRemoving(await api(`/runs/${run.id}/removal-preview`));
+                } catch (error) {
+                  notify((error as Error).message, true);
+                }
+              }}
+            >
+              Remove run
+            </button>
+          )}
         </aside>
       )}
+      <Modal
+        open={!!removing}
+        onOpenChange={(open) => {
+          if (!open) setRemoving(null);
+        }}
+        title="Remove run"
+        description="Disarm this run and retain its broker and audit history."
+      >
+        {removing && (
+          <>
+            <p>
+              {removing.run.name}:{" "}
+              {removing.reason ??
+                (removing.will_cancel
+                  ? "Remaining entries will be cancelled. Removal waits for terminal orders, released risk and fresh flat reconciliation."
+                  : "Remove this run from the active desk. Its audit history is retained.")}
+            </p>
+            <button
+              disabled={busy || !removing.eligible}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await api(`/runs/${removing.run.id}/remove`, "POST");
+                  setRemoving(null);
+                  await refresh();
+                  notify("Run removal requested. Audit history is preserved.");
+                } catch (error) {
+                  notify((error as Error).message, true);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Confirm run removal
+            </button>
+          </>
+        )}
+      </Modal>
       <RecordHistory
         selectOrder={setOrderIdentity}
         selectRun={(run) => {
@@ -1608,6 +1669,13 @@ function Settings({
       <div className="ws-settings-grid">
         <Panel
           title="1. Connect Gateway"
+          action={
+            <ConnectionTestLauncher
+              snapshot={snapshot}
+              refresh={refresh}
+              notify={notify}
+            />
+          }
           caption="A dedicated local paper connection."
         >
           {snapshot?.migration?.pending && (
@@ -1902,9 +1970,13 @@ function Settings({
 function Testing({
   notify,
   createRun,
+  snapshot,
+  refresh,
 }: {
   notify: (message: string, error?: boolean) => void;
   createRun: (version: Version) => void;
+  snapshot: Snapshot | null;
+  refresh: () => Promise<void>;
 }) {
   const [strategies, setStrategies] = useState<Draft[]>([]);
   const [versions, setVersions] = useState<Version[]>([]);
@@ -2030,6 +2102,13 @@ function Testing({
       </div>
       <Panel
         title="Run a deterministic replay"
+        action={
+          <ConnectionTestLauncher
+            snapshot={snapshot}
+            refresh={refresh}
+            notify={notify}
+          />
+        }
         caption="Choose a published version and timestamped trade observations."
       >
         <div className="ws-replay-controls">

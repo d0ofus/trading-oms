@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import pytest
 from test_workspace_engine import BrokerDouble
 
 from trading_oms_backend.workspace.engine import Engine
@@ -74,17 +75,21 @@ def test_repair_never_replaces_uncertain_protection_or_disagreed_position(tmp_pa
     assert len(engine.broker.submitted) == 1
 
 
-def test_protection_requires_exact_owned_quantity_client_and_overfill_block(tmp_path):
+@pytest.mark.parametrize("extended", [False, True])
+def test_protection_requires_exact_owned_quantity_client_and_overfill_block(tmp_path, extended):
     store, engine, entry, position = fixture(tmp_path)
     store.transition(entry["id"], "filled", {})
     entry = store.orders()[0]
+    entry["payload"].update(outside_rth=extended, stop_limit="98.90" if extended else None)
     valid = {
         "status": "Submitted",
         "client_id": 71,
         "own_account": True,
         "reference": "oms-" + entry["id"],
         "conid": 1,
-        "order_type": "STP",
+        "order_type": "STP LMT" if extended else "STP",
+        "outside_rth": extended,
+        "limit": "98.90" if extended else None,
         "action": "SELL",
         "quantity": "2",
         "tif": "GTC",
@@ -100,8 +105,14 @@ def test_protection_requires_exact_owned_quantity_client_and_overfill_block(tmp_
         ("oca_type", 3),
         ("stop", "98"),
         ("own_account", False),
+        ("outside_rth", not extended),
     ]:
         engine.broker_orders[102] = {**valid, field: value}
+        assert not engine._valid_protection(position, entry)
+    if extended:
+        engine.broker_orders[102] = {**valid, "order_type": "STP"}
+        assert not engine._valid_protection(position, entry)
+        engine.broker_orders[102] = {**valid, "limit": "98.80"}
         assert not engine._valid_protection(position, entry)
 
 

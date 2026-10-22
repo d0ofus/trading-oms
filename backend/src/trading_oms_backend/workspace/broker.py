@@ -515,9 +515,9 @@ class GatewayData(BrokerSnapshots, BrokerValuation, BrokerFeeds):
                     reference=order.orderRef
                     if re.fullmatch(r"oms-[a-f0-9]{32}", order.orderRef or "")
                     else "external",
-                    limit=str(order.lmtPrice) if order.orderType == "LMT" else None,
+                    limit=str(order.lmtPrice) if order.orderType in {"LMT", "STP LMT"} else None,
                     status=orderState.status,
-                    stop=str(order.auxPrice) if order.orderType == "STP" else None,
+                    stop=str(order.auxPrice) if order.orderType in {"STP", "STP LMT"} else None,
                     tif=order.tif,
                     oca_type=order.ocaType,
                     oca_group=order.ocaGroup
@@ -1077,7 +1077,7 @@ class PaperGateway(PaperCredit, PaperFX, PaperCrypto, PaperOCA, PaperStocks, Gat
             raise ValueError("Unsupported stock exit type.")
         if order.orderType == "LMT":
             order.lmtPrice = float(Decimal(intent["limit"]))
-        order.tif, order.outsideRth, order.transmit = "DAY", False, True
+        order.tif, order.outsideRth, order.transmit = "DAY", bool(intent.get("outside_rth")), True
         deadline = self._stock_extended_deadline(intent)
         if deadline:
             if order.orderType != "LMT":
@@ -1116,16 +1116,22 @@ class PaperGateway(PaperCredit, PaperFX, PaperCrypto, PaperOCA, PaperStocks, Gat
             contract = self._stock_contract(intent, entry=intent.get("purpose", "entry") == "entry")
         elif contract is None or contract.secType != "STK" or contract.currency != "USD":
             raise ValueError("Resolve the supported equity contract first.")
+        extended = bool(intent.get("outside_rth")) and not intent.get("stock_plan")
+        protective_limit = Decimal(intent.get("stop_limit") or intent["stop"])
+        if extended and not 0 < protective_limit < stop:
+            raise ValueError("Extended protection requires a valid stop-limit plan.")
         order = Order()
         order.orderId, order.action, order.orderType = (
             intent["broker_id"],
             intent.get("action", "SELL"),
-            "STP",
+            "STP LMT" if extended else "STP",
         )
         if order.action not in {"BUY", "SELL"}:
             raise ValueError("Unsupported protective action.")
+        if extended:
+            order.lmtPrice = float(protective_limit)
         order.totalQuantity, order.auxPrice = Decimal(quantity), float(stop)
-        order.tif, order.outsideRth, order.transmit = "GTC", False, True
+        order.tif, order.outsideRth, order.transmit = "GTC", extended, True
         order.account, order.orderRef = self._accounts[0], "oms-" + intent["id"]
         order.ocaGroup, order.ocaType = "oms-" + intent.get("exit_group", intent["entry_id"]), 2
         self.client.placeOrder(order.orderId, contract, order)
@@ -1145,6 +1151,16 @@ class PaperGateway(PaperCredit, PaperFX, PaperCrypto, PaperOCA, PaperStocks, Gat
         if not intent.get("stock_plan") and (type(quantity) is not int or not 1 <= quantity <= 10):
             raise ValueError("Paper orders require 1–10 whole shares.")
         limit, stop = Decimal(intent["limit"]), Decimal(intent["stop"])
+        extended = bool(intent.get("outside_rth")) and not intent.get("stock_plan")
+        protective_limit = Decimal(intent.get("stop_limit") or intent["stop"])
+        if extended and (
+            not 0 < protective_limit < stop
+            or quantity * (limit - protective_limit) > 10
+            or intent.get("entry_type", "LMT") != "LMT"
+        ):
+            raise ValueError(
+                "Extended bracket requires qualified limit entry and stop-limit protection."
+            )
         if not 0 < stop < limit or (
             not intent.get("stock_plan")
             and (quantity * limit > 1000 or quantity * (limit - stop) > 10)
@@ -1163,7 +1179,7 @@ class PaperGateway(PaperCredit, PaperFX, PaperCrypto, PaperOCA, PaperStocks, Gat
         deadline = datetime.fromisoformat(intent["expires_at"])
         if not 0 < (deadline - datetime.now(UTC)).total_seconds() <= 31:
             raise ValueError("The durable entry deadline has expired.")
-        parent.tif, parent.transmit, parent.outsideRth = "GTD", False, False
+        parent.tif, parent.transmit, parent.outsideRth = "GTD", False, extended
         parent.goodTillDate = deadline.astimezone(UTC).strftime("%Y%m%d-%H:%M:%S")
         if parent.orderType == "MKT":
             parent.tif, parent.goodTillDate = "DAY", ""
@@ -1188,11 +1204,17 @@ class PaperGateway(PaperCredit, PaperFX, PaperCrypto, PaperOCA, PaperStocks, Gat
             profit.orderId, profit.orderType, profit.lmtPrice = base + 1, "LMT", float(target)
             children.append(profit)
         protection = Order()
-        protection.orderId, protection.orderType, protection.auxPrice = base + 2, "STP", float(stop)
+        protection.orderId, protection.orderType, protection.auxPrice = (
+            base + 2,
+            "STP LMT" if extended else "STP",
+            float(stop),
+        )
+        if extended:
+            protection.lmtPrice = float(protective_limit)
         children.append(protection)
         for child in children:
             child.action, child.totalQuantity, child.parentId = "SELL", Decimal(quantity), base
-            child.tif, child.outsideRth, child.transmit = "GTC", False, child is protection
+            child.tif, child.outsideRth, child.transmit = "GTC", extended, child is protection
             child.account, child.orderRef = self._accounts[0], parent.orderRef
             child.ocaGroup, child.ocaType = parent.orderRef, 2
         # Durable dispatch is owned by the caller. An exception at ANY point is

@@ -25,6 +25,7 @@ class StrategyLibrary:
                 for row in db.execute(
                     "SELECT d.payload FROM documents d LEFT JOIN documents l "
                     "ON l.kind='strategy_lifecycle' AND l.id=d.id WHERE d.kind='draft' "
+                    "AND COALESCE(json_extract(d.payload,'$.diagnostic_only'),0)=0 "
                     "AND COALESCE(json_extract(l.payload,'$.state'),'active')=? "
                     "ORDER BY d.rowid DESC",
                     ("archived" if archived else "active",),

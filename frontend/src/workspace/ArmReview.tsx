@@ -143,6 +143,7 @@ export function ArmReview({
     profileId: string,
     version: number,
     unattended: boolean,
+    sessionDate = preview?.session_date,
   ) {
     if (!preview) return;
     cancelPolling();
@@ -159,6 +160,7 @@ export function ArmReview({
           profile_id: profileId,
           profile_version: version,
           unattended,
+          session_date: sessionDate,
         },
         request.signal,
       );
@@ -179,6 +181,9 @@ export function ArmReview({
         profile_id: preview.limits.id,
         profile_version: preview.limits.version,
         unattended: preview.authorization === "unattended_paper_session",
+        session_date: preview.flexible_session
+          ? preview.session_date
+          : undefined,
       },
       signal,
     );
@@ -366,6 +371,26 @@ export function ArmReview({
                 execution limits; it does not change the strategy's signals.
               </p>
               <div className="ws-form-grid">
+                {preview.flexible_session && (
+                  <label>
+                    Trading date (New York)
+                    <input
+                      type="date"
+                      value={preview.session_date ?? ""}
+                      disabled={busy}
+                      onChange={(event) => {
+                        if (event.target.value)
+                          void review(
+                            preview.limits.id,
+                            preview.limits.version,
+                            preview.authorization ===
+                              "unattended_paper_session",
+                            event.target.value,
+                          );
+                      }}
+                    />
+                  </label>
+                )}
                 <label>
                   Risk profile
                   <select
@@ -754,6 +779,9 @@ export function ArmReview({
                     await api("/runs/arm", "POST", {
                       ids: preview.runs.map((r) => r.id),
                       mutation_id: actionId,
+                      session_date: preview.flexible_session
+                        ? preview.session_date
+                        : undefined,
                       review_fingerprint: preview.review_fingerprint,
                       resume_policy: preview.resume_policy,
                       ...(brokerCredit

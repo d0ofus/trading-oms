@@ -33,7 +33,9 @@ from .market import Market, calendar, session_bounds
 from .oca import is_pair
 from .oca_engine import OCAController
 from .oms import OrderLedger
+from .operations import OperatorActions
 from .outages import OutageNotifications
+from .paper_test import PaperConnectionTest
 from .power import SleepGuard
 from .premarket import PremarketController, premarket
 from .preparation import Preparation
@@ -66,6 +68,8 @@ def check(code, title, passed, detail, remedy="/settings"):
 
 
 class Engine(
+    PaperConnectionTest,
+    OperatorActions,
     RunPolicies,
     CreditController,
     DataScheduling,
@@ -276,12 +280,20 @@ class Engine(
         holds = self.incidents.applicable([run or {}])
         watchdog_ready = status["ready"]
         checks = self.readiness([run or {}])
-        execution_fresh = bool(run and self._run_feed_health(run)["execution_fresh"])
+        execution_fresh = bool(
+            run
+            and (
+                self.connection_diagnostics(run["conid"])["eligible"]
+                if run.get("diagnostic_test")
+                else self._run_feed_health(run)["execution_fresh"]
+            )
+        )
         permitted = bool(
             run
             and not run.get("archived")
             and run.get("armed")
             and run.get("expires_at", "") > now()
+            and self._session_permission(run)
         )
         if self._stock_run(run):
             permitted = (
@@ -411,11 +423,11 @@ class Engine(
             ) from exc
 
     def _loop(self):
+        batch = []
         while not self.stopping.is_set():
             operation, observation_kind = "observations", None
             try:
-                batch = []
-                for _ in range(100):
+                for _ in range(100 if not batch else 0):
                     try:
                         observation = self.observations.get_nowait()
                     except queue.Empty:
@@ -425,11 +437,13 @@ class Engine(
                 ticks = [item for item in batch if item["type"] in {"tick", "quote"}]
                 capture = self.store.capture_batch(ticks) if ticks else None
                 self._batch_runs = self.store.list("run") if ticks else None
-                for observation in batch:
+                while batch:
+                    observation = batch.pop(0)
                     observation_kind = observation["type"]
                     if observation["type"] in {"tick", "quote"}:
                         observation["capture"] = capture
                     self.observe(observation)
+                    self._operation_succeeded(operation, observation_kind)
                 self._batch_runs = None
                 try:
                     future, method, kwargs = self.commands.get(timeout=0.025)
@@ -439,6 +453,7 @@ class Engine(
                     operation, observation_kind = "command:" + method, None
                     try:
                         future.set_result(self._dispatch(method, kwargs))
+                        self._operation_succeeded(operation)
                     except (ValueError, KeyError) as exc:
                         future.set_exception(exc)
                     except Exception:
@@ -450,6 +465,7 @@ class Engine(
                         raise
                 operation, observation_kind = "maintenance", None
                 self.maintain()
+                self._operation_succeeded(operation)
                 self.last_loop = time.monotonic()
             except Exception as exc:
                 self._batch_runs = None
@@ -468,6 +484,9 @@ class Engine(
         self.sleep_guard.set(False)
 
     def incident(self, code, detail, **context):
+        if code == "engine_fault":
+            self._fault_at = time.monotonic()
+            self._fault_retest_pending = True
         self._overview_cache = None
         context.setdefault("connection_epoch", self.broker.epoch)
         from .fault_policy import CORRECTED
@@ -705,7 +724,13 @@ class Engine(
             day = stamp.date().isoformat()
             sessions = cal.sessions_in_range((stamp - timedelta(days=24)).date().isoformat(), day)
             for session in sessions[-12:]:
-                end = min(cal.session_close(session).to_pydatetime() + timedelta(seconds=1), stamp)
+                if self.legacy_extended_history(conid):
+                    from .sessions import candle_bounds
+
+                    close = candle_bounds(cal.session_open(session).to_pydatetime(), True)[1]
+                else:
+                    close = cal.session_close(session).to_pydatetime()
+                end = min(close + timedelta(seconds=1), stamp)
                 jobs.append((conid, end.strftime("%Y%m%d-%H:%M:%S"), 60))
         if not stock_runs or any(
             r["binding"]["execution_plan"]["requirements"]["timeframe"] == 5 for r in stock_runs
@@ -779,6 +804,8 @@ class Engine(
             self._next_health_write = time.monotonic() + 2
             self.migration.maintain(self)
             return
+        self._finish_removals()
+        self._maintain_paper_tests()
         clock = time.monotonic()
         self._maintain_reconciliation(clock)
         if type(self.broker) is PaperGateway and clock >= self._next_acceptance_record:
@@ -1085,6 +1112,8 @@ class Engine(
             ):
                 event = {**event, "context": "retired_data"}
             code = event["code"]
+            if code == 2119:
+                self.store.event("broker.service.connecting", {"code": code})
             service = event.get("service") if known_service(event.get("service"), code) else None
             rejection = (
                 safe_rejection({**(event.get("rejection") or {}), "code": code})
@@ -1239,11 +1268,25 @@ class Engine(
                             diagnostic={"code": code, "context": "execution"},
                         )
                     else:
+                        from .diagnostics import broker_diagnostic
+
+                        safe_diagnostic = broker_diagnostic(
+                            code,
+                            "Read-Only mode"
+                            if (event.get("diagnostic") or {}).get("reason") == "api_read_only"
+                            else "",
+                        )
                         self.incident(
                             "broker_notice",
-                            f"Broker notification {code}; "
+                            safe_diagnostic["detail"]
+                            if code == 321
+                            else f"Broker notification {code}; "
                             "no submitted order is associated with this request.",
-                            diagnostic={"code": code, "context": event.get("context", "broker")},
+                            diagnostic={
+                                "code": code,
+                                "context": event.get("context", "broker"),
+                                **({"reason": safe_diagnostic["reason"]} if code == 321 else {}),
+                            },
                             correlation_key=f"code:{code}",
                             notify=False,
                         )
@@ -1638,8 +1681,19 @@ class Engine(
         for run in self.store.list("run"):
             position = owned.get(run["id"])
             if position and position["quantity"] != 0:
+                if run.get("archived"):
+                    run.update(
+                        archived=False, removal_pending=False, armed=False, late_fill_recovery=True
+                    )
+                    self.incident(
+                        "late_archived_fill",
+                        "A removed run received a late fill; reconcile ownership and protection.",
+                        run=run,
+                    )
                 run.update(
-                    state="position_open" if position.get("protected") else "recovery_required",
+                    state="position_open"
+                    if position.get("protected") and not run.get("late_fill_recovery")
+                    else "recovery_required",
                     position=str(position["quantity"]),
                     protected=position.get("protected", False),
                 )
@@ -1662,7 +1716,14 @@ class Engine(
                     and o["state"] not in {"filled", "cancelled", "rejected"}
                     for o in self.store.orders()
                 )
-                run.update(state="entry_working" if pending else "armed", blocking_reason=None)
+                run.update(
+                    state="entry_working"
+                    if pending
+                    else "waiting_session"
+                    if run.get("valid_from", "") > now()
+                    else "armed",
+                    blocking_reason=None,
+                )
                 self.store.put("run", run["id"], run)
             if not position or position["quantity"] == 0:
                 if self.store.get("exit_request", run["id"]):
@@ -1686,7 +1747,10 @@ class Engine(
             evidence = self.store.get("qualification", "broker_evidence") or {}
             for position in owned.values():
                 key = position["run_id"]
-                if (self.store.get("run", key) or {}).get("execution") == "crypto_breakout":
+                trial_run = self.store.get("run", key) or {}
+                if trial_run.get("execution") == "crypto_breakout" or trial_run.get(
+                    "diagnostic_test"
+                ):
                     continue
                 trial = self.store.get("paper_trial", key) or {}
                 if position["quantity"] > 0 and position.get("protected"):
@@ -2057,6 +2121,7 @@ class Engine(
                 r.get("armed")
                 and r.get("expires_at", "") > now()
                 and self._run_feed_health(r)["execution_fresh"]
+                and self._session_permission(r)
                 and not self.incidents.applicable([r])
                 for r in self.store.list("run")
             ),
@@ -2340,7 +2405,13 @@ class Engine(
         if self._stock_run(run) and existing_data:
             self._queue_history(conid, extend=True)
 
-    def arm_preview(self, ids, profile_id="smoke", profile_version=None, unattended=False):
+    def arm_preview(
+        self, ids, profile_id="smoke", profile_version=None, unattended=False, session_date=None
+    ):
+        if self._flexible_selection(ids, session_date):
+            return self._flexible_preview(
+                ids, profile_id, profile_version, unattended, session_date
+            )
         # Interest only: polling never sends a credit request. The paced background
         # coordinator decides whether this review needs new evidence.
         interest = getattr(self, "_credit_review_interest", {})
@@ -2752,6 +2823,7 @@ class Engine(
         resume_policy=None,
         fx_policy_revision=None,
         funding_policy_acknowledged=None,
+        session_date=None,
     ):
         acknowledgments = recovery_acknowledgments or []
         revisions = execution_plan_revisions or {}
@@ -2771,10 +2843,11 @@ class Engine(
                 or prior.get("execution_plan_revisions", {}) != revisions
                 or prior.get("local_protection_acknowledged", False)
                 != local_protection_acknowledged
+                or prior.get("requested_session_date") != session_date
             ):
                 raise Conflict("This action identifier was already used for a different selection.")
             return prior["result"]
-        preview = self.arm_preview(ids, profile_id, profile_version, unattended)
+        preview = self.arm_preview(ids, profile_id, profile_version, unattended, session_date)
         modern = preview["limits"].get("risk_policy") == "paper_stock_v2"
         if (modern or review_fingerprint is not None) and review_fingerprint != preview[
             "review_fingerprint"
@@ -2856,7 +2929,7 @@ class Engine(
                     raise Conflict("Emergency stop became active. Review the session again.")
                 run.update(
                     armed=True,
-                    state="armed",
+                    state="waiting_session" if run.get("valid_from", "") > now() else "armed",
                     authorization_status="authorized",
                     authorization_instance=self.process_identity,
                     authorization_context=getattr(self, "paper_context_token", None),
@@ -2869,7 +2942,9 @@ class Engine(
                     if self._fx_run(run)
                     else run.get("funding_currency"),
                     live_after=now(),
-                    expires_at=preview["expires_at"],
+                    expires_at=run.get("expires_at")
+                    if preview.get("flexible_session")
+                    else preview["expires_at"],
                     authorized_at=now(),
                     authorization_id=mutation_id,
                     epoch=self.broker.epoch,
@@ -2884,7 +2959,7 @@ class Engine(
                     )
                     and run.get("session_date") == datetime.now(UTC).date().isoformat()
                     else 0,
-                    session_date=datetime.now(UTC).date().isoformat(),
+                    session_date=preview.get("session_date", datetime.now(UTC).date().isoformat()),
                 )
                 self.store.write(db, "run", run["id"], run)
                 self.store.append(
@@ -2931,6 +3006,7 @@ class Engine(
                     "actor": actor,
                     "local_protection_acknowledged": local_protection_acknowledged,
                     "execution_plan_revisions": revisions,
+                    "requested_session_date": session_date,
                     "result": {"armed": ids},
                 },
             )
@@ -3169,6 +3245,8 @@ class Engine(
         for run in runs:
             if not self._run_history_ready(run):
                 continue
+            if run.get("archived") or run.get("diagnostic_test"):
+                continue
             if run["conid"] != conid or (
                 not self.environment.crypto and run.get("capability_error")
             ):
@@ -3221,7 +3299,7 @@ class Engine(
                 or context["minutes_to_close"] <= graph.document["settings"]["exit_before_close"]
             ):
                 self._request_exit(run["id"])
-        elif run.get("armed") and signal:
+        elif run.get("armed") and signal and self._session_permission(run):
             state["last_bar"] = context["bar_start"]
             run["last_signal"] = now()
             self.store.put("run", run["id"], run)
@@ -3266,6 +3344,16 @@ class Engine(
                 continue
             if not run.get("armed") and self.owned().get(run["id"], {}).get("quantity", 0) == 0:
                 continue
+            if run.get("diagnostic_test"):
+                bounds = self._run_bounds(run, stamp)
+                position = self.owned().get(run["id"], {}).get("quantity", 0)
+                if position > 0 and (
+                    self.store.get("exit_request", run["id"])
+                    or bounds
+                    and stamp >= bounds[1] - timedelta(minutes=5)
+                ):
+                    self._request_exit(run["id"])
+                continue
             data = self.data.get(run["conid"], {})
             state = self._runtime(run)
             context = (
@@ -3282,7 +3370,11 @@ class Engine(
                     }
                 )
                 self._evaluate_context(run, state, context, capture)
-            bounds = state["market"].session_bounds(stamp)
+            bounds = (
+                self._run_bounds(run, stamp)
+                if run.get("valid_from")
+                else state["market"].session_bounds(stamp)
+            )
             if (
                 bounds
                 and bounds[0] <= stamp
@@ -3302,15 +3394,24 @@ class Engine(
                     self._request_exit(run["id"])
 
     def _enter(self, run, result, context, capture):
+        if not self._session_permission(run):
+            raise Conflict("The selected execution session is not open for new entries.")
         if not self._binding_valid(run):
             raise Conflict("Contract identity changed. Prepare and approve a new run binding.")
-        if (
-            not all(c["passed"] for c in self.readiness([run]))
-            or not self._run_feed_health(run)["execution_fresh"]
+        if not all(c["passed"] for c in self.readiness([run])) or not (
+            self.connection_diagnostics(run["conid"])["eligible"]
+            if run.get("diagnostic_test")
+            else self._run_feed_health(run)["execution_fresh"]
         ):
             raise Conflict("Connection, reconciliation, data or incident readiness blocks entries.")
         if context["minutes_to_close"] <= 15 or run["expires_at"] <= now():
             raise Conflict("The entry session has ended.")
+        if run.get("valid_from"):
+            bounds = self._run_bounds(run)
+            if not self._session_permission(run) or datetime.now(UTC) >= bounds[1] - timedelta(
+                minutes=15
+            ):
+                raise Conflict("The selected execution session is not open for new entries.")
         graph = self._runtime(run)["graph"]
         settings = graph.document["settings"]
         profile = run.get(
@@ -3335,6 +3436,12 @@ class Engine(
         ):
             raise Conflict("Current bid and ask quotes are required.")
         limit = number(quotes["ask"]["price"])
+        if run.get("diagnostic_test"):
+            limit = number(result["test_limit"])
+            if limit >= number(quotes["bid"]["price"]):
+                raise Conflict(
+                    "The reviewed test price is no longer below bid. Refresh the preview."
+                )
         contract = self.contracts[run["conid"]]
         increments = self.market_rules.get(contract.get("market_rule"), [])
         if not increments:
@@ -3362,6 +3469,20 @@ class Engine(
         stop = (stop / tick).to_integral_value(rounding=ROUND_DOWN) * tick
         if not Decimal(0) < stop < limit:
             raise Conflict("The protective stop must be positive and below the entry limit.")
+        extended = settings.get("trading_hours") == "extended"
+        protective_limit = stop
+        if extended:
+            protective_limit = stop - number(settings["stop_limit_offset"])
+            tick = increment(protective_limit)
+            if tick <= 0 or protective_limit <= 0:
+                raise Conflict(
+                    "The protective stop-limit price must be positive with a valid increment."
+                )
+            protective_limit = (protective_limit / tick).to_integral_value(
+                rounding=ROUND_DOWN
+            ) * tick
+            if not 0 < protective_limit < stop:
+                raise Conflict("The protective limit must be below the stop trigger.")
         reserved_funds = sum(
             (number(r["notional"]) for r in self.store.list("reservation") if r.get("active")),
             Decimal(0),
@@ -3374,7 +3495,7 @@ class Engine(
                 settings,
                 profile,
                 limit,
-                stop,
+                protective_limit,
                 number(self.facts["AvailableFunds"]) - reserved_funds,
                 contract,
             )
@@ -3406,6 +3527,8 @@ class Engine(
         key = uuid.uuid4().hex
         payload = {
             "purpose": "entry",
+            "outside_rth": extended,
+            "stop_limit": str(protective_limit) if extended else None,
             "conid": run["conid"],
             "symbol": run["symbol"],
             "quantity": str(quantity)
@@ -3445,7 +3568,7 @@ class Engine(
             stock_reservation
             or {
                 "symbol": run["symbol"],
-                "risk": str(quantity * (limit - stop)),
+                "risk": str(quantity * (limit - protective_limit)),
                 "notional": str(quantity * limit),
             },
         )
@@ -3536,6 +3659,20 @@ class Engine(
             raise Conflict("Reconcile the paper account before closing an owned position.")
         if not self.store.get("exit_request", key):
             self.store.put("exit_request", key, {"requested_at": now()})
+        run = self.store.get("run", key) or {}
+        if run.get("valid_from"):
+            from .sessions import NY, execution_bounds
+
+            stamp = datetime.now(UTC)
+            bounds = execution_bounds(
+                stamp.astimezone(NY).date().isoformat(),
+                run.get("trading_hours", "regular"),
+                self.contracts.get(position["conid"]),
+            )
+            if not bounds or not bounds[0] <= stamp < bounds[1]:
+                raise Conflict(
+                    "The broker session is closed. Exit remains pending; protection is retained."
+                )
         if any(
             o["run_id"] == key
             and o["payload"].get("purpose") == "exit"
@@ -3555,6 +3692,7 @@ class Engine(
         identity = uuid.uuid4().hex
         payload = {
             "purpose": "exit",
+            "outside_rth": bool(entry and entry["payload"].get("outside_rth")),
             "entry_id": position["entry_id"],
             "conid": position["conid"],
             "symbol": position["symbol"],

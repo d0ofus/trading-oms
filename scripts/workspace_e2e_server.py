@@ -170,6 +170,7 @@ with tempfile.TemporaryDirectory(
     serialize_offline_engine(engine)
     engine.code_verified = False  # Stable fixture; never claim a real release gate.
     engine.broker = OfflineBroker(engine.observations)
+    engine.store.event("broker.service.connecting", {"code": 2119})
     engine.contracts[100] = {
         "conid": 100,
         "symbol": "AAPL",

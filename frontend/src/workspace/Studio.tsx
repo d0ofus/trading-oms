@@ -1018,7 +1018,9 @@ export function Studio({
           <>
             <div className="ws-editor-heading">
               <div className="ws-strategy-name">
+                <label htmlFor="strategy-name">Strategy name</label>
                 <input
+                  id="strategy-name"
                   aria-label="Strategy name"
                   value={active.name}
                   maxLength={100}
@@ -1177,6 +1179,47 @@ export function Studio({
                                   ["ETH", "ETH / USD - PAXOS"],
                                 ]
                               : undefined,
+                          )}
+                          {!reusable &&
+                            !simulation &&
+                            !paired &&
+                            (active.document.schema_version === 4 ? (
+                              setting("trading_hours", "Execution hours", [
+                                ["regular", "Regular hours only"],
+                                ["extended", "Regular + pre/post-market"],
+                              ])
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  update({
+                                    ...active.document,
+                                    schema_version: 4,
+                                    settings: {
+                                      ...active.document.settings,
+                                      trading_hours: "regular",
+                                      stop_limit_offset: "0.10",
+                                    },
+                                  })
+                                }
+                              >
+                                Enable session settings in this draft
+                              </button>
+                            ))}
+                          {active.document.settings.trading_hours ===
+                            "extended" && (
+                            <>
+                              {setting(
+                                "stop_limit_offset",
+                                "Protective limit below stop trigger",
+                                undefined,
+                                "USD",
+                              )}
+                              <p className="ws-banner warning">
+                                Extended hours use broker-held stop-limit
+                                protection. A triggered stop-limit can remain
+                                unfilled. Supervision is required.
+                              </p>
+                            </>
                           )}
                           {setting("timeframe", "Candle interval", [
                             [5, "5 seconds"],

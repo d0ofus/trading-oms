@@ -1226,6 +1226,21 @@ details p {
   grid-template-columns: 1fr 1fr;
   margin-bottom: 15px;
 }
+.ws-connection-test > .ws-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 22px 16px;
+  max-width: 780px;
+}
+.ws-test-checks {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+.ws-test-checks li {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
 .ws-span-all {
   grid-column: 1/-1;
 }

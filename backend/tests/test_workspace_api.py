@@ -99,3 +99,28 @@ def test_retried_mutation_returns_original_result_and_rejects_different_payload(
         ).status_code
         == 409
     )
+
+
+def test_read_only_diagnostics_and_blocked_test_never_create_an_order(client):
+    engine = client.app.state.engine
+    before = engine.store.orders()
+    assert client.get("/api/paper/diagnostics?conid=1").status_code == 200
+    preview = client.post("/api/paper/order-tests/preview", json={"conid": 1}).json()
+    assert not preview["eligible"]
+    assert (
+        client.post("/api/paper/order-tests", json={"preview_id": preview["id"]}).status_code == 409
+    )
+    assert engine.store.orders() == before
+
+
+def test_incident_inspection_and_safe_run_removal_are_authenticated(client):
+    engine = client.app.state.engine
+    engine.incident("engine_fault", "Synthetic failed operation")
+    detail = client.get("/api/operations/incidents/engine_fault")
+    assert detail.status_code == 200 and not detail.json()["recovery"]["can_release"]
+    assert client.post("/api/operations/incidents/engine_fault/review").status_code == 409
+    engine.store.put("run", "fixture", {"id": "fixture", "position": "0", "armed": False})
+    assert client.post("/api/runs/fixture/remove").json()["archived"]
+    assert engine.store.get("run", "fixture")
+    client.cookies.clear()
+    assert client.post("/api/runs/fixture/remove").status_code == 401
