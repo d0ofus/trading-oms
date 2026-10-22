@@ -1,14 +1,15 @@
-# ExecPlan: Restore saved paper work and publish main
+# ExecPlan: Integrate saved paper work and verify locally
 
 ## 1. Goal
 
-Integrate the saved local paper-workspace changes with the current GitHub `main`, verify the combined build, and publish the reviewed result to GitHub `main`. Provide exact operator steps for a supervised IBKR paper FX breakout test.
+Integrate the saved local paper-workspace changes with the current GitHub `main` on `codex/restore-paper-work` and produce a verified, reviewed local integration commit. Publication and an IBKR paper trial are subsequent steps.
 
 ## 2. Non-goals
 
 - No live-trading capability, account login, broker order, or automatic arming.
 - No expansion of strategy behavior beyond reconciling the saved work and incoming `main` commits.
 - No claim that broker fill or protective-order qualification has already passed.
+- No GitHub publication or broker connection during this slice.
 
 ## 3. Safety constraints
 
@@ -22,7 +23,7 @@ Integrate the saved local paper-workspace changes with the current GitHub `main`
 
 ## 5. Proposed design
 
-Create a local integration branch from the stash's original base. Restore the stash there and add the intended untracked files after inspecting for secrets and generated artifacts. Verify that coherent local snapshot, then merge the two newer `main` commits, resolve each overlap with behavior and safety checks, rerun the full gate, review the publish diff, and fast-forward GitHub `main` only if all required gates pass.
+Merge `main` into the preserved branch and resolve overlaps by behavior. Schema 4 crypto retains its interpretation; explicit stock session settings select the upstream stock schema-4 compiler, and mixed shapes fail closed. Preserve existing publication hashes. Port scheduled stock sessions, broker-held extended stop-limit protection, the explicitly authorized one-shot stock paper test, diagnostics and safe run removal into the saved workspace's existing risk, ownership, authorization and recovery flow. Existing pre-market and FX policies retain their meaning. Carry forward upstream patched lockfiles and run focused regressions plus the full offline gate.
 
 ## 6. Data model changes
 
@@ -30,15 +31,15 @@ Preserve only the saved work's additive migrations and event schema. Review migr
 
 ## 7. API changes
 
-Preserve the saved paper-workspace API additions. Review route collisions and current `main` endpoints during integration.
+Preserve saved APIs and upstream session-date, diagnostics, paper-test preview/start, incident recheck and run-removal routes. Extend typed frontend contracts accordingly. Review route collisions and bind operator identity to explicit authorizations.
 
 ## 8. Test plan
 
-Run focused FX candle, policy, broker, execution, protection, recovery, and safety tests, plus the full backend/frontend/e2e verification gate. Check merge conflicts, duplicate routes, paper-only transport, secret scan, and frontend build fingerprint.
+Add schema-4 family/hash and mixed-shape regressions first. Cover future sessions, quote-only one-shot stock tests, stale previews/quotes, duplicate starts, uncertain submissions, unexpected fills, protection, removal and restart/reconciliation. Retain FX candle, policy, execution, protection and recovery coverage. Run the full backend/frontend/e2e verification gate, secret scan, dependency audits, duplicate-route review and frontend build fingerprint check.
 
 ## 9. Verification commands
 
-`git diff --check`, `python -m pytest -q backend/tests/test_workspace_fx_broker_candles.py backend/tests/test_workspace_fx_policy.py backend/tests/test_workspace_fx_execution.py`, and `.\scripts\verify.ps1` with `.venv\Scripts` on `PATH`. Confirm `git rev-list --left-right --count main...origin/main` after publication.
+`git diff --check`, focused `python -m pytest` commands covering the above scenarios, `python -m pip check`, `npm.cmd --prefix frontend ci`, and `.\scripts\verify.ps1` with the verification environment on `PATH`. Require `verify: ok` without reducing audit thresholds.
 
 ## 10. Rollback plan
 
@@ -46,15 +47,15 @@ Keep the original stash and original remote tip recorded. If verification or saf
 
 ## 11. Implementation steps
 
-1. Preserve the current remote tip and create a branch at the stash base.
-2. Restore the tracked stash, inspect and stage intended untracked files, scan for secrets, and verify the original local snapshot.
-3. Merge current `main`; resolve overlaps and add focused regressions if a merge behavior changes.
-4. Run all verification, review trading safety and publication diff.
-5. Commit the verified integration, fast-forward local and remote `main`, and record exact paper testing instructions.
+1. Record this approved scope, preserving original commits and stash.
+2. Merge current `main`; add compatibility regressions and resolve schema/compiler overlaps.
+3. Integrate session authorization, paper diagnostic lifecycle, protection, removal and UI behavior through existing safety controls.
+4. Install the upstream patched dependencies and run focused and full verification.
+5. Review trading safety and compatibility, fix findings, update operator docs and commit the verified local integration.
 
 ## 12. Completion criteria
 
-GitHub `main` contains the saved work and previous upstream commits, full verification passes, no secrets or live-order path are introduced, the original stash remains recoverable, and paper-account initiation steps describe the verified commit.
+The local branch contains saved work and upstream commits; old publication hashes remain valid; every order-capable path remains paper-only, risk-gated and journaled; full verification reaches `verify: ok`; the original stash is recoverable; and GitHub `main` is unchanged.
 
 ## 13. Risks and assumptions
 
