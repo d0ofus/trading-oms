@@ -31,6 +31,14 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Create isolated verification environment
+        shell: pwsh
+        run: |
+          python -m venv .tmp/ci-venv
+          if ($LASTEXITCODE -ne 0) { throw "Creating the verification environment failed." }
+          $scriptsDirectory = if ($env:RUNNER_OS -eq 'Windows') { 'Scripts' } else { 'bin' }
+          Join-Path (Resolve-Path .tmp/ci-venv).Path $scriptsDirectory | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements-dev.txt
 

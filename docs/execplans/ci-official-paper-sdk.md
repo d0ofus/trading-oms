@@ -18,7 +18,7 @@ Integration commit `b39d590d7b5171bf0152ee610f8ee7362f7b880c` is published on `m
 
 ## 5. Proposed design
 
-Add one shared matrix step, using PowerShell Core on both hosted platforms, immediately after backend dependency installation. Invoke the existing SDK installer and check installed Python dependency consistency. Move the SDK installation before verification in both setup entry points and explain that offline adapter tests need its classes. Reuse the installer and existing adapter tests rather than introducing another download path or weakening tests.
+Create an isolated Python virtual environment on each hosted platform and add its executable directory to the subsequent steps' PATH using `GITHUB_PATH`. Add one shared matrix step, using PowerShell Core, immediately after backend dependency installation. Invoke the existing SDK installer and check installed Python dependency consistency. Move the SDK installation before verification in both setup entry points and explain that offline adapter tests need its classes. Reuse the installer and existing adapter tests rather than introducing another download path or weakening tests.
 
 ## 6. Data model changes
 
@@ -62,3 +62,9 @@ Implemented the shared CI installer step and corrected README/Windows setup orde
 The full local `./scripts/verify.ps1` rerun reached `verify: ok` at 23:57 Sydney time: 1,565 backend tests, 190 frontend unit tests and 29 browser tests passed, together with formatting, lint, types, build, secret scanning and both dependency audits. Python and npm audits reported no known vulnerabilities. The source/build fingerprint is `47cd60eea0d5da1cbde023293ddc56a0b3d49a630feb7095a58c27ba4524d1a3`; the record retains `paper_trials: false`. Switching to local main caused Git's Windows line-ending conversion and invalidated the earlier byte-level stamp; this complete rerun verifies the current checkout.
 
 Diff self-review found only the CI installation step, setup ordering/explanation and this plan. Existing tests directly cover the missing SDK dependency; no test skips, protocol changes, audit suppression or trading changes were introduced. Secret scanning and `git diff --check` passed. Publication and the complete hosted CI results remain the final checks for this slice.
+
+### Hosted environment correction, 23 October 2026 Sydney time
+
+Published the initial CI fix as `7bada8d`. Run `39782879237` installed the verified SDK successfully on both platforms. Windows then failed `pip check` because the hosted global Python includes `pipx 1.17.12`, which requires newer filelock, packaging and platformdirs than this repository's deliberately locked versions. Isolate the application dependencies in a fresh CI virtual environment, preserve the existing lockfile pins, and retain the dependency-consistency check. This is a setup correction within the approved CI fix. The local verification environment already uses the same isolation principle.
+
+Installed the complete locked development requirements alongside the official SDK in the clean local environment. `pip check` reported no broken requirements and the PATH handoff selected that environment's interpreter. Replayed all 27 original SDK-related CI failures from their exact pytest node IDs in this environment: all 27 passed. The workflow-only isolation change does not alter the covered application source/build fingerprint. Repository/secret checks and the final staged whitespace check remain required before pushing this correction; hosted matrix outcomes will be reported with the published commit.
