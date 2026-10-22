@@ -59,3 +59,9 @@ GitHub `main` contains the saved work and previous upstream commits, full verifi
 ## 13. Risks and assumptions
 
 The saved work is large and spans broker, risk, OMS, UI, tests, and migrations; historical successful verification does not prove compatibility with the newer GitHub commits. An upstream semantic conflict, secret finding, or failing verification blocks publication until resolved.
+
+### Integration checkpoint, 22 October 2026
+
+The saved files are preserved in local commit `7e6248c` on `codex/restore-paper-work`; the original stash remains intact. On their original base, formatting, lint, 1,525 backend tests, 190 frontend tests, 28 browser tests, build, and secret scan passed. The full gate stopped at the older lockfile's vulnerable `certifi 2026.6.17`; GitHub `main` has the patched dependency.
+
+Merging `main` produced 18 conflicting files. The newer session feature uses strategy schema 4 for extended stock hours, while the saved workspace uses schema 4 for crypto. Its one-shot paper test cannot publish through the saved compiler, and its old engine fixture does not represent the saved workspace's additional watchdog readiness. The merge was reset to the preserved local commit. GitHub `main` remains unchanged. Before publication, design a compatibility migration for both schema-4 document families, adapt the paper connection test and future-session authorization to the saved broker/risk/OMS architecture, then rerun the full gate and review paper-only dispatch semantics.
