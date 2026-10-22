@@ -16,13 +16,13 @@ From the repository root:
 
 ```powershell
 python -m pip install -r backend/requirements-dev.txt
+.\scripts\install-paper-sdk.ps1
 npm.cmd --prefix frontend ci
 npm.cmd --prefix frontend exec -- playwright install chromium
 .\scripts\verify.ps1
-.\scripts\install-paper-sdk.ps1
 ```
 
-The full gate builds the frontend and writes an exact source/build fingerprint only on success. Editing covered files requires another gate. The SDK installer verifies the official archive hash and applies the documented Protobuf security patch to packaging metadata; it does not log in or connect to a broker.
+Install the official SDK before verification: the offline adapter tests use its classes with isolated broker doubles. CI follows the same order on Windows and Ubuntu. The full gate builds the frontend and writes an exact source/build fingerprint only on success. Editing covered files requires another gate. The SDK installer verifies the official archive hash and applies the documented Protobuf security patch to packaging metadata; it does not log in or connect to a broker.
 
 ## 2. Prepare IB Gateway
 

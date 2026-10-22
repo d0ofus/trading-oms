@@ -34,6 +34,13 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements-dev.txt
 
+      - name: Install verified official paper SDK
+        shell: pwsh
+        run: |
+          ./scripts/install-paper-sdk.ps1
+          python -m pip check
+          if ($LASTEXITCODE -ne 0) { throw "Installed Python dependencies are inconsistent." }
+
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 

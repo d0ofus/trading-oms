@@ -14,10 +14,10 @@ Read [Windows setup and first paper test](GETTING_STARTED_WINDOWS.md), followed 
 
 ```powershell
 python -m pip install -r backend/requirements-dev.txt
+.\scripts\install-paper-sdk.ps1
 npm.cmd --prefix frontend ci
 npm.cmd --prefix frontend exec -- playwright install chromium
 .\scripts\verify.ps1
-.\scripts\install-paper-sdk.ps1
 .\scripts\paper-preflight.ps1
 .\scripts\start-workspace.ps1
 ```
