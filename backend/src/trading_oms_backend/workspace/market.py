@@ -15,7 +15,16 @@ def calendar():
     return exchange_calendars.get_calendar("XNYS", start="2000-01-01", end="2040-12-31")
 
 
-def session_bounds(timestamp: datetime):
+def session_bounds(timestamp: datetime, policy="xnys"):
+    if policy == "utc_24x7":
+        opened = timestamp.astimezone(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        return opened, opened + timedelta(days=1)
+    if policy.startswith("stock:"):
+        from .stock_sessions import StockSession
+
+        return StockSession({"stock_rules": {"calendar": policy[6:]}}).bounds(timestamp)
+    if policy != "xnys":
+        raise GraphError("Unsupported session policy.")
     from zoneinfo import ZoneInfo
 
     day = timestamp.astimezone(ZoneInfo("America/New_York")).date().isoformat()
@@ -45,6 +54,11 @@ def parse_tick(raw: dict):
     return stamp.astimezone(UTC), price, size
 
 
+def volume_sum(values):
+    values = list(values)
+    return None if any(v is None for v in values) else sum(values, Decimal(0))
+
+
 @dataclass
 class Candle:
     start: datetime
@@ -52,18 +66,23 @@ class Candle:
     high: Decimal
     low: Decimal
     close: Decimal
-    volume: Decimal
+    volume: Decimal | None
 
     def update(self, price, size):
         self.high = max(self.high, price)
         self.low = min(self.low, price)
         self.close = price
-        self.volume += size
+        self.volume = volume_sum([self.volume, size])
 
 
 class Market:
     def __init__(self, graph: Compiled):
         self.graph = graph
+        self.session_policy = (
+            "utc_24x7"
+            if graph.document["settings"].get("instrument_profile") == "paxos_crypto"
+            else "xnys"
+        )
         self.current: Candle | None = None
         self.closed: list[Candle] = []
         self.previous_time: datetime | None = None
@@ -90,6 +109,30 @@ class Market:
             if n["kind"] == "field" and n["params"]["field"] == "ema"
         }
 
+    def session_bounds(self, stamp):
+        return session_bounds(stamp, self.session_policy)
+
+    def volume_value(self, value):
+        return number(value)
+
+    def elapsed_seconds(self, stamp, opened):
+        return int((stamp - opened).total_seconds())
+
+    def tradable(self, stamp):
+        bounds = self.session_bounds(stamp)
+        return bool(bounds and bounds[0] <= stamp < bounds[1])
+
+    def expected_minutes(self, stamp, until=None):
+        bounds = self.session_bounds(stamp)
+        return (
+            set(range(max(0, int(((until or bounds[1]) - bounds[0]).total_seconds() // 60))))
+            if bounds
+            else set()
+        )
+
+    def history_day(self, day):
+        return datetime.fromisoformat(day + "T16:00:00+00:00")
+
     def _finish_candle(self, candle):
         self.closed_until = candle.start + timedelta(
             seconds=self.graph.document["settings"]["timeframe"]
@@ -109,7 +152,7 @@ class Market:
     def seed(self, minute_bars: list[dict], fine_bars: list[dict], stamp: datetime):
         """Warm indicators without evaluating signals or inventing historical ticks."""
         timeframe = self.graph.document["settings"]["timeframe"]
-        bounds = session_bounds(stamp)
+        bounds = self.session_bounds(stamp)
         if not bounds:
             return
         opened, _ = bounds
@@ -118,30 +161,31 @@ class Market:
         by_day: dict[str, dict[int, dict]] = {}
         for bar in minute_bars:
             time = datetime.fromtimestamp(int(bar["timestamp"]), UTC)
-            window = session_bounds(time)
-            if window and window[0] <= time < window[1] and time + timedelta(minutes=1) <= stamp:
+            window = self.session_bounds(time)
+            if window and self.tradable(time) and time + timedelta(minutes=1) <= stamp:
                 by_day.setdefault(window[0].date().isoformat(), {})[
-                    int((time - window[0]).total_seconds() // 60)
+                    self.elapsed_seconds(time, window[0]) // 60
                 ] = bar
         self.history_volumes = []
         for day, items in sorted(by_day.items()):
             if day >= opened.date().isoformat():
                 continue
-            window = session_bounds(datetime.fromisoformat(day + "T16:00:00+00:00"))
-            expected = int((window[1] - window[0]).total_seconds() // 60)
-            if set(items) != set(range(expected)):
+            expected = self.expected_minutes(self.history_day(day))
+            if set(items) != expected:
+                continue
+            if any(self.volume_value(bar.get("volume")) is None for bar in items.values()):
                 continue
             total, cumulative = Decimal(0), {}
             for minute, bar in sorted(items.items()):
                 cumulative[minute] = total
-                total += number(bar["volume"])
+                total += self.volume_value(bar["volume"])
             self.history_volumes.append(cumulative)
         self.history_volumes = self.history_volumes[-10:]
         today = by_day.get(opened.date().isoformat(), {})
-        elapsed = max(0, int((stamp - opened).total_seconds() // 60))
+        elapsed = max(0, self.elapsed_seconds(stamp, opened) // 60)
         self.day = opened.date()
-        self.day_complete = set(today) == set(range(elapsed))
-        self.volume = sum((number(b["volume"]) for b in today.values()), Decimal(0))
+        self.day_complete = set(today) == self.expected_minutes(stamp, stamp)
+        self.volume = volume_sum(self.volume_value(b.get("volume")) for b in today.values())
         self.low = min((number(b["low"]) for b in today.values()), default=None)
         opening = [b for i, b in today.items() if i < 5]
         self.range_high = max((number(b["high"]) for b in opening), default=None)
@@ -156,14 +200,14 @@ class Market:
         accumulated = Decimal(0)
         for minute, bar in sorted(today.items()):
             self.minute_volumes[minute] = accumulated
-            accumulated += number(bar["volume"])
+            accumulated = volume_sum([accumulated, self.volume_value(bar.get("volume"))])
         grouped: dict[datetime, Candle] = {}
         for bar in sorted(
             fine_bars if timeframe == 5 else minute_bars, key=lambda b: int(b["timestamp"])
         ):
             time = datetime.fromtimestamp(int(bar["timestamp"]), UTC)
-            window = session_bounds(time)
-            if not window or not window[0] <= time < window[1]:
+            window = self.session_bounds(time)
+            if not window or not self.tradable(time):
                 continue
             start = window[0] + timedelta(
                 seconds=int((time - window[0]).total_seconds()) // timeframe * timeframe
@@ -179,7 +223,7 @@ class Market:
                     number(bar["high"]),
                     number(bar["low"]),
                     number(bar["close"]),
-                    number(bar["volume"]),
+                    self.volume_value(bar.get("volume")),
                 )
             else:
                 candle = grouped[start]
@@ -189,7 +233,7 @@ class Market:
                 )
                 candle.close, candle.volume = (
                     number(bar["close"]),
-                    candle.volume + number(bar["volume"]),
+                    volume_sum([candle.volume, self.volume_value(bar.get("volume"))]),
                 )
         self.closed = []
         self.current = None
@@ -207,11 +251,11 @@ class Market:
             raise GraphError("Out-of-order observations require data recovery.")
         if self.closed_until is not None and stamp < self.closed_until:
             raise GraphError("A late trade belongs to an already completed candle. Repair history.")
-        bounds = session_bounds(stamp)
+        bounds = self.session_bounds(stamp)
         if not bounds or not bounds[0] <= stamp < bounds[1]:
             return None
         opened, closed = bounds
-        seconds = int((stamp - opened).total_seconds())
+        seconds = self.elapsed_seconds(stamp, opened)
         new_day = opened.date() != self.day
         if new_day:
             if self.day_complete and self.minute_volumes:
@@ -232,7 +276,7 @@ class Market:
             self.minute_volumes[minute] = self.volume
             self.last_minute = minute
         if self.session_seed_until is None or stamp >= self.session_seed_until:
-            self.volume += size
+            self.volume = volume_sum([self.volume, size])
             self.low = price if self.low is None else min(price, self.low)
             if seconds < 300:
                 self.range_high = price if self.range_high is None else max(price, self.range_high)
@@ -242,7 +286,9 @@ class Market:
                     window[0] = price if window[0] is None else max(price, window[0])
                     window[1] = price if window[1] is None else min(price, window[1])
         timeframe = self.graph.document["settings"]["timeframe"]
-        start = opened + timedelta(seconds=seconds // timeframe * timeframe)
+        start = opened + timedelta(
+            seconds=int((stamp - opened).total_seconds()) // timeframe * timeframe
+        )
         transitioned = self.current is not None and self.current.start != start
         if transitioned:
             self._finish_candle(self.current)
@@ -265,20 +311,24 @@ class Market:
         return self.context(end, True)
 
     def context(self, stamp, transitioned=False):
-        bounds = session_bounds(stamp)
+        bounds = self.session_bounds(stamp)
         if not bounds:
             return None
         opened, closed = bounds
-        seconds = int((stamp - opened).total_seconds())
+        seconds = self.elapsed_seconds(stamp, opened)
         minute = seconds // 60
         timeframe = self.graph.document["settings"]["timeframe"]
-        start = opened + timedelta(seconds=seconds // timeframe * timeframe)
+        start = opened + timedelta(
+            seconds=int((stamp - opened).total_seconds()) // timeframe * timeframe
+        )
         history = self.history_volumes
         relative = None
         if self.day_complete and len(history) == 10 and all(minute in h for h in history):
             average = sum(h[minute] for h in history) / 10
             relative = (
-                self.minute_volumes.get(minute, self.volume) / average if average > 0 else None
+                self.minute_volumes.get(minute, self.volume) / average
+                if average > 0 and self.minute_volumes.get(minute, self.volume) is not None
+                else None
             )
         context = {
             "last": self.last_price,
@@ -344,6 +394,23 @@ class Market:
 
 
 def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
+    if graph.document["schema_version"] == 9:
+        raise GraphError(
+            "FX requires its published timestamped Midpoint/Bid/Ask source. "
+            "The trade-tick replay format cannot represent this execution policy; "
+            "prepare the published FX definition in the paper workspace."
+        )
+    if any(n["kind"] in {"paired_stop", "long_breakout"} for n in graph.ordered):
+        raise GraphError(
+            "Paired-stop templates run in the paper or live-data local simulation workspace. "
+            "Recorded-tick replay currently supports the existing single-entry templates."
+        )
+    if graph.document["schema_version"] in {6, 7, 8} and "shares" not in graph.document["settings"]:
+        from .reusable import bind_graph
+
+        graph = bind_graph(
+            graph.document, {"contract": {"symbol": "REPLAY"}, "sizing": {"shares": 1}}
+        )
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
@@ -360,16 +427,18 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
     state = {"graph": graph, "previous": {}, "entry": False, "seeded": False, "last_bar": None}
     settings = graph.document["settings"]
     profile = {"shares": 10, "planned_stop_risk": "10", "notional": "1000"}
+    if graph.document["schema_version"] == 8:
+        profile = {"risk_policy": "paper_stock_v2", "notional": None, "planned_stop_risk": None}
     oms = ReplayOMS(directory, graph, ticks)
     trades, signals = [], []
     position = pending = None
     entry_count = 0
     current_day = previous_stamp = None
-    realized = daily_realized = Decimal(0)
+    realized = Decimal(0)
     target_required = any(n["kind"] == "target" for n in graph.ordered)
     for sequence, raw in enumerate(ticks):
         stamp, price, size = parse_tick(raw)
-        bounds = session_bounds(stamp)
+        bounds = market.session_bounds(stamp)
         if (
             previous_stamp
             and bounds
@@ -385,7 +454,7 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
         if current is None:
             continue
         if market.day != current_day:
-            entry_count, current_day, daily_realized = 0, market.day, Decimal(0)
+            entry_count, current_day = 0, market.day
         if pending:
             if (stamp - pending["at"]).total_seconds() > settings["entry_timeout"] or current[
                 "minutes_to_close"
@@ -416,16 +485,17 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
             )
             if reason:
                 oms.fill(position, price, exit=True)
-                pnl = (price - position["entry"]) * position["quantity"]
+                pnl = (price - position["entry"]) * number(position["quantity"])
                 realized += pnl
-                daily_realized += pnl
                 trades.append(
                     {
                         "entered_at": position["entered_at"],
                         "exited_at": stamp.isoformat(),
                         "entry": str(position["entry"]),
                         "exit": str(price),
-                        "quantity": position["quantity"],
+                        "quantity": str(position["quantity"])
+                        if graph.document["schema_version"] == 4
+                        else position["quantity"],
                         "pnl": str(pnl),
                         "reason": reason,
                     }
@@ -438,7 +508,6 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
                 and not pending
                 and context["minutes_to_close"] > 15
                 and entry_count < settings["max_entries"]
-                and daily_realized > -100
             ):
                 continue
             limit = (price * Decimal("1.001")).quantize(Decimal("0.01"))
@@ -446,7 +515,14 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
             if target_required and target is None or target is not None and target <= limit:
                 continue
             try:
-                quantity = size_entry(settings, profile, limit, stop, Decimal(5000))
+                quantity = size_entry(
+                    settings,
+                    profile,
+                    limit,
+                    stop,
+                    Decimal(5000),
+                    {"size_increment": "0.00000001", "min_size": "0.00000001"},
+                )
             except Conflict:
                 continue
             intent = {"quantity": quantity, "limit": limit, "stop": stop, "target": target}
@@ -456,7 +532,9 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
                 {
                     "sequence": sequence,
                     "timestamp": stamp.isoformat(),
-                    "quantity": quantity,
+                    "quantity": str(quantity)
+                    if graph.document["schema_version"] == 4
+                    else quantity,
                     "limit": str(limit),
                     "stop": str(stop),
                 }
@@ -472,7 +550,9 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
         "trades": trades,
         "realized_pnl": str(realized),
         "open_position": {
-            "quantity": position["quantity"],
+            "quantity": str(position["quantity"])
+            if graph.document["schema_version"] == 4
+            else position["quantity"],
             "entry": str(position["entry"]),
             "stop": str(position["stop"]),
         }
@@ -480,6 +560,14 @@ def replay(graph: Compiled, ticks: list[dict], directory=None) -> dict:
         else None,
         "working_entry": pending is not None,
         "limitations": [
+            *(
+                [
+                    "Unbound stock replay uses a synthetic USD, one-share US session fixture; "
+                    "it does not qualify a selected exchange contract."
+                ]
+                if graph.document["schema_version"] in (7, 8)
+                else []
+            ),
             "Simulated fills use the next eligible trade; fees and liquidity are not modeled.",
             "Open positions at dataset end remain open; no fill is invented.",
             "Quotes use a fixed simulated spread. "

@@ -2,9 +2,206 @@ import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 import AxeBuilder from "@axe-core/playwright";
 
+test("crypto workspace identifies local fills, fractional settings and history separately", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("http://127.0.0.1:8014/desk");
+  await expect(
+    page.getByText(".\\scripts\\start-crypto-sim.ps1", { exact: true }),
+  ).toBeVisible();
+  await page.goto("about:blank");
+  await page.goto(
+    "http://127.0.0.1:8014/desk#pair=synthetic-crypto-browser-pairing-only",
+  );
+  await expect(
+    page.getByText("Simulation — live Paxos data — local fills", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("$59,999.75", { exact: true })).toBeVisible();
+  await expect(page.getByText("$60,000.25", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("History downloaded", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/10\/10 complete reference sessions/),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/crypto-desk.png",
+    fullPage: true,
+  });
+  await page.getByRole("link", { name: "Strategy Studio" }).click();
+  await page.getByRole("button", { name: /Moving average crossover/ }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Crypto symbol", exact: true }),
+  ).toHaveValue("BTC");
+  await page.getByLabel("Fixed-quantity ceiling").fill("0.0001");
+  await expect(page.locator(".ws-save-state")).toContainText("Saved");
+  await page.getByRole("button", { name: "Review & publish" }).click();
+  await page
+    .getByRole("button", { name: "Publish version", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page.getByText("Daily loss stop", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByText("Daily P/L is informational and never blocks entries."),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No broker orders", { exact: true }),
+  ).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze())
+      .violations,
+  ).toEqual([]);
+  expect(errors).toEqual([]);
+  const fixture = async (step: string) => {
+    const response = await page.request.post(
+      `http://127.0.0.1:8014/fixture/oca/${step}`,
+      { headers: { Origin: "http://127.0.0.1:8014" } },
+    );
+    expect(response.ok(), await response.text()).toBeTruthy();
+  };
+  await fixture("ready");
+  await page.getByRole("link", { name: "Strategy Studio" }).click();
+  await page.getByRole("button", { name: /Previous 1-minute candle/ }).click();
+  await expect(page.getByLabel("Strategy name")).toHaveValue(
+    "Previous 1-minute candle — OCA breakout",
+  );
+  await page.getByLabel("Strategy name").fill("Weekend OCA test");
+  await expect(page.getByLabel("Candle interval")).toBeDisabled();
+  await expect(
+    page.getByText(/Shorts are hypothetical local positions/),
+  ).toBeVisible();
+  await expect(page.locator(".ws-save-state")).toContainText("Saved");
+  await page.getByRole("button", { name: "Review & publish" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Fixed 1% protection");
+  await page
+    .getByRole("button", { name: "Publish version", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Review & publish" }).click();
+  await page.getByRole("button", { name: "Prepare published v1" }).click();
+  await page.getByLabel("Resolved instrument").selectOption("1");
+  await page.getByRole("button", { name: "Prepare bound run" }).click();
+  await expect(page.getByRole("dialog")).toContainText("authorization");
+  await fixture("warm");
+  await expect(page.getByLabel("Paired entry review")).toContainText(
+    "Combined pending reservation",
+  );
+  await expect(page.getByLabel("Paired entry review")).toContainText(
+    "Short sell stop-market",
+  );
+  const armResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/runs/arm") &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Arm selected simulation session" })
+    .click();
+  expect((await armResponse).ok()).toBeTruthy();
+  await page.getByRole("link", { name: "Trading Desk", exact: true }).click();
+  await fixture("minute");
+  await expect(page.getByLabel("OCA group status")).toContainText(
+    "Awaiting direction",
+  );
+  await fixture("short");
+  await expect(
+    page.getByRole("button", { name: "Buy to cover", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Protection verified", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "test-results/oca-short-protected.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Buy to cover", exact: true }).click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Buy to cover an owned short position",
+  );
+  const closeResponse = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/close") &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Request close of owned position" })
+    .click();
+  expect((await closeResponse).ok()).toBeTruthy();
+  await fixture("exit");
+  await expect(
+    page.getByText("No owned positions", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("OCA group status")).toContainText("Complete");
+  await expect(page.getByText(/One OCA trade completed/)).toBeVisible();
+  await fixture("warm");
+  await page
+    .getByRole("checkbox", { name: "Select Weekend OCA test BTC" })
+    .check();
+  await page.getByRole("button", { name: /Review & arm/ }).click();
+  const secondArm = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/runs/arm") &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Arm selected simulation session" })
+    .click();
+  expect((await secondArm).ok()).toBeTruthy();
+  await fixture("minute");
+  await fixture("long");
+  await expect(
+    page.getByRole("button", { name: "Close owned position", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Protection verified", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Close owned position", exact: true })
+    .click();
+  const longClose = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/close") &&
+      response.request().method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Request close of owned position" })
+    .click();
+  expect((await longClose).ok()).toBeTruthy();
+  await fixture("exit");
+  await expect(
+    page.getByText("No owned positions", { exact: true }),
+  ).toBeVisible();
+  expect(
+    (await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze())
+      .violations,
+  ).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test("configure, recover, publish, replay and inspect blocked arming", async ({
   page,
 }) => {
+  // Exercise the existing schema-6 workflow and visual baselines. The schema-7
+  // catalog/binding is covered separately by zzz-stock-strategies.spec.ts.
+  await page.route(
+    "**/api/strategies/catalog?schema_version=8",
+    async (route) => {
+      const response = await route.fetch({
+        url: route
+          .request()
+          .url()
+          .replace("schema_version=8", "schema_version=6"),
+      });
+      await route.fulfill({ response });
+    },
+  );
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   async function visual(name: string) {
@@ -127,14 +324,12 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
   await expect(
     page.getByText("Synthetic exercise", { exact: false }).first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Prepare paper run" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Trading Desk", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("checkbox", { name: "Select Morning crossover AAPL" })
-    .check();
-  await page.getByRole("button", { name: /Review & arm/ }).click();
+  await page.getByRole("button", { name: "Prepare a run" }).click();
+  await page.getByLabel("Resolved instrument").selectOption("100");
+  await page.getByRole("button", { name: "Prepare bound run" }).click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Review paper-session authorization",
+  );
   await expect(
     page.getByRole("button", { name: "Arm selected paper session" }),
   ).toBeDisabled();
@@ -150,6 +345,7 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
       .violations,
   ).toEqual([]);
   await page.getByRole("button", { name: "Back to desk" }).click();
+  await page.getByRole("link", { name: "Trading Desk", exact: true }).click();
   await page
     .getByRole("button", { name: "Emergency stop", exact: true })
     .click();
@@ -191,7 +387,7 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
   ]) {
     await page.setViewportSize(viewport);
     await expect(
-      page.locator(".ws-topbar").getByText("Paper", { exact: true }),
+      page.locator(".ws-topbar").getByText("IBKR Paper", { exact: true }),
     ).toBeVisible();
     await page.getByRole("link", { name: "Strategy Studio" }).click();
     await expect(
@@ -244,11 +440,25 @@ test("configure, recover, publish, replay and inspect blocked arming", async ({
     "My retained edits recovered",
   );
   await page.getByRole("link", { name: "Trading Desk", exact: true }).click();
-  await page.route("**/api/paper/session", (route) => route.abort());
+  await page.route("**/api/workspace/overview", (route) => route.abort());
   await expect(page.getByText(/Last known values are retained/)).toBeVisible();
   await expect(
     page.getByText("Morning crossover", { exact: true }).first(),
   ).toBeVisible();
-  await page.unroute("**/api/paper/session");
+  await page.unroute("**/api/workspace/overview");
+  expect(errors).toEqual([]);
+  await page.getByRole("link", { name: "Strategy Studio" }).click();
+  await page.getByRole("button", { name: /Previous 1-minute candle/ }).click();
+  await expect(page.getByLabel("Stock or ETF symbol")).toHaveCount(0);
+  await expect(page.getByLabel("Candle interval")).toBeDisabled();
+  await expect(page.locator(".ws-save-state")).toContainText("Saved");
+  await page.getByRole("button", { name: "Review & publish" }).click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "short sell stop-market",
+  );
+  await page
+    .getByRole("button", { name: "Publish version", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

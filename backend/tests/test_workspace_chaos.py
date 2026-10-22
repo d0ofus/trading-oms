@@ -80,6 +80,7 @@ def test_tick_after_data_gap_never_evaluates_a_retrospective_entry(tmp_path):
         "history_loaded": True,
         "received_at": (datetime.now(UTC) - timedelta(seconds=30)).isoformat(),
     }
+    engine._data_gap(1, "Confirmed subscription interruption requires repair.")
     engine._tick(
         {
             "type": "tick",

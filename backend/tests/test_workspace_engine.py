@@ -121,7 +121,10 @@ def test_five_distinct_signals_use_shared_oms_capacity_and_never_duplicate(tmp_p
 
     store = Store(tmp_path)
     engine = Engine(store, ExecutionBroker)
-    engine.readiness = lambda: [{"passed": True}]
+    from test_workspace_health import healthy_watchdog
+
+    healthy_watchdog(engine)
+    engine.readiness = lambda *args: [{"passed": True}]
     engine.facts = {"AvailableFunds": "10000"}
     engine.daily_pnl, engine.pnl_at = Decimal(0), time.monotonic()
     graph = templates()[1]["document"]
@@ -141,7 +144,7 @@ def test_five_distinct_signals_use_shared_oms_capacity_and_never_duplicate(tmp_p
             "expires_at": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
         }
         store.put("run", run["id"], run)
-        engine.data[i + 1] = {"warm": True, "live": True}
+        engine.data[i + 1] = {"warm": True, "live": True, "received_at": now(), "source_at": now()}
         engine.contracts[i + 1] = {"market_rule": 1}
         engine.quotes[i + 1] = {
             side: {"price": "100", "received_at": now()} for side in ["bid", "ask"]

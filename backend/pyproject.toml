@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Local strategy workspace and durable paper-only trading operations service."
 requires-python = ">=3.12"
 dependencies = [
+  "defusedxml==0.7.1",
   "fastapi==0.139.0",
   "exchange-calendars==4.13.2",
   "tzdata==2026.4",

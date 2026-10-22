@@ -3,9 +3,11 @@
 import json
 import time
 import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from .graph import number
+from .oca import is_pair
 from .store import now
 
 TERMINAL = {"Filled", "Cancelled", "ApiCancelled", "Rejected"}
@@ -14,7 +16,13 @@ ACTIVE = {"Submitted", "PreSubmitted"}
 
 def order_ids(order):
     base, payload = order["broker_id"], order["payload"]
-    if payload.get("purpose", "entry") != "entry":
+    if payload.get("execution") == "oca_breakout":
+        return set(payload["leg_ids"].values())
+    if (
+        payload.get("execution") in {"crypto_breakout", "fx_breakout"}
+        or (payload.get("stock_plan") and payload.get("protection_type") == "locally_monitored")
+        or payload.get("purpose", "entry") != "entry"
+    ):
         return {base}
     return {base, base + 2} | ({base + 1} if payload.get("target") else set())
 
@@ -93,6 +101,8 @@ class ProtectionController:
                 filled = observation.get("filled")
                 if (
                     filled is None
+                    and not is_pair(order["payload"])
+                    and order["payload"].get("execution") != "crypto_breakout"
                     and broker_id == order["broker_id"]
                     and order["state"] == "filled"
                     and order["payload"].get("purpose", "entry") == "entry"
@@ -103,7 +113,25 @@ class ProtectionController:
         return issues
 
     def _valid_protection(self, position, entry):
-        candidates = [(entry["broker_id"] + 2, entry, entry["state"] == "filled")]
+        if entry["payload"].get("execution") == "fx_breakout":
+            return self._fx_valid_protection(position, entry)
+        stock_plan = (
+            self.store.get("stock_protection", position["run_id"])
+            if entry["payload"].get("stock_plan")
+            else None
+        )
+        if stock_plan and stock_plan["type"] == "locally_monitored":
+            return self._stock_valid_local(position)
+        if entry["payload"].get("execution") == "crypto_breakout":
+            return self._crypto_valid_protection(position)
+        if is_pair(entry["payload"]):
+            return self._oca_valid_protection(position, entry)
+        activated = entry["state"] == "filled" or bool(
+            entry["payload"].get("stock_plan")
+            and entry["state"] in {"cancelled", "rejected"}
+            and position["quantity"] > 0
+        )
+        candidates = [(entry["broker_id"] + 2, entry, activated)]
         for order in self.store.orders():
             if (
                 order["payload"].get("purpose") == "protection"
@@ -126,17 +154,40 @@ class ProtectionController:
                 and p.get("tif") == "GTC"
                 and p.get("oca_type") == 2
                 and p.get("oca_group") == "oms-" + entry["id"]
-                and number(p.get("stop", 0)) == number(entry["payload"]["stop"])
+                and number(p.get("stop", 0))
+                == number(stock_plan["stop"] if stock_plan else entry["payload"]["stop"])
             ):
                 return True
         return False
 
     def _repair_protection(self, position, entry):
+        if entry["payload"].get("execution") == "fx_breakout":
+            self._fx_sync(self.store.get("run", position["run_id"]))
+            return
+        if (
+            entry["payload"].get("stock_plan")
+            and entry["payload"].get("protection_type") == "locally_monitored"
+        ):
+            return
+        if entry["payload"].get("execution") == "stock_breakout" and self._stock_amend(
+            position, entry
+        ):
+            return
+        if entry["payload"].get("execution") == "crypto_breakout":
+            return  # Local plans recover from confirmed fills; never submit a native crypto stop.
+        if is_pair(entry["payload"]):
+            group = self.store.get("oca_group", entry["id"])
+            self._oca_update_protection(position, entry, group)
+            return
         if not self.position_agreement or not self.connected or not self.attested:
             return
         if (
-            position["quantity"] != position["quantity"].to_integral_value()
-            or not 0 < position["quantity"] <= 10
+            not entry["payload"].get("stock_plan")
+            and not getattr(getattr(self, "environment", None), "crypto", False)
+            and position["quantity"] != position["quantity"].to_integral_value()
+        ) or not (
+            0 < position["quantity"]
+            and (entry["payload"].get("stock_plan") or position["quantity"] <= 10)
         ):
             return
         if entry["state"] in {"working", "dispatching"}:
@@ -172,9 +223,16 @@ class ProtectionController:
             "entry_id": entry["id"],
             "conid": position["conid"],
             "symbol": position["symbol"],
-            "quantity": int(position["quantity"]),
+            "quantity": str(position["quantity"])
+            if entry["payload"].get("stock_plan")
+            or getattr(getattr(self, "environment", None), "crypto", False)
+            else int(position["quantity"]),
             "stop": entry["payload"]["stop"],
         }
+        if entry["payload"].get("stock_plan"):
+            payload["stock_plan"] = entry["payload"]["stock_plan"]
+            planned = self.store.get("stock_protection", position["run_id"]) or {}
+            payload["stop"] = planned.get("stop", payload["stop"])
         self.store.event(
             "protection.repair.risk_checked",
             {
@@ -201,13 +259,13 @@ class ProtectionController:
                 "protection_uncertain",
                 "Protection dispatch is uncertain. Inspect Gateway; do not resend.",
             )
-        self.reconciled = False
+        self.invalidate_reconciliation()
         self.next_reconcile = time.monotonic() + 1
 
     def _cancel_known_sell(self, broker_id):
         self._queue_cancel(broker_id, "protection_or_exit")
 
-    def _queue_cancel(self, broker_id, purpose):
+    def _queue_cancel(self, broker_id, purpose, reason=None):
         pending = self.store.get("cancel_request", str(broker_id))
         if pending:
             return
@@ -216,9 +274,11 @@ class ProtectionController:
         self.store.put(
             "cancel_request",
             str(broker_id),
-            {"broker_id": broker_id, "timestamp": now(), "state": "queued"},
+            {"broker_id": broker_id, "timestamp": now(), "state": "queued", "reason": reason},
         )
-        self.store.event("order.cancel.requested", {"broker_id": broker_id, "purpose": purpose})
+        self.store.event(
+            "order.cancel.requested", {"broker_id": broker_id, "purpose": purpose, "reason": reason}
+        )
         self._flush_cancellations()
 
     def _flush_cancellations(self):
@@ -241,6 +301,10 @@ class ProtectionController:
 
     def _identity_issues(self):
         issues = []
+        if any(o.get("status_conflict") for o in self.store.list("broker_order")):
+            issues.append(
+                "Conflicting broker order status awaits a fresh completed-order snapshot."
+            )
         orders = self.store.orders()
         known = {i for order in orders for i in order_ids(order)}
         for key, observed in self.broker_orders.items():
@@ -250,6 +314,15 @@ class ProtectionController:
                 continue
             intent = next(o for o in orders if key in order_ids(o))
             payload = intent["payload"]
+            if payload.get("execution") == "fx_breakout":
+                issues.extend(self._fx_identity(intent, observed))
+                continue
+            if payload.get("execution") == "crypto_breakout":
+                issues.extend(self._crypto_identity_issues(intent, observed))
+                continue
+            if is_pair(payload):
+                issues.extend(self._oca_identity_issues(intent, key, observed))
+                continue
             if observed.get("order_type") is None:
                 issues.append("Order details are incomplete.")
                 continue
@@ -264,33 +337,70 @@ class ProtectionController:
                 valid = valid and prior["permanent_id"] == observed["permanent_id"]
             if key == intent["broker_id"]:
                 purpose = payload.get("purpose", "entry")
-                expected_type = "STP" if purpose == "protection" else "LMT"
-                expected_action = "BUY" if purpose == "entry" else "SELL"
+                expected_type = (
+                    "STP"
+                    if purpose == "protection"
+                    else payload.get("exit_type", payload.get("entry_type", "LMT"))
+                )
+                expected_action = "BUY" if purpose == "entry" else payload.get("action", "SELL")
                 valid = (
                     valid
                     and observed.get("order_type") == expected_type
                     and observed.get("action") == expected_action
                 )
-                valid = (
-                    valid
-                    and Decimal(0) < number(observed.get("quantity", 0)) <= payload["quantity"]
+                valid = valid and Decimal(0) < number(observed.get("quantity", 0)) <= number(
+                    payload["quantity"]
                 )
                 price = "stop" if purpose == "protection" else "limit"
-                valid = valid and number(observed.get(price) or 0) == number(payload[price])
+                prices = {number(payload[price])}
+                if payload.get("pair_recovery") and purpose == "protection":
+                    amendment = self.store.get("oca_amendment", payload["entry_id"]) or {}
+                    if amendment.get("broker_id") == key:
+                        prices.add(number(amendment["stop"]))
+                        if amendment.get("previous_stop"):
+                            prices.add(number(amendment["previous_stop"]))
+                valid = valid and (
+                    expected_type == "MKT" or number(observed.get(price) or 0) in prices
+                )
                 if purpose == "entry":
                     valid = (
                         valid
-                        and number(observed.get("quantity", 0)) == payload["quantity"]
-                        and observed.get("tif") == "GTD"
+                        and number(observed.get("quantity", 0)) == number(payload["quantity"])
+                        and observed.get("tif") == ("DAY" if expected_type == "MKT" else "GTD")
                         and observed.get("parent_id", 0) == 0
+                    )
+                if payload.get("stock_plan", {}).get("session_mode") == "premarket_regular":
+                    from .premarket import broker_deadline
+
+                    deadline = broker_deadline(observed.get("good_till_date"))
+                    valid = (
+                        valid
+                        and observed.get("outside_rth") is True
+                        and deadline is not None
+                        and deadline
+                        == datetime.fromisoformat(payload["expires_at"]).replace(microsecond=0)
                     )
                 if purpose != "entry":
                     valid = (
                         valid
                         and observed.get("parent_id", 0) == 0
-                        and observed.get("oca_type") == 2
-                        and observed.get("oca_group") == "oms-" + payload["entry_id"]
-                        and observed.get("tif") == ("GTC" if purpose == "protection" else "DAY")
+                        and (
+                            observed.get("oca_type", 0) == 0 and not observed.get("oca_group")
+                            if payload.get("stock_plan")
+                            and payload.get("protection_type") == "locally_monitored"
+                            else observed.get("oca_type") == 2
+                            and observed.get("oca_group")
+                            == "oms-" + payload.get("exit_group", payload["entry_id"])
+                        )
+                        and observed.get("tif")
+                        == (
+                            "GTC"
+                            if purpose == "protection"
+                            else "GTD"
+                            if payload.get("stock_plan", {}).get("session_mode")
+                            == "premarket_regular"
+                            else "DAY"
+                        )
                     )
             else:
                 stop = key == intent["broker_id"] + 2
@@ -302,9 +412,15 @@ class ProtectionController:
                     and observed.get("tif") == "GTC"
                     and observed.get("oca_type") == 2
                     and observed.get("oca_group") == "oms-" + intent["id"]
-                    and Decimal(0) < number(observed.get("quantity", 0)) <= payload["quantity"]
+                    and Decimal(0)
+                    < number(observed.get("quantity", 0))
+                    <= number(payload["quantity"])
                     and number(observed.get("stop" if stop else "limit") or 0)
-                    == number(payload["stop" if stop else "target"])
+                    in (
+                        self._stock_expected_prices(intent, stop)
+                        if payload.get("stock_plan")
+                        else {number(payload["stop" if stop else "target"])}
+                    )
                 )
             if not valid:
                 issues.append("Broker order identity or payload differs from the durable intent.")

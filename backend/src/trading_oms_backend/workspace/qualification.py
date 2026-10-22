@@ -14,7 +14,6 @@ DEFAULTS = [
         "runs": 1,
         "planned_stop_risk": "10",
         "notional": "1000",
-        "daily_loss": "100",
         "entry_timeout": 30,
     },
     {
@@ -25,30 +24,61 @@ DEFAULTS = [
         "runs": 5,
         "planned_stop_risk": "10",
         "notional": "1000",
-        "daily_loss": "100",
         "entry_timeout": 30,
     },
 ]
 
 
-def profiles(store):
-    for profile in DEFAULTS:
+def profiles(store, simulation=False):
+    defaults = [dict(p) for p in DEFAULTS]
+    if simulation:
+        for profile in defaults:
+            profile.pop("shares")
+            profile.update(
+                quantity="10",
+                runs=2,
+                name="Supervised crypto simulation"
+                if profile["id"] == "smoke"
+                else "Crypto simulation limits",
+            )
+    for profile in defaults:
         if store.get("risk_profile", profile["id"] + ":1") is None:
             store.put("risk_profile", profile["id"] + ":1", profile)
+    # Publish a successor once, never rewrite an immutable historical profile.
+    with store.transaction() as db:
+        existing = store.list("risk_profile")
+        for identity in {p["id"] for p in existing}:
+            latest = max((p for p in existing if p["id"] == identity), key=lambda p: p["version"])
+            if "daily_loss" in latest:
+                replacement = {k: v for k, v in latest.items() if k != "daily_loss"}
+                replacement["version"] += 1
+                store.write(db, "risk_profile", f"{identity}:{replacement['version']}", replacement)
+                store.append(
+                    db,
+                    "risk_profile.daily_loss_retired",
+                    {
+                        "id": identity,
+                        "previous_version": latest["version"],
+                        "version": replacement["version"],
+                    },
+                )
     return store.list("risk_profile")
 
 
-def save_profile(store, profile):
+def save_profile(store, profile, simulation=False):
     limits = {
         "shares": 10,
         "runs": 5,
         "planned_stop_risk": 10,
         "notional": 1000,
-        "daily_loss": 100,
         "entry_timeout": 30,
     }
+    if simulation:
+        limits.pop("shares")
+        limits["quantity"] = 10
+        limits["runs"] = 2
     if (
-        not set(profile) <= {"id", "name", *limits}
+        not set(profile) <= {"id", "name", "stock_units", *limits}
         or not isinstance(profile.get("name"), str)
         or not profile["name"].strip()
         or len(profile["name"]) > 100
@@ -63,18 +93,28 @@ def save_profile(store, profile):
         in {
             "smoke",
             "qualified",
+            "stock_smoke",
+            "stock_qualified",
         }
     ):
         raise ValueError("Choose a new custom profile identity.")
+    if "stock_units" in profile and (
+        simulation
+        or type(profile["stock_units"]) is not int
+        or not 1 <= profile["stock_units"] <= 1000
+    ):
+        raise ValueError(
+            "Use one to 1000 legal lots; USD risk and qualification ceilings remain enforced."
+        )
     for field, ceiling in limits.items():
         if not 0 < number(profile.get(field, 0)) <= ceiling:
             raise ValueError(
                 f"{field.replace('_', ' ').title()} must be positive and at most {ceiling}."
             )
-    for field in ("shares", "runs", "entry_timeout"):
+    for field in ("runs", "entry_timeout") if simulation else ("shares", "runs", "entry_timeout"):
         if type(profile[field]) is not int:
             raise ValueError("Share, run and timeout limits require whole numbers.")
-    profiles(store)
+    profiles(store, simulation=simulation)
     with store.transaction() as db:
         current = [p for p in store.list("risk_profile") if p["id"] == profile["id"]]
         record = {**profile, "version": max((p["version"] for p in current), default=0) + 1}
@@ -113,8 +153,7 @@ def qualification_checks(store, profile, unattended, code_verified):
             and datetime.fromisoformat(store.get("monitoring", channel)["timestamp"]) > recent
             for channel in ("telegram", "healthchecks")
         )
-        watchdog = store.directory / "watchdog-health.json"
-        import time
+        from .health import watchdog_status
 
         heartbeat = store.get("monitoring", "last_heartbeat") or {}
         heartbeat_ready = heartbeat.get("passed") and datetime.fromisoformat(
@@ -148,7 +187,7 @@ def qualification_checks(store, profile, unattended, code_verified):
                 {
                     "code": "watchdog",
                     "title": "Independent watchdog running",
-                    "passed": watchdog.exists() and time.time() - watchdog.stat().st_mtime < 15,
+                    "passed": watchdog_status(store)["ready"],
                     "detail": "Start the packaged local launcher with its independent watchdog.",
                     "remediation": "/settings",
                 },

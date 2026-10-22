@@ -19,10 +19,52 @@ export function LegacyHistory({
   const [selected, setSelected] = useState<Import | null>(null);
   const [record, setRecord] = useState<Event | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cursor, setCursor] = useState(0);
+  const [next, setNext] = useState<number | null>(null);
+  const [recordSequence, setRecordSequence] = useState<number | null>(null);
   useEffect(() => {
-    void api<Import[]>("/events/legacy")
+    setRecords([]);
+    if (!selected) return;
+    const controller = new AbortController();
+    void api<{ items: Event[]; next_cursor: number | null }>(
+      `/events/legacy/${selected.id}/page?after=${cursor}`,
+      "GET",
+      undefined,
+      controller.signal,
+    )
+      .then((page) => {
+        setRecords(page.items);
+        setNext(page.next_cursor);
+      })
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) notify(error.message, true);
+      });
+    return () => controller.abort();
+  }, [selected, cursor, notify]);
+  useEffect(() => {
+    setRecord(null);
+    if (!selected || recordSequence === null) return;
+    const controller = new AbortController();
+    void api<Event>(
+      `/events/legacy/${selected.id}/detail/${recordSequence}`,
+      "GET",
+      undefined,
+      controller.signal,
+    )
+      .then(setRecord)
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) notify(error.message, true);
+      });
+    return () => controller.abort();
+  }, [selected, recordSequence, notify]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void api<Import[]>("/events/legacy", "GET", undefined, controller.signal)
       .then(setImports)
-      .catch((error: Error) => notify(error.message, true));
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) notify(error.message, true);
+      });
+    return () => controller.abort();
   }, [notify]);
   async function importFile(file: File, definition: boolean) {
     setBusy(true);
@@ -108,9 +150,8 @@ export function LegacyHistory({
           rowId={(row) => row.id}
           onSelect={(item) => {
             setSelected(item);
-            void api<Event[]>(`/events/legacy/${item.id}`)
-              .then(setRecords)
-              .catch((error: Error) => notify(error.message, true));
+            setCursor(0);
+            setRecordSequence(null);
           }}
           columns={[
             { accessorKey: "name", header: "Historical journal", size: 300 },
@@ -129,9 +170,10 @@ export function LegacyHistory({
           <h3>{selected.name} · read-only</h3>
           <Grid<Event>
             name="legacy-records"
+            virtual
             rows={records}
             rowId={(row) => String(row.sequence)}
-            onSelect={setRecord}
+            onSelect={(item) => setRecordSequence(item.sequence)}
             columns={[
               { accessorKey: "sequence", header: "Sequence" },
               {
@@ -149,12 +191,27 @@ export function LegacyHistory({
               },
             ]}
           />
+          <button disabled={next === null} onClick={() => setCursor(next!)}>
+            Next historical page
+          </button>
+          <button onClick={() => setCursor(0)}>First historical page</button>
+          <button
+            onClick={() => {
+              setSelected(null);
+              setRecords([]);
+            }}
+          >
+            Close historical records
+          </button>
         </>
       )}
       <Modal
-        open={!!record}
+        open={recordSequence !== null}
         onOpenChange={(open) => {
-          if (!open) setRecord(null);
+          if (!open) {
+            setRecordSequence(null);
+            setRecord(null);
+          }
         }}
         title="Historical event"
         description="Read-only compatibility view. Historical approvals have no paper execution authority."

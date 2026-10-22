@@ -7,6 +7,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -15,14 +16,19 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from .acceptance import accept_session, session_status
+from .audit import audit_detail, audit_page, legacy_page, record_page
+from .build_info import build_identity
 from .engine import Engine
-from .graph import CATALOG, GraphError, compile_graph, templates
+from .graph import CATALOG, GraphError, compile_graph, crypto_copy, templates
 from .idempotency import execute_once
 from .legacy import import_history, migrate_definition
+from .library import StrategyLibrary
 from .market import parse_tick, replay
 from .monitoring import Monitoring
 from .qualification import accept_review, profiles, save_profile
 from .recovery import backup_bundle, restore_bundle
+from .reusable import reusable_copy, shared_templates
+from .startup import DeferredMigration
 from .store import Conflict, Store, now
 
 
@@ -56,7 +62,27 @@ class Contract(Model):
     conid: int = Field(gt=0)
 
 
+class FeedRetry(Model):
+    components: list[Literal["quote", "trade", "history"]] = Field(min_length=1, max_length=3)
+    mutation_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+
+
+class StockRules(Model):
+    rules: dict
+
+
+class FeeAllowance(Model):
+    amount: str = Field(max_length=32)
+    revision: int = Field(ge=0)
+
+
 class Run(Contract):
+    execution_policy: Literal["idealpro_funded_fx_v1", "idealpro_broker_candles_v2"] | None = None
+    funding_policy: Literal["broker_credit_v1", "paper_buying_power_v1"] | None = None
+    session_mode: Literal["regular", "premarket_regular", "fx"] = "regular"
+    protection_type: Literal["broker_held", "locally_monitored"] = "broker_held"
+    execution_plan_revision: str | None = None
+    sizing: dict | None = None
     strategy_id: str = Field(pattern=r"^[a-f0-9]{32}$")
     version: int = Field(ge=1)
 
@@ -64,8 +90,35 @@ class Run(Contract):
 class Selection(Model):
     ids: list[str] = Field(min_length=1, max_length=5)
     profile_id: str = Field(default="smoke", pattern=r"^[a-z0-9_-]{1,40}$")
-    profile_version: int = Field(default=1, ge=1)
+    profile_version: int | None = Field(default=None, ge=1)
     unattended: bool = False
+
+
+class PreparationRequest(Run):
+    lease_id: str | None = Field(default=None, pattern=r"^[a-f0-9-]{32,36}$")
+
+
+class PreparationRelease(Model):
+    lease_id: str = Field(pattern=r"^[a-f0-9-]{32,36}$")
+
+
+class ArchiveSelection(Model):
+    ids: list[str] = Field(min_length=1, max_length=50)
+
+
+class PolicyReplacement(Model):
+    target_execution_policy_revision: Literal["idealpro_broker_candles_v2"] | None = None
+    ids: list[str] = Field(min_length=1, max_length=5)
+    expected_binding_hashes: dict[str, str] = Field(max_length=5)
+    target_policy_revision: Literal["broker_credit_v1", "paper_buying_power_v1"]
+    mutation_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    action: Literal["adopt", "restore"] = "adopt"
+    expected_replacement_states: dict[str, str] = Field(default_factory=dict, max_length=5)
+
+
+class BatchConfirmation(Model):
+    preview_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    mutation_id: str = Field(pattern=r"^[a-f0-9]{32}$")
 
 
 class QualificationReview(Model):
@@ -73,8 +126,36 @@ class QualificationReview(Model):
     confirmed: bool
 
 
+class RecoveryAcknowledgment(Model):
+    id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    revision: int = Field(ge=1)
+
+
+class IncidentReview(Model):
+    rationale: str = Field(default="", max_length=1000)
+    revision: int | None = Field(default=None, ge=1)
+
+
 class Arm(Selection):
+    funding_policy_acknowledged: (
+        Literal["broker_credit_v1", "paper_buying_power_v1"]
+        | list[Literal["broker_credit_v1", "paper_buying_power_v1"]]
+        | None
+    ) = None
+    fx_policy_revision: (
+        Literal["idealpro_funded_fx_v1", "idealpro_broker_candles_v2"]
+        | list[Literal["idealpro_funded_fx_v1", "idealpro_broker_candles_v2"]]
+        | None
+    ) = None
+    review_fingerprint: str | None = Field(default=None, max_length=64)
+    resume_policy: str | None = Field(default=None, pattern=r"^same_engine_routine_v1$")
+    local_protection_acknowledged: bool = False
+    execution_plan_revisions: dict[str, str] = Field(default_factory=dict)
     mutation_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    recovery_acknowledgments: list[RecoveryAcknowledgment] = Field(
+        default_factory=list, max_length=200
+    )
+    review_instance: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
 
 
 class Emergency(Model):
@@ -97,7 +178,7 @@ class ReplayRequest(Model):
 class MonitorConfiguration(Model):
     telegram_token: str = Field(max_length=200)
     telegram_chat: str = Field(max_length=30)
-    healthchecks_url: str = Field(max_length=200)
+    healthchecks_url: str = Field(default="", max_length=200)
 
 
 class NotificationTest(Model):
@@ -114,6 +195,10 @@ class LegacyDefinition(Model):
     document: dict
 
 
+class CryptoImport(LegacyDefinition):
+    symbol: str = Field(default="BTC", pattern=r"^(BTC|ETH)$")
+
+
 def create_app(
     directory: Path,
     pairing_token: str,
@@ -123,12 +208,20 @@ def create_app(
     development=False,
     port=8000,
     launcher_key=None,
+    environment="paper",
+    defer_migration=False,
 ):
+    migration = (
+        DeferredMigration(directory, directory.parent / "simulation" / "live-crypto")
+        if defer_migration
+        else None
+    )
     store = Store(directory)
     simulation = Store(
         directory.parent / "simulation" if directory.name == "paper" else directory / "simulation"
     )
-    engine = Engine(store)
+    engine = Engine(store, environment=environment, migration=migration)
+    cookie = engine.environment.cookie
     monitoring = Monitoring(
         store,
         lambda: (
@@ -138,6 +231,7 @@ def create_app(
         ),
     )
     sessions: dict[str, float] = {}
+    session_actors: dict[str, str] = {}
     unused_pairing = pairing_token
 
     @asynccontextmanager
@@ -160,6 +254,8 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.store, app.state.engine = store, engine
+    build = build_identity(frontend)
+    engine.build = build
     hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
     if development:
         hosts |= {"127.0.0.1:5173", "localhost:5173"}
@@ -185,21 +281,26 @@ def create_app(
                     {"detail": "Request exceeds the workspace size limit."}, status_code=413
                 )
         if request.url.path.startswith("/api/") and request.url.path != "/api/auth/pair":
-            session = request.cookies.get("oms_session", "")
+            session = request.cookies.get(cookie, "")
             if sessions.get(session, 0) < time.monotonic():
                 return JSONResponse(
                     {
-                        "detail": "Open start-paper.ps1 to establish a local session.",
+                        "detail": "Open start-crypto-sim.ps1 to establish a local session."
+                        if engine.environment.crypto
+                        else "Open start-paper.ps1 to establish a local session.",
                         "code": "local_session_required",
                     },
                     status_code=401,
                 )
             sessions[session] = time.monotonic() + 12 * 60 * 60
+            request.state.operator_id = session_actors.setdefault(
+                session, "operator-" + uuid.uuid4().hex
+            )
         response = await execute_once(request, call_next, store)
-        if request.url.path.startswith("/api/") and request.cookies.get("oms_session") in sessions:
+        if request.url.path.startswith("/api/") and request.cookies.get(cookie) in sessions:
             response.set_cookie(
-                "oms_session",
-                request.cookies["oms_session"],
+                cookie,
+                request.cookies[cookie],
                 httponly=True,
                 samesite="strict",
                 max_age=12 * 60 * 60,
@@ -239,6 +340,7 @@ def create_app(
         return JSONResponse(
             {
                 "detail": str(exc),
+                **({"dependencies": exc.dependencies} if hasattr(exc, "dependencies") else {}),
                 "issues": [
                     {
                         "code": "conflict"
@@ -259,8 +361,10 @@ def create_app(
     def health():
         return {
             "status": "running" if not engine.stopping.is_set() else "stopped",
-            "mode": "paper",
+            "mode": engine.environment.mode,
+            "environment": engine.environment.name,
             "engine": bool(engine.thread and engine.thread.is_alive()),
+            "build": build,
         }
 
     @app.post("/api/auth/pair")
@@ -277,25 +381,59 @@ def create_app(
         unused_pairing = ""
         session = secrets.token_urlsafe(32)
         sessions[session] = time.monotonic() + 12 * 60 * 60
+        session_actors[session] = "operator-" + uuid.uuid4().hex
         response = JSONResponse({"authenticated": True})
         response.set_cookie(
-            "oms_session", session, httponly=True, samesite="strict", max_age=12 * 60 * 60, path="/"
+            cookie, session, httponly=True, samesite="strict", max_age=12 * 60 * 60, path="/"
         )
         return response
 
     @app.get("/api/paper/session")
+    @app.get("/api/workspace/session")
     def snapshot():
         return engine.call("snapshot")
 
+    @app.get("/api/workspace/overview")
+    def overview():
+        return engine.call("overview")
+
+    @app.get("/api/workspace/records/{kind}")
+    def records(kind: str, before: int | None = None, limit: int = 100):
+        return record_page(store, kind, before, limit)
+
+    @app.get("/api/market-data/{conid}/candles")
+    def candles(
+        conid: int,
+        seconds: int = 60,
+        before: str | None = None,
+        limit: int = 120,
+        signal_source: Literal["MIDPOINT", "BID", "ASK"] | None = None,
+    ):
+        return engine.call(
+            "candles",
+            conid=conid,
+            seconds=seconds,
+            before=before,
+            limit=limit,
+            signal_source=signal_source,
+        )
+
     @app.post("/api/paper/session/connect")
+    @app.post("/api/workspace/session/connect")
     def connect():
         return engine.call("connect")
 
     @app.post("/api/paper/session/attest")
+    @app.post("/api/workspace/session/attest")
     def attest(body: Attest):
         return engine.call("attest", confirmed=body.confirmed)
 
+    @app.post("/api/workspace/session/disconnect")
+    def disconnect():
+        return engine.call("disconnect")
+
     @app.post("/api/paper/session/reconcile")
+    @app.post("/api/workspace/session/reconcile")
     def reconcile():
         return engine.call("begin_reconcile")
 
@@ -304,20 +442,184 @@ def create_app(
         return engine.call("snapshot")["contracts"]
 
     @app.post("/api/market-data/resolve")
-    def resolve(symbol: str):
-        return engine.call("resolve", symbol=symbol)
+    def resolve(
+        symbol: str = "",
+        sec_type: str = "",
+        exchange: str = "",
+        currency: str = "",
+        conid: int | None = None,
+    ):
+        return engine.call(
+            "resolve",
+            symbol=symbol,
+            sec_type=sec_type,
+            exchange=exchange,
+            currency=currency,
+            conid=conid,
+        )
+
+    @app.get("/api/market-data/search/{identity}")
+    def search_status(identity: str):
+        return engine.call("search_status", identity=identity)
 
     @app.post("/api/market-data/subscribe")
     def subscribe(body: Contract):
         return engine.call("subscribe", conid=body.conid)
 
+    @app.post("/api/market-data/{conid}/retry")
+    def retry_feeds(conid: int, body: FeedRetry, request: Request):
+        return engine.call(
+            "retry_feeds",
+            conid=conid,
+            components=body.components,
+            mutation_id=body.mutation_id,
+            actor=request.state.operator_id,
+        )
+
     @app.get("/api/strategies/catalog")
-    def catalog():
-        return {"blocks": CATALOG, "templates": templates()}
+    def catalog(schema_version: int = 6):
+        from .stock_strategies import stock_templates
+
+        items = (
+            templates()
+            if engine.environment.crypto
+            else stock_templates(schema_version)
+            if schema_version in (7, 8)
+            else shared_templates()
+        )
+        if engine.environment.crypto:
+            items = [{**item, "document": crypto_copy(item["document"])} for item in items]
+        return {"blocks": CATALOG, "templates": items, "environment": engine.environment.name}
+
+    @app.post("/api/strategies/convert-stock")
+    def convert_stock(body: LegacyDefinition):
+        from .stock_strategies import stock_copy
+
+        document = stock_copy(body.document)
+        store.backup(store.directory / "backups")
+        draft = store.save_draft(None, body.name[:80] + " (stock copy)", document, 0)
+        store.event(
+            "strategy.stock_copy.created",
+            {
+                "id": draft["id"],
+                "source_schema": body.document.get("schema_version"),
+                "source_modified": False,
+            },
+        )
+        return draft
+
+    @app.post("/api/strategies/convert-fx")
+    def convert_fx(body: LegacyDefinition):
+        from .fx_strategies import fx_copy
+
+        if engine.environment.crypto:
+            raise Conflict("Open the paper workspace to create an FX definition.")
+        document = fx_copy(body.document)
+        store.backup(store.directory / "backups")
+        draft = store.save_draft(None, body.name[:80] + " (FX copy)", document, 0)
+        store.event(
+            "strategy.fx_copy.created",
+            {
+                "id": draft["id"],
+                "source_schema": body.document.get("schema_version"),
+                "source_modified": False,
+            },
+        )
+        return draft
+
+    @app.post("/api/contracts/{conid}/stock-rules")
+    def stock_rules(conid: int, body: StockRules, request: Request):
+        return engine.call(
+            "stock_rules", conid=conid, rules=body.rules, actor=request.state.operator_id
+        )
+
+    @app.post("/api/runs/prepare-context")
+    def prepare_context(body: PreparationRequest):
+        return engine.call(
+            "prepare_context",
+            conid=body.conid,
+            session_mode=body.session_mode,
+            strategy_id=body.strategy_id,
+            version=body.version,
+            lease_id=body.lease_id,
+            execution_policy=body.execution_policy,
+        )
+
+    @app.post("/api/runs/prepare-context/release")
+    def release_preparation(body: PreparationRelease):
+        return engine.call("release_preparation", lease_id=body.lease_id)
+
+    @app.post("/api/runs/compatibility")
+    def stock_compatibility(body: Run):
+        return engine.call(
+            "stock_compatibility",
+            strategy_id=body.strategy_id,
+            version=body.version,
+            conid=body.conid,
+            protection_type=body.protection_type,
+            session_mode=body.session_mode,
+            sizing=body.sizing,
+            funding_policy=body.funding_policy,
+            execution_policy=body.execution_policy,
+        )
+
+    @app.post("/api/contracts/{conid}/fee-allowance")
+    def fee_allowance(conid: int, body: FeeAllowance, request: Request):
+        return engine.call(
+            "stock_fee",
+            conid=conid,
+            amount=body.amount,
+            revision=body.revision,
+            actor=request.state.operator_id,
+        )
+
+    @app.post("/api/strategies/convert-crypto")
+    def convert_crypto(body: CryptoImport):
+        if not engine.environment.crypto:
+            raise Conflict("Open the crypto simulator to import a converted copy.")
+        document = crypto_copy(body.document, body.symbol)
+        draft = store.save_draft(None, body.name[:86] + " (crypto copy)", document, 0)
+        store.event(
+            "strategy.crypto_copy.created",
+            {
+                "id": draft["id"],
+                "source_schema": body.document.get("schema_version"),
+                "source_modified": False,
+            },
+        )
+        return draft
+
+    @app.post("/api/strategies/convert-reusable")
+    def convert_reusable(body: LegacyDefinition):
+        document = reusable_copy(body.document)
+        draft = store.save_draft(None, body.name[:80] + " (reusable copy)", document, 0)
+        store.event(
+            "strategy.reusable_copy.created",
+            {
+                "id": draft["id"],
+                "source_schema": body.document.get("schema_version"),
+                "source_modified": False,
+            },
+        )
+        return draft
 
     @app.get("/api/strategies")
-    def strategies():
-        return store.list("draft")
+    def strategies(archived: bool = False):
+        return StrategyLibrary(store).listing(archived)
+
+    @app.post("/api/strategies/removal-preview")
+    def strategy_removal_preview(body: ArchiveSelection):
+        return StrategyLibrary(store).preview(body.ids)
+
+    @app.post("/api/strategies/removal-confirm")
+    def strategy_removal_confirm(body: BatchConfirmation, request: Request):
+        return StrategyLibrary(store).confirm(
+            body.preview_id, body.mutation_id, request.state.operator_id
+        )
+
+    @app.post("/api/strategies/{identity}/restore")
+    def strategy_restore(identity: str, request: Request):
+        return StrategyLibrary(store).restore(identity, request.state.operator_id)
 
     @app.post("/api/strategies")
     def create_draft(body: Draft):
@@ -328,6 +630,8 @@ def create_app(
     @app.put("/api/strategies/{identity}")
     def save_draft(identity: str, body: Draft):
         if not store.get("draft", identity):
+            if (store.get("strategy_lifecycle", identity) or {}).get("state") == "deleted":
+                raise Conflict("This strategy was deleted from the library.")
             raise ValueError("Draft not found.")
         return store.save_draft(identity, body.name, body.document, body.revision)
 
@@ -356,9 +660,23 @@ def create_app(
     def preview(body: Selection):
         return engine.call("arm_preview", **body.model_dump())
 
+    @app.post("/api/runs/policy-replacement")
+    def policy_replacement(body: PolicyReplacement, request: Request):
+        return engine.call(
+            "policy_replacement", **body.model_dump(), actor=request.state.operator_id
+        )
+
+    @app.post("/api/runs/archive-preview")
+    def archive_preview(body: ArchiveSelection):
+        return engine.call("archive_preview", ids=body.ids)
+
+    @app.post("/api/runs/archive-confirm")
+    def archive_confirm(body: BatchConfirmation, request: Request):
+        return engine.call("archive_confirm", **body.model_dump(), actor=request.state.operator_id)
+
     @app.post("/api/runs/arm")
-    def arm(body: Arm):
-        return engine.call("arm", **body.model_dump())
+    def arm(body: Arm, request: Request):
+        return engine.call("arm", actor=request.state.operator_id, **body.model_dump())
 
     @app.post("/api/runs/{identity}/disarm")
     def disarm(identity: str):
@@ -390,6 +708,17 @@ def create_app(
     def legacy_records(identity: str):
         return [r for r in store.list("legacy_record") if r["import_id"] == identity]
 
+    @app.get("/api/events/legacy/{identity}/page")
+    def legacy_records_page(identity: str, after: int = 0):
+        return legacy_page(store, identity, after)
+
+    @app.get("/api/events/legacy/{identity}/detail/{sequence}")
+    def legacy_record_detail(identity: str, sequence: int):
+        record = store.get("legacy_record", f"{identity}:{sequence}")
+        if not record:
+            raise ValueError("Historical event not found.")
+        return record
+
     @app.post("/api/events/legacy")
     def legacy_import(body: LegacyImport):
         return import_history(store, body.name, body.records)
@@ -401,6 +730,20 @@ def create_app(
     @app.get("/api/operations/orders/{identity}")
     def order_detail(identity: str):
         return engine.call("order_detail", identity=identity)
+
+    @app.get("/api/events/page")
+    def event_page(
+        before: int | None = None,
+        after: int | None = None,
+        q: str = "",
+        limit: int = 200,
+        watermark: int | None = None,
+    ):
+        return audit_page(store, before=before, after=after, q=q, limit=limit, watermark=watermark)
+
+    @app.get("/api/events/detail/{sequence}")
+    def event_detail(sequence: int):
+        return audit_detail(store, sequence)
 
     @app.get("/api/events")
     def events(after: int = 0, q: str = ""):
@@ -422,14 +765,24 @@ def create_app(
         return engine.call("unsubscribe", conid=body.conid)
 
     @app.get("/api/events/stream")
-    async def event_stream(request: Request, after: int = 0):
+    async def event_stream(request: Request, after: int = 0, summaries: bool = False):
         last = request.headers.get("last-event-id", "")
         cursor = max(0, int(last) if last.isdecimal() else after)
 
         async def generate():
             nonlocal cursor
             while not await request.is_disconnected():
-                items = store.events(cursor)
+                if summaries:
+                    page = await asyncio.to_thread(audit_page, store, after=cursor)
+                    if page["latest"] - cursor > 2000:
+                        yield (
+                            "event: resync\ndata: "
+                            '{"reason":"Older events remain available in history."}\n\n'
+                        )
+                        return
+                    items = page["items"]
+                else:
+                    items = await asyncio.to_thread(store.events, cursor)
                 for item in items:
                     cursor = item["sequence"]
                     yield f"id: {cursor}\nevent: journal\ndata: {json.dumps(item)}\n\n"
@@ -456,8 +809,44 @@ def create_app(
         return monitoring.retry_failed()
 
     @app.post("/api/operations/incidents/{identity}/review")
-    def incident_review(identity: str):
-        return engine.call("review_incident", identity=identity)
+    def incident_review(identity: str, request: Request, body: IncidentReview | None = None):
+        return engine.call(
+            "review_incident",
+            identity=identity,
+            actor=request.state.operator_id,
+            **(body or IncidentReview()).model_dump(),
+        )
+
+    @app.get("/api/incidents")
+    def incidents(view: str = "current", before: int | None = None, limit: int = 200):
+        return engine.call("incident_page", view=view, before=before, limit=limit)
+
+    @app.post("/api/incidents/recovery-preview")
+    def recovery_preview():
+        return engine.call("recovery_batch_preview")
+
+    @app.post("/api/incidents/recovery-confirm")
+    def recovery_confirm(body: BatchConfirmation, request: Request):
+        return engine.call(
+            "recovery_batch_confirm", **body.model_dump(), actor=request.state.operator_id
+        )
+
+    @app.get("/api/incidents/recovery-status")
+    def recovery_status():
+        return engine.call("recovery_status")
+
+    @app.get("/api/incidents/{identity}")
+    def incident_detail(identity: str):
+        return engine.call("incident_detail", identity=identity)
+
+    @app.post("/api/incidents/{identity}/investigation/close")
+    def close_investigation(identity: str, body: IncidentReview, request: Request):
+        return engine.call(
+            "close_investigation",
+            identity=identity,
+            actor=request.state.operator_id,
+            **body.model_dump(),
+        )
 
     @app.get("/api/preferences")
     def preferences():
@@ -481,15 +870,16 @@ def create_app(
 
     @app.get("/api/risk-profiles")
     def risk_profiles():
-        return profiles(store)
+        return profiles(store, simulation=engine.environment.crypto)
 
     @app.post("/api/risk-profiles")
     def profile(body: dict):
-        return save_profile(store, body)
+        return save_profile(store, body, simulation=engine.environment.crypto)
 
     @app.get("/api/operations/qualification")
     def qualification():
         return {
+            "environment": engine.environment.name,
             "verified_build": engine.code_verified,
             "broker_evidence": store.get("qualification", "broker_evidence") or {},
             "operator_review": store.get("qualification", "operator_review") or {},
@@ -498,10 +888,14 @@ def create_app(
 
     @app.post("/api/operations/qualification")
     def qualification_review(body: QualificationReview):
+        if engine.environment.crypto:
+            raise Conflict("Local simulation cannot qualify IBKR paper execution.")
         return accept_review(store, body.stage, body.confirmed)
 
     @app.post("/api/operations/qualification/sessions/{day}")
     def session_review(day: str, body: dict):
+        if engine.environment.crypto:
+            raise Conflict("Local simulation cannot qualify IBKR paper execution.")
         return accept_session(store, day, body.get("confirmed"))
 
     @app.get("/api/testing/datasets")

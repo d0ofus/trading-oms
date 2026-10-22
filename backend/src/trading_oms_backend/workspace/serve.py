@@ -52,20 +52,27 @@ def main():
         description="Local paper workspace; never binds a public interface."
     )
     parser.add_argument("--state", type=Path)
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--environment", choices=("paper", "live_crypto_simulation"), default="paper"
+    )
+    parser.add_argument("--port", type=int)
     parser.add_argument("--open", action="store_true")
     parser.add_argument("--development", action="store_true")
     parser.add_argument(
         "--no-watchdog", action="store_true", help="For isolated automated tests only."
     )
     args = parser.parse_args()
+    args.environment = "paper"  # Legacy environment flag opens the unified broker workspace.
+    if args.port is None:
+        args.port = 8000
+    if args.port != 8000 and not args.development:
+        parser.error("The unified workspace uses port 8000.")
     if not 1024 <= args.port <= 65535:
         parser.error("Use a local unprivileged application port.")
-    directory = (
-        args.state
-        or Path(os.environ.get("LOCALAPPDATA", str(Path.home() / ".local" / "share")))
-        / "TradingOMS"
-        / "paper"
+    directory = args.state or Path(
+        os.environ.get("LOCALAPPDATA", str(Path.home() / ".local" / "share"))
+    ) / "TradingOMS" / (
+        "simulation/live-crypto" if args.environment == "live_crypto_simulation" else "paper"
     )
     frontend = Path(__file__).resolve().parents[4] / "frontend" / "dist"
     if not args.development and not (frontend / "index.html").exists():
@@ -79,12 +86,23 @@ def main():
             with httpx.Client(timeout=1, trust_env=False) as client:
                 running = client.get(f"http://127.0.0.1:{args.port}/healthz")
             previous_key = vault.read("session_key")
-            if running.is_success and running.json().get("engine") and previous_key:
+            if (
+                running.is_success
+                and running.json().get("engine")
+                and running.json().get("environment", "paper") == args.environment
+                and previous_key
+            ):
                 webbrowser.open(f"http://127.0.0.1:{args.port}/desk#pair=" + previous_key)
                 return
         except (httpx.HTTPError, ValueError):
             pass
-    with exclusive_owner(directory):
+    simulator_directory = directory.parent / "simulation" / "live-crypto"
+    with exclusive_owner(directory), exclusive_owner(simulator_directory):
+        print(
+            "Opening the workspace. Gateway login can wait until you connect in Settings. "
+            "Any pending migration blocks execution until its read-only check succeeds.",
+            flush=True,
+        )
         if os.name == "nt":
             vault.write("session_key", token)
         app = create_app(
@@ -94,6 +112,8 @@ def main():
             development=args.development,
             port=args.port,
             launcher_key=token if os.name == "nt" else None,
+            environment=args.environment,
+            defer_migration=True,
         )
         stop = threading.Event()
         supervisor = None
@@ -107,6 +127,8 @@ def main():
                     str(directory.resolve()),
                     "--pid",
                     str(os.getpid()),
+                    "--instance",
+                    app.state.engine.process_identity,
                 ],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,

@@ -1,5 +1,13 @@
 # Windows setup and first paper test
 
+Current release: use [the unified IBKR workspace guide](docs/UNIFIED_WORKSPACE_GUIDE.md)
+for contract search, reusable templates and the new crypto paper workflow. Both legacy
+launchers open port 8000. Stop old engines and reconcile the paper account flat before
+first migration. Local PAXOS protection is distinct from broker-held equity protection.
+The web app can open before Gateway login. If migration needs a fresh snapshot,
+Settings shows the pending check; log into paper Gateway and click **Connect paper
+Gateway** when ready. A connection failure leaves the web app available for navigation.
+
 Use the existing `trading-oms` checkout on this PC. Python 3.12 and Node.js 24 are the tested toolchain. Keep the application and Gateway on this Windows computer.
 
 ## 1. Install and verify the application
@@ -35,19 +43,19 @@ After read-only connection/data/reconciliation checks pass, you must manually di
 .\scripts\start-paper.ps1
 ```
 
-A failed endpoint check means Gateway is not listening; it does not mean an order was attempted. The launcher opens an authenticated browser at `http://127.0.0.1:8000`, starts the independent watchdog and serves the production UI. Re-running the launcher opens the current process. It uses an existing built bundle; rebuild/reverify only while disarmed.
+A failed endpoint check means Gateway is not listening; it does not mean an order was attempted. The launcher builds the frontend, opens an authenticated browser at `http://127.0.0.1:8000`, starts the independent watchdog and serves the production UI. Use `-SkipBuild` when reopening an already verified running build. Build and verify code changes only while disarmed, then restart the application.
 
 In **Settings**:
 
 1. Connect Gateway, verify the paper login context, and reconcile. Connected, current data and permission to enter are separate states.
-2. Search and select the exact US stock/ETF contract. Subscribe and wait for real-time entitlement, fresh Last ticks/quotes, price increments and history warm-up. Five-symbol capacity depends on your IBKR entitlement. Historical requests are paced and may take several minutes.
+2. Search and select an exact IBKR contract. Subscriptions are separate from the five-active-run limit and depend on account entitlement and API support. For execution, start with a supported US stock/ETF or BTC/ETH USD PAXOS contract. Wait for real-time entitlement, fresh Last ticks/quotes, valid increments and history warm-up. Historical requests are paced and may take several minutes.
 3. Select **Supervised paper smoke test** (one run, one share). Do not begin with the five-symbol profile.
 4. For unattended qualification, enter Telegram and Healthchecks settings locally. Set Healthchecks to a one-minute period and two-minute grace period. Use the explicit test buttons, then verify the messages in the external services. Secret fields clear after saving; secrets are stored in Windows Credential Manager.
 5. Create a backup and validate a restore through Settings. Review remaining readiness items using their direct links.
 
 ## 4. Test, publish and prepare a strategy
 
-In **Strategy Studio**, duplicate a template, name it and configure the six guided sections. Switch to Canvas to inspect or edit the same graph. Blocks can be added with buttons and connected through input selectors without dragging. Resolve validation issues, inspect the exact explanation and publish a version.
+In **Strategy Studio**, duplicate a template, name it and configure its rules and ceilings. Switch to Canvas to inspect or edit the same graph. Blocks can be added with buttons and connected through input selectors without dragging. Resolve validation issues, inspect the exact explanation and publish a version. Choose **Prepare published vN** and select the resolved instrument and reviewed sizing; new templates are reusable across compatible contracts.
 
 In **Testing**, import recorded tick CSV (`timestamp,price,size`, with timezone-aware ISO timestamps). Intrabar replay requires actual ticks; OHLCV bars are not converted into invented ticks. The synthetic practice dataset is clearly labelled and does not count as broker evidence. A within-session tick gap longer than 15 seconds blocks replay until the capture is repaired. Inspect trades, open positions and limitations; then prepare a paper run from the immutable version.
 

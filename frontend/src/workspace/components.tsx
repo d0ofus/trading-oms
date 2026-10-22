@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   flexRender,
@@ -13,6 +13,7 @@ import {
   ArrowUp,
   CheckCircle2,
   CircleAlert,
+  Clock3,
   Search,
   X,
 } from "lucide-react";
@@ -121,30 +122,55 @@ export function Readiness({
 }) {
   return (
     <div className="ws-readiness">
-      {checks.map((item) => (
-        <div
-          key={item.code}
-          className={`ws-check ${item.passed ? "passed" : "blocked"}`}
-        >
-          {item.passed ? (
-            <CheckCircle2 size={17} aria-label="Passed" />
-          ) : (
-            <CircleAlert size={17} aria-label="Blocked" />
-          )}
-          <div>
-            <strong>{item.title}</strong>
-            <p>{item.detail}</p>
+      {checks.map((item) => {
+        const tone = item.feed_health
+          ? item.feed_health === "healthy"
+            ? "passed"
+            : item.feed_health === "checking"
+              ? "waiting"
+              : "blocked"
+          : item.passed
+            ? "passed"
+            : ["waiting", "checking"].includes(item.status ?? "")
+              ? "waiting"
+              : "blocked";
+        return (
+          <div key={item.code} className={`ws-check ${tone}`}>
+            {tone === "passed" ? (
+              <CheckCircle2
+                size={17}
+                aria-label={item.feed_health ? "Feed healthy" : "Passed"}
+              />
+            ) : tone === "waiting" ? (
+              <Clock3 size={17} aria-label="Waiting" />
+            ) : (
+              <CircleAlert size={17} aria-label="Blocked" />
+            )}
+            <div>
+              <strong>{item.title}</strong>
+              <p>
+                {item.feed_health === "healthy"
+                  ? `Timestamped ${item.signal_source ?? "signal"} and bid/ask feeds established. Required history complete.`
+                  : item.detail}
+              </p>
+              {item.feed_health === "healthy" && item.execution_detail && (
+                <p className="ws-execution-status">{item.execution_detail}</p>
+              )}
+            </div>
+            {!item.passed &&
+              navigate &&
+              item.remediation &&
+              !["waiting", "checking"].includes(item.status ?? "") && (
+                <button
+                  className="ws-link"
+                  onClick={() => navigate(item.remediation!)}
+                >
+                  Resolve <span aria-hidden="true">↗</span>
+                </button>
+              )}
           </div>
-          {!item.passed && navigate && (
-            <button
-              className="ws-link"
-              onClick={() => navigate(item.remediation)}
-            >
-              Resolve <span aria-hidden="true">↗</span>
-            </button>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -156,8 +182,10 @@ export function Grid<T>({
   rowId,
   onSelect,
   selected,
+  virtual = false,
 }: {
   name: string;
+  virtual?: boolean;
   rows: T[];
   columns: ColumnDef<T>[];
   rowId: (row: T) => string;
@@ -203,15 +231,36 @@ export function Grid<T>({
     readPreference(`table.${name}.density`, "comfortable"),
   );
   const data = useMemo(() => {
-    const ranks = new Map(order.map((id, i) => [id, i]));
-    return rows
-      .filter((row) =>
+    const filtered = rows.filter(
+      (row) =>
+        !filter ||
         JSON.stringify(row).toLowerCase().includes(filter.toLowerCase()),
-      )
-      .sort(
-        (a, b) => (ranks.get(rowId(a)) ?? 1e9) - (ranks.get(rowId(b)) ?? 1e9),
+    );
+    if (virtual) {
+      const current = sorting[0];
+      if (!current) return filtered;
+      const column = columns.find(
+        (item) =>
+          item.id === current.id ||
+          ("accessorKey" in item && item.accessorKey === current.id),
       );
-  }, [rows, order, filter, rowId]);
+      const value = (row: T) =>
+        column && "accessorFn" in column && column.accessorFn
+          ? column.accessorFn(row, 0)
+          : (row as Record<string, unknown>)[
+              column && "accessorKey" in column
+                ? String(column.accessorKey)
+                : current.id
+            ];
+      return filtered.sort(
+        (a, b) => compareValues(value(a), value(b)) * (current.desc ? -1 : 1),
+      );
+    }
+    const ranks = new Map(order.map((id, i) => [id, i]));
+    return filtered.sort(
+      (a, b) => (ranks.get(rowId(a)) ?? 1e9) - (ranks.get(rowId(b)) ?? 1e9),
+    );
+  }, [rows, order, filter, rowId, virtual, sorting, columns]);
   const table = useReactTable({
     data,
     columns,
@@ -235,6 +284,25 @@ export function Grid<T>({
     preference(`table.${name}.filter`, filter);
     preference(`table.${name}.density`, density);
   }, [name, filter, density]);
+  const scroll = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const rowHeight = density === "compact" ? 32 : 44;
+  const allRows = table.getRowModel().rows;
+  const first = virtual
+    ? Math.max(
+        0,
+        Math.min(allRows.length - 1, Math.floor(scrollTop / rowHeight) - 5),
+      )
+    : 0;
+  const last = virtual
+    ? Math.min(allRows.length, first + Math.ceil(height / rowHeight) + 10)
+    : allRows.length;
+  useEffect(() => {
+    if (virtual && scroll.current && scrollTop > allRows.length * rowHeight) {
+      scroll.current.scrollTop = 0;
+      setScrollTop(0);
+    }
+  }, [virtual, allRows.length, rowHeight, scrollTop]);
   function sortColumn(id: string) {
     const desc = sorting[0]?.id === id && !sorting[0].desc;
     const ordered = [...table.getCoreRowModel().rows].sort(
@@ -296,7 +364,14 @@ export function Grid<T>({
           <option value="compact">Compact</option>
         </select>
       </div>
-      <div className="ws-table-scroll" style={{ maxHeight: height }}>
+      <div
+        ref={scroll}
+        className={`ws-table-scroll ${virtual ? "ws-virtual" : ""}`}
+        style={{ maxHeight: height }}
+        onScroll={(event) => {
+          if (virtual) setScrollTop(event.currentTarget.scrollTop);
+        }}
+      >
         <table style={{ minWidth: table.getTotalSize() }}>
           <thead>
             {table.getHeaderGroups().map((group) => (
@@ -350,16 +425,52 @@ export function Grid<T>({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => (
+            {virtual && first > 0 && (
+              <tr aria-hidden="true" className="ws-spacer">
+                <td
+                  colSpan={table.getVisibleLeafColumns().length}
+                  style={{ height: first * rowHeight, padding: 0 }}
+                />
+              </tr>
+            )}
+            {allRows.slice(first, last).map((row) => (
               <tr
                 key={row.id}
+                style={virtual ? { height: rowHeight } : undefined}
                 className={selected === row.id ? "selected" : ""}
                 tabIndex={onSelect ? 0 : undefined}
                 aria-selected={onSelect ? selected === row.id : undefined}
                 onClick={() => onSelect?.(row.original)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") onSelect?.(row.original);
+                  if (event.key === "Enter" && onSelect) {
+                    event.preventDefault();
+                    onSelect(row.original);
+                  }
+                  if (virtual && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+                    event.preventDefault();
+                    const index =
+                      allRows.findIndex((item) => item.id === row.id) +
+                      (event.key === "ArrowDown" ? 1 : -1);
+                    if (
+                      index >= 0 &&
+                      index < allRows.length &&
+                      scroll.current
+                    ) {
+                      scroll.current.scrollTop = Math.max(
+                        0,
+                        (index - 2) * rowHeight,
+                      );
+                      requestAnimationFrame(() => {
+                        const target =
+                          scroll.current?.querySelector<HTMLElement>(
+                            `tr[data-row-id="${CSS.escape(allRows[index].id)}"]`,
+                          );
+                        target?.focus();
+                      });
+                    }
+                  }
                 }}
+                data-row-id={row.id}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id}>
@@ -368,6 +479,17 @@ export function Grid<T>({
                 ))}
               </tr>
             ))}
+            {virtual && last < allRows.length && (
+              <tr aria-hidden="true" className="ws-spacer">
+                <td
+                  colSpan={table.getVisibleLeafColumns().length}
+                  style={{
+                    height: (allRows.length - last) * rowHeight,
+                    padding: 0,
+                  }}
+                />
+              </tr>
+            )}
           </tbody>
         </table>
         {data.length === 0 && (

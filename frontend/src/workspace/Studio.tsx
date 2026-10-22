@@ -39,6 +39,7 @@ import {
   type Version,
 } from "./api";
 import { Badge, Empty, Modal } from "./components";
+import { RemoveStrategies } from "./RemoveStrategies";
 import "@xyflow/react/dist/style.css";
 
 function StrategyNode({ data, selected }: NodeProps) {
@@ -86,14 +87,19 @@ const signature = (draft: Draft) =>
 
 export function Studio({
   contracts,
+  simulation = false,
   notify,
   createRun,
 }: {
   contracts: Contract[];
+  simulation?: boolean;
   notify: (message: string, error?: boolean) => void;
   createRun: (version: Version) => void;
 }) {
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [removalIds, setRemovalIds] = useState<string[] | null>(null);
+  const [librarySelection, setLibrarySelection] = useState<string[]>([]);
+  const [archivedDrafts, setArchivedDrafts] = useState<Draft[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [catalog, setCatalog] = useState<Spec[]>([]);
   const [active, setActive] = useState<Draft | null>(null);
@@ -150,7 +156,9 @@ export function Studio({
     let live = true;
     void Promise.all([
       api<Draft[]>("/strategies"),
-      api<{ templates: Template[]; blocks: Spec[] }>("/strategies/catalog"),
+      api<{ templates: Template[]; blocks: Spec[] }>(
+        "/strategies/catalog?schema_version=8",
+      ),
     ])
       .then(([items, data]) => {
         if (!live) return;
@@ -168,7 +176,7 @@ export function Studio({
   }, [selectDraft, notify]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || removalIds) return;
     preference(`recovery.${active.id}`, active);
     if (signature(active) === saved.current || saveState === "Conflict") return;
     const timer = setTimeout(() => {
@@ -208,7 +216,7 @@ export function Studio({
         });
     }, 850);
     return () => clearTimeout(timer);
-  }, [active, saveState]);
+  }, [active, saveState, removalIds]);
 
   useEffect(() => {
     if (!active) return;
@@ -508,6 +516,7 @@ export function Studio({
         ))}
         <div className="ws-inline-actions">
           <button
+            disabled={["paired_stop", "long_breakout"].includes(block.kind)}
             onClick={() => {
               const id = "block_" + crypto.randomUUID().slice(0, 8);
               modify((document) => {
@@ -534,6 +543,7 @@ export function Studio({
           </button>
           <button
             className="ws-danger-text"
+            disabled={["paired_stop", "long_breakout"].includes(block.kind)}
             onClick={() => {
               modify((document) => {
                 document.nodes = document.nodes.filter(
@@ -555,6 +565,14 @@ export function Studio({
     );
   }
   const settings = active?.document.settings;
+  const reusable = [6, 7, 8, 9].includes(active?.document.schema_version ?? 0);
+  const fx = active?.document.schema_version === 9;
+  const longOnly = active?.document.nodes.some(
+    (n) => n.kind === "long_breakout",
+  );
+  const paired = active?.document.nodes.some(
+    (n) => n.kind === "paired_stop" || n.kind === "long_breakout",
+  );
   function focusRule(identity: string) {
     setSelected(identity);
     setView("guided");
@@ -571,13 +589,25 @@ export function Studio({
     options?: [string | number, string][],
     unit?: string,
   ) {
-    if (!settings) return null;
+    if (
+      !settings ||
+      (reusable &&
+        ["symbol", "shares", "quantity", "instrument_profile"].includes(key))
+    )
+      return null;
+    const locked =
+      (paired &&
+        ["timeframe", "evaluation", "entry_timeout", "max_entries"].includes(
+          key,
+        )) ||
+      (fx && key === "sizing");
     return (
       <label key={key}>
         {label}
         {options ? (
           <select
-            value={settings[key]}
+            disabled={locked}
+            value={settings[key] ?? ""}
             onChange={(event) =>
               modify((document) => {
                 document.settings[key] =
@@ -596,22 +626,34 @@ export function Studio({
         ) : (
           <div className="ws-unit-input">
             <input
-              value={settings[key]}
+              disabled={locked}
+              value={settings[key] ?? ""}
               type={key === "symbol" ? "text" : "number"}
+              step={key === "quantity" ? "0.00000001" : undefined}
+              placeholder={
+                [8, 9].includes(active?.document.schema_version ?? 0) &&
+                ["risk", "notional"].includes(key)
+                  ? "No ceiling (optional)"
+                  : undefined
+              }
               list={key === "symbol" ? "ws-contract-symbols" : undefined}
               onChange={(event) =>
                 modify((document) => {
                   document.settings[key] =
-                    key === "symbol"
-                      ? event.target.value.toUpperCase()
-                      : [
-                            "shares",
-                            "entry_timeout",
-                            "max_entries",
-                            "exit_before_close",
-                          ].includes(key) && event.target.value !== ""
-                        ? Number(event.target.value)
-                        : event.target.value;
+                    [8, 9].includes(document.schema_version) &&
+                    ["risk", "notional"].includes(key) &&
+                    event.target.value === ""
+                      ? null
+                      : key === "symbol"
+                        ? event.target.value.toUpperCase()
+                        : [
+                              "shares",
+                              "entry_timeout",
+                              "max_entries",
+                              "exit_before_close",
+                            ].includes(key) && event.target.value !== ""
+                          ? Number(event.target.value)
+                          : event.target.value;
                 })
               }
             />
@@ -640,7 +682,7 @@ export function Studio({
       }
       return ids;
     };
-    const entry = ancestors(["entry"]),
+    const entry = ancestors(["entry", "paired_stop", "long_breakout"]),
       protection = ancestors(["stop", "target"]),
       exit = ancestors(["exit"]);
     for (const node of active.document.nodes)
@@ -736,28 +778,96 @@ export function Studio({
             onChange={(event) => setLibrarySearch(event.target.value)}
           />
         </label>
+        <div className="ws-inline-actions">
+          <button
+            disabled={
+              !librarySelection.length ||
+              librarySelection.length > 50 ||
+              saveState !== "Saved"
+            }
+            onClick={() => setRemovalIds([...librarySelection])}
+          >
+            Remove selected
+          </button>
+          <button
+            onClick={() => {
+              setLibrarySelection([]);
+              if (archivedDrafts) setArchivedDrafts(null);
+              else
+                void api<Draft[]>("/strategies?archived=true")
+                  .then(setArchivedDrafts)
+                  .catch((e: Error) => notify(e.message, true));
+            }}
+          >
+            {archivedDrafts ? "Active library" : "Archived"}
+          </button>
+        </div>
+        {archivedDrafts && (
+          <div className="ws-library-items">
+            {!archivedDrafts.length && <p>No archived strategies.</p>}
+            {archivedDrafts
+              .filter((d) =>
+                d.name.toLowerCase().includes(librarySearch.toLowerCase()),
+              )
+              .map((d) => (
+                <div key={d.id}>
+                  <strong>{d.name}</strong>
+                  <button
+                    onClick={() =>
+                      void api(`/strategies/${d.id}/restore`, "POST")
+                        .then(() => {
+                          setDrafts((items) => [d, ...items]);
+                          setArchivedDrafts(
+                            (items) =>
+                              items?.filter((item) => item.id !== d.id) ?? null,
+                          );
+                        })
+                        .catch((e: Error) => notify(e.message, true))
+                    }
+                  >
+                    Restore {d.name}
+                  </button>
+                </div>
+              ))}
+          </div>
+        )}
         <div className="ws-library-items">
-          {drafts
+          {(archivedDrafts ? [] : drafts)
             .filter((draft) =>
               draft.name.toLowerCase().includes(librarySearch.toLowerCase()),
             )
             .map((draft) => (
-              <button
-                key={draft.id}
-                className={`ws-library-item ${active?.id === draft.id ? "active" : ""}`}
-                onClick={() => selectDraft(draft)}
-              >
-                <GitBranch size={17} />
-                <span>
-                  <strong>{draft.name}</strong>
-                  <small>
-                    {draft.document.settings.symbol} ·{" "}
-                    {draft.published_version
-                      ? `Published v${draft.published_version}`
-                      : "Unpublished draft"}
-                  </small>
-                </span>
-              </button>
+              <div key={draft.id} className="ws-library-record">
+                <input
+                  type="checkbox"
+                  aria-label={`Select strategy ${draft.name}`}
+                  checked={librarySelection.includes(draft.id)}
+                  onChange={(e) =>
+                    setLibrarySelection((items) =>
+                      e.target.checked
+                        ? [...items, draft.id]
+                        : items.filter((id) => id !== draft.id),
+                    )
+                  }
+                />
+                <button
+                  className={`ws-library-item ${active?.id === draft.id ? "active" : ""}`}
+                  onClick={() => selectDraft(draft)}
+                >
+                  <GitBranch size={17} />
+                  <span>
+                    <strong>{draft.name}</strong>
+                    <small>
+                      {draft.document.settings.symbol ??
+                        "Instrument selected per run"}{" "}
+                      ·{" "}
+                      {draft.published_version
+                        ? `Published v${draft.published_version}`
+                        : "Unpublished draft"}
+                    </small>
+                  </span>
+                </button>
+              </div>
             ))}
         </div>
         <div className="ws-library-templates">
@@ -778,6 +888,72 @@ export function Studio({
           ))}
         </div>
         <details className="ws-library-options">
+          <summary>Strategy import / export</summary>
+          {active && (
+            <button
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob(
+                    [
+                      JSON.stringify(
+                        { name: active.name, document: active.document },
+                        null,
+                        2,
+                      ),
+                    ],
+                    { type: "application/json" },
+                  ),
+                );
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "strategy.json";
+                link.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Export strategy JSON
+            </button>
+          )}
+          {simulation && (
+            <label>
+              Import a converted crypto copy
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    if (file.size > 100000)
+                      throw new Error("Strategy JSON must be under 100 KB.");
+                    const source = JSON.parse(await file.text()) as {
+                      name?: string;
+                      document?: Graph;
+                    } & Graph;
+                    const draft = await api<Draft>(
+                      "/strategies/convert-crypto",
+                      "POST",
+                      {
+                        name: source.name ?? "Imported strategy",
+                        document: source.document ?? source,
+                        symbol: "BTC",
+                      },
+                    );
+                    setDrafts((items) => [draft, ...items]);
+                    selectDraft(draft);
+                    notify(
+                      "Created a BTC crypto copy. Review its symbol, sizing and UTC session settings.",
+                    );
+                  } catch (error) {
+                    notify((error as Error).message, true);
+                  }
+                  event.target.value = "";
+                }}
+              />
+            </label>
+          )}
+        </details>
+        <details className="ws-library-options">
           <summary>Panel preferences</summary>
           <label>
             Library width
@@ -794,6 +970,30 @@ export function Studio({
           </label>
         </details>
       </aside>
+      {removalIds && (
+        <RemoveStrategies
+          ids={removalIds}
+          close={() => setRemovalIds(null)}
+          removed={(ids) => {
+            setDrafts((items) => items.filter((d) => !ids.includes(d.id)));
+            for (const id of ids) {
+              preference(`recovery.${id}`, null);
+              preference(`conflict-backup.${id}`, null);
+            }
+            if (active && ids.includes(active.id)) {
+              activeRef.current = null;
+              setActive(null);
+              setVersions([]);
+              setHistory([]);
+              setFuture([]);
+              preference("studio.selected", "");
+            }
+            setLibrarySelection([]);
+            setRemovalIds(null);
+            notify("Library updated. Existing runs continue unchanged.");
+          }}
+        />
+      )}
       <section className="ws-editor">
         {!active ? (
           <Empty
@@ -951,18 +1151,45 @@ export function Studio({
                       <div>
                         <h3>Market & session</h3>
                         <p>
-                          Regular US exchange hours. Session boundaries adjust
-                          for holidays and early closes.
+                          {fx
+                            ? "IDEALPRO spot currencies use qualified broker FX sessions, including maintenance breaks and weekend closures. Choose the pair when preparing a run."
+                            : reusable
+                              ? "Choose the exact contract when preparing a run. Equities use regular US sessions; PAXOS crypto uses UTC days, including weekends."
+                              : simulation
+                                ? "UTC daily sessions, including weekends. Session windows and exits refer to UTC midnight. Protection and fills are simulated locally."
+                                : "Regular US exchange hours. Session boundaries adjust for holidays and early closes."}
                         </p>
                         <div className="ws-form-grid">
-                          {setting("symbol", "Stock or ETF symbol")}
+                          {fx &&
+                            setting("signal_source", "Signal price source", [
+                              ["MIDPOINT", "Midpoint"],
+                              ["BID", "Bid"],
+                              ["ASK", "Ask"],
+                            ])}
+                          {setting(
+                            "symbol",
+                            simulation
+                              ? "Crypto symbol"
+                              : "Stock or ETF symbol",
+                            simulation
+                              ? [
+                                  ["BTC", "BTC / USD - PAXOS"],
+                                  ["ETH", "ETH / USD - PAXOS"],
+                                ]
+                              : undefined,
+                          )}
                           {setting("timeframe", "Candle interval", [
                             [5, "5 seconds"],
                             [60, "1 minute"],
                             [300, "5 minutes"],
                           ])}
                           {setting("evaluation", "Evaluate conditions", [
-                            ["intrabar", "On each trade · intrabar"],
+                            [
+                              "intrabar",
+                              fx
+                                ? "On each selected FX observation · intrabar"
+                                : "On each trade · intrabar",
+                            ],
                             ["bar_close", "At completed candle"],
                           ])}
                         </div>
@@ -987,6 +1214,17 @@ export function Studio({
                           on the canvas. Shared calculations have one
                           definition.
                         </p>
+                        {paired && (
+                          <p>
+                            {fx
+                              ? "Wait for a full live minute after arming. During the following minute, the selected signal price must strictly exceed that candle’s high. Equality does not trigger. Submit one base-quantity BUY MKT/IOC to IBKR Paper; then pause after the trade or a zero-fill terminal outcome."
+                              : longOnly
+                                ? "Monitor the previous complete live minute high. A subsequent fresh Last crossing sends one USD cash-budget market buy, IOC, to IBKR Paper. No short branch."
+                                : "Buy stop-market at the previous completed live minute high; short sell stop-market at its low. First fill cancels the other entry. Wait for a complete live minute after arming."}
+                            {simulation &&
+                              " Shorts are hypothetical local positions; no Paxos orders."}
+                          </p>
+                        )}
                         {rules("entry")}
                       </div>
                     </section>
@@ -994,6 +1232,25 @@ export function Studio({
                       <div className="ws-section-number">03</div>
                       <div>
                         <h3>Position sizing</h3>
+                        {active.document.schema_version === 7 && (
+                          <button
+                            onClick={() =>
+                              modify((document) => {
+                                document.schema_version = 8;
+                              })
+                            }
+                          >
+                            Use optional paper ceilings in this draft
+                          </button>
+                        )}
+                        {[8, 9].includes(active.document.schema_version) && (
+                          <p>
+                            Monetary ceilings are optional for fixed shares.
+                            Leave a ceiling empty to disable it. Risk-based
+                            sizing requires a positive stop-risk budget. Publish
+                            explicitly to apply changes to new runs.
+                          </p>
+                        )}
                         <p>
                           Gaps can exceed planned stop risk. The session risk
                           profile can impose tighter limits.
@@ -1001,7 +1258,14 @@ export function Studio({
                         <div className="ws-form-grid">
                           {setting("sizing", "Sizing method", [
                             ["risk", "Planned stop risk"],
-                            ["fixed", "Fixed shares"],
+                            [
+                              "fixed",
+                              simulation
+                                ? "Fixed crypto quantity"
+                                : fx
+                                  ? "Fixed base-currency quantity"
+                                  : "Fixed shares",
+                            ],
                           ])}
                           {setting(
                             "risk",
@@ -1010,10 +1274,12 @@ export function Studio({
                             "USD",
                           )}
                           {setting(
-                            "shares",
-                            "Fixed-share ceiling",
+                            simulation ? "quantity" : "shares",
+                            simulation
+                              ? "Fixed-quantity ceiling"
+                              : "Fixed-share ceiling",
                             undefined,
-                            "shares",
+                            simulation ? "units" : "shares",
                           )}
                           {setting(
                             "notional",
@@ -1029,10 +1295,21 @@ export function Studio({
                       <div>
                         <h3>Protective stop & profit target</h3>
                         <p>
-                          A stop is mandatory. Add a profit-target block when
-                          the strategy needs one.
+                          {paired
+                            ? longOnly
+                              ? "Locally monitored protection based on confirmed broker fills."
+                              : "Both directions use fixed protection based on the confirmed fill."
+                            : "A stop is mandatory. Add a profit-target block when the strategy needs one."}
                         </p>
-                        {rules("protection")}
+                        {paired ? (
+                          <p>
+                            {longOnly
+                              ? "Local stop: 99% of actual average entry, rounded toward entry. A fresh Last breach requests a paper market sell, IOC. It cannot execute while the application or connection is unavailable."
+                              : "Fixed stop-loss: 99% of actual average entry for a long, 101% for a short, rounded toward entry. No profit target or trailing stop."}
+                          </p>
+                        ) : (
+                          rules("protection")
+                        )}
                       </div>
                     </section>
                     <section className="ws-config-section">
@@ -1043,7 +1320,14 @@ export function Studio({
                           Existing positions retain their published exit rules
                           after disarming.
                         </p>
-                        {rules("exit")}
+                        {paired ? (
+                          <p>
+                            One completed trade then pause. Review and manually
+                            re-arm for another trade.
+                          </p>
+                        ) : (
+                          rules("exit")
+                        )}
                         {setting(
                           "exit_before_close",
                           "Initiate session exit",
@@ -1057,13 +1341,16 @@ export function Studio({
                       <div>
                         <h3>Execution limits</h3>
                         <p>
-                          Entries stop 15 minutes before exchange close. Every
-                          entry passes account-wide risk checks.
+                          Entries stop 15 minutes before{" "}
+                          {simulation ? "UTC midnight" : "exchange close"}.
+                          Every entry passes account-wide risk checks.
                         </p>
                         <div className="ws-form-grid">
                           {setting(
                             "max_entries",
-                            "Entries per session",
+                            paired
+                              ? "Trades per authorization"
+                              : "Entries per session",
                             undefined,
                             "entries",
                           )}
@@ -1239,6 +1526,11 @@ export function Studio({
                       />
                     </label>
                     {catalog
+                      .filter(
+                        (spec) =>
+                          !paired &&
+                          !["paired_stop", "long_breakout"].includes(spec.kind),
+                      )
                       .filter((spec) =>
                         `${spec.label} ${spec.group}`
                           .toLowerCase()
@@ -1276,8 +1568,9 @@ export function Studio({
                 <div>
                   <h3>{active.name}</h3>
                   <p>
-                    {active.document.settings.symbol} ·{" "}
-                    {titleCase(String(active.document.settings.evaluation))} ·{" "}
+                    {active.document.settings.symbol ??
+                      "Instrument selected per run"}{" "}
+                    · {titleCase(String(active.document.settings.evaluation))} ·{" "}
                     {active.document.settings.timeframe}-second candles
                   </p>
                   {explanation.map((item) => (
@@ -1337,6 +1630,48 @@ export function Studio({
                 <button onClick={() => setPublishOpen(false)}>
                   Keep editing
                 </button>
+                {![7, 8, 9].includes(active.document.schema_version) && (
+                  <button
+                    onClick={() => {
+                      void api<Draft>("/strategies/convert-stock", "POST", {
+                        name: active.name,
+                        document: active.document,
+                      })
+                        .then((draft) => {
+                          setPublishOpen(false);
+                          notify(
+                            "Created a reusable stock copy. The original published strategy is unchanged.",
+                          );
+                          setDrafts((items) => [...items, draft]);
+                          selectDraft(draft);
+                        })
+                        .catch((error: Error) => notify(error.message, true));
+                    }}
+                  >
+                    Create reusable copy
+                  </button>
+                )}
+                {longOnly && !fx && !simulation && (
+                  <button
+                    onClick={() => {
+                      void api<Draft>("/strategies/convert-fx", "POST", {
+                        name: active.name,
+                        document: active.document,
+                      })
+                        .then((draft) => {
+                          setPublishOpen(false);
+                          setDrafts((items) => [...items, draft]);
+                          selectDraft(draft);
+                          notify(
+                            "Created an FX copy with Midpoint signals. Review and publish it explicitly; the original is unchanged.",
+                          );
+                        })
+                        .catch((error: Error) => notify(error.message, true));
+                    }}
+                  >
+                    Create FX copy
+                  </button>
+                )}
                 {versions[0] && (
                   <button
                     onClick={() => {
@@ -1370,7 +1705,7 @@ export function Studio({
                         }
                         setPublishOpen(false);
                         notify(
-                          `Version ${version.version} published. Test it before arming a paper session.`,
+                          `Version ${version.version} published. Test it before arming a session.`,
                         );
                       })
                       .catch((error: Error) => notify(error.message, true))

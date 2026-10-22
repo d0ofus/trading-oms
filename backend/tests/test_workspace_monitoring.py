@@ -65,6 +65,9 @@ def test_durable_alert_retry_and_heartbeat_stop_when_engine_is_unhealthy(tmp_pat
     store = Store(tmp_path)
     monitor = Monitoring(store, lambda: healthy[0], vault=MemoryVault())
     monitor.status = lambda: {"configured": True}
+    monitor.vault.write(
+        "healthchecks_url", "https://hc-ping.com/00000000-0000-0000-0000-000000000000"
+    )
     monitor.last_backup_day = datetime.now(UTC).date().isoformat()
     monitor.deliver = lambda channel, *args: deliveries.append(channel) or len(deliveries) > 1
     store.put(
@@ -85,3 +88,22 @@ def test_durable_alert_retry_and_heartbeat_stop_when_engine_is_unhealthy(tmp_pat
     healthy[0] = False
     monitor.tick(200)
     assert len(deliveries) == 3
+
+
+def test_telegram_can_operate_without_healthchecks(tmp_path):
+    vault = MemoryVault()
+    calls = []
+    monitor = Monitoring(
+        Store(tmp_path),
+        lambda: True,
+        vault=vault,
+        transport=httpx.MockTransport(
+            lambda request: calls.append(request.url.host) or httpx.Response(200, json={"ok": True})
+        ),
+    )
+    monitor.configure("000000:" + "fixture" * 5, "000000", "")
+    assert monitor.status()["configured"]
+    assert monitor.test("telegram")["passed"]
+    with pytest.raises(ValueError):
+        monitor.test("healthchecks")
+    assert calls == ["api.telegram.org"]

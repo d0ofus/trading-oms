@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+from .graph import number
 from .oms import OrderLedger
 from .store import Store
 
@@ -39,6 +40,9 @@ class ReplayOMS(OrderLedger):
     def incident(self, code, detail):
         raise ValueError(f"Replay observation failed: {code}: {detail}")
 
+    def _order_failure(self, order, observed, state):
+        self.incident("order_uncertain", "An order was rejected or has unknown state.")
+
     def entry(self, payload):
         identity = uuid.uuid4().hex
         payload = {
@@ -48,7 +52,9 @@ class ReplayOMS(OrderLedger):
             "symbol": self.symbol,
             "capture": self.capture,
         }
-        quantity, limit, stop = payload["quantity"], payload["limit"], payload["stop"]
+        quantity, limit, stop = number(payload["quantity"]), payload["limit"], payload["stop"]
+        if not isinstance(payload["quantity"], int):
+            payload["quantity"] = str(quantity)
         for field in ("limit", "stop", "target"):
             if payload.get(field) is not None:
                 payload[field] = str(payload[field])

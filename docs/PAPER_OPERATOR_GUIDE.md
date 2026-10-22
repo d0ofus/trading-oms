@@ -1,18 +1,38 @@
 # Internal paper operations and acceptance
 
+New stock/FX runs use [paper account buying power and visible signal outcomes](PAPER_BUYING_POWER_AND_SIGNALS.md). This supersedes native-currency cash and mandatory credit-preview requirements for `paper_buying_power_v1`; older bindings retain their approved policies.
+
+Current monitoring and recovery behavior is defined in [Current operational monitoring](CURRENT_OPERATIONAL_MONITORING.md). It supersedes the historical recovery intervals and acknowledgment workflow described below.
+
+See [Minimal paper workflow](MINIMAL_PAPER_WORKFLOW.md) for schema-8 sizing, automatic preparation, final authorization and routine resumption. It supersedes the legacy monetary caps and manual setup instructions below for newly published schema-8 stock runs. [Automatic recovery and stock preparation](AUTOMATIC_RECOVERY_AND_STOCK_RULES.md) describes contract rules; [Run preparation and recovery](RUN_PREPARATION_AND_RECOVERY.md) describes inactive-run archival and legacy recovery APIs.
+
+Current release: use [the unified IBKR workspace guide](UNIFIED_WORKSPACE_GUIDE.md)
+for contract search, reusable templates and the new crypto paper workflow. Both legacy
+launchers open port 8000. Stop old engines and reconcile the paper account flat before
+first migration. Local PAXOS protection is distinct from broker-held equity protection.
+
+For pending acknowledgment, code 201 rejection diagnostics, and explicit incident
+recovery, see [pending paper orders and recovery](PENDING_ORDER_RECOVERY.md).
+
 This guide applies to the professional workspace in `workspace/`. Historical simulation and review packets describe earlier releases. The current gate is automated verification, recorded code self-review, supervised actual paper trials, then operator acceptance. No independent review, real broker test or five-session acceptance is implied by a passing automated test.
 
 ## Session operation
 
-The session is the current regular XNYS exchange session, including holidays and early closes. Times appear in America/New_York and your browser's local timezone. New entries stop 15 minutes before close. The published exit setting starts a serialized close at least five minutes before close. Authorization ends at the exchange close. There are no extended-hours entries.
+Stock execution uses the contract's approved exchange session, including holidays, breaks and early closes. Qualified US whole-share long-only runs may explicitly select pre-market plus regular hours with limit entries and locally monitored protection. Other runs retain their approved regular-session policy. The published entry/exit cutoffs remain effective. The PAXOS long-only template retains UTC calendar days and its existing execution policy.
 
-The default smoke profile allows one run and one share. After a protected paper entry, deliberate close and successful reconciliation, the operator may accept supervised expansion. Qualified limits are five distinct symbols/runs, ten shares and $1,000 notional per run, $10 planned stop risk per run, $50 reserved stop risk and $5,000 gross exposure account-wide, a $100 daily loss stop and five entries per run/session. Strategy and custom profile limits may be tighter. Profiles are immutable versions.
+Legacy smoke/qualified profiles retain one-share qualification and their USD 1,000 notional, USD 10 run risk, USD 50 reserved risk and USD 5,000 exposure ceilings. New schema-8 profiles default to selected quantity and five runs with no monetary ceilings, subject to funding, reservations, legal quantities and optional published limits. One-lot qualification is optional. Profiles are immutable versions; changing a published strategy requires explicit publication and a new run. There is no cumulative daily-loss entry stop.
 
 Select several runs and review them together. Batch arming succeeds for the whole set or fails for the whole set. Fix or deselect a blocked run. Server checks run again at arming, reservation and dispatch; the UI cannot override a failed check.
 
-Entries are whole-share limit orders using current broker quotes and market increment rules, with a broker GTD deadline bounded by 30 seconds. Brackets transmit the parent and optional target before the final GTC stop. Protective legs use an OCA group with proportional reduction and overfill blocking. The service verifies actual broker identities, quantities, prices, executions, positions and protection. A connected socket alone never means permission to trade.
+Existing equity graph entries are whole-share limit orders using current broker quotes and market increment rules, with a broker GTD deadline bounded by 30 seconds. Brackets transmit the parent and optional target before the final GTC stop. Protective legs use an OCA group with proportional reduction and overfill blocking. The previous-minute OCA template instead uses protected native stop-market entry pairs and minute replacement. The PAXOS long-only template uses cash-budget market IOC buys and fractional market IOC sells, with a locally monitored stop. The service verifies actual broker identities, quantities, prices, executions, positions and protection. A connected socket alone never means permission to trade.
 
-The daily loss gate uses current broker daily P/L, including unrealized P/L, and conservatively subtracts reported USD costs received today. This can count some costs twice; it cannot silently omit a missing P/L value. Current account facts and reserved capacity constrain sizing.
+Daily P/L is informational, with its value, timestamp and current/stale/unavailable status in Settings. Missing or invalid P/L, a quiet subscription, subscription-specific errors and losses do not prevent arming or entry. This deliberately permits continued paper entries after cumulative losses. Current account facts, reserved capacity, fresh position marks, quotes, protection and other risk checks still apply. The old commission-adjusted daily-loss calculation has been removed; commissions remain journaled. Historical profiles with a daily-loss field are retained and labelled retired/unenforced; a successor without that field is published for new authorizations.
+
+Gateway 2119 is an informational market-data farm connection message, not a critical incident. A one-time audited correction resolves old `broker_2119` incidents without clearing unrelated incidents or arming runs. Connection and feed readiness are still independently checked.
+
+Reconciliation preserves position instrument types. Confirmed own-account `CASH` currency/FX contracts are displayed separately from OMS-managed security positions; they do not create a false stock-quantity mismatch. They are not treated as proof that the account is empty. Unknown instrument types, external security holdings and unexpected working orders still block. Currency symbols alone are never used to infer CASH classification. Historical journal entries are unchanged; a new typed snapshot is required.
+
+The Trading Desk shows Last, bid and ask with separate timestamps, downloaded history counts and feed readiness. `History downloaded` does not imply a fresh trade stream or that every strategy indicator is ready. Closed-market equities can have complete history while waiting for the next session's trades. See the [unified workspace guide](UNIFIED_WORKSPACE_GUIDE.md) for weekend PAXOS paper testing. Former local simulation records remain historical and do not establish broker execution capability.
 
 ## Strategies and replay
 
@@ -26,9 +46,24 @@ Replay shares the graph evaluator, signal transitions, Decimal sizing, durable o
 
 ## Interruptions and operator recovery
 
+Current recovery uses scoped trading restrictions, separately from incident history
+and ongoing investigation. See [current-risk recovery and capacity](WORKSPACE_HEALTH_AND_CAPACITY.md)
+for migration and evidence requirements. After a routine watchdog/connectivity
+failure, allow a fresh post-failure reconciliation and 30 healthy seconds, then
+explicitly acknowledge verified recovery inside **Review & arm**. Active failures
+cannot be acknowledged away. Engine faults and order/protection uncertainty still
+need dedicated review by selecting the incident in **Activity > Current restrictions**
+and explicitly acknowledging verified recovery. Notes are optional; no typing is
+required to release a verified restriction. The dialog refreshes every two seconds
+while visible and shows individual checks and the remaining observation interval.
+See [feed diagnosis and recovery controls](FEED_RECOVERY.md) for targeted retries.
+Emergency stop is separate. Released historical episodes do not block later runs;
+new runs cannot bypass applicable unresolved uncertainty. Operational recovery can
+leave an investigation open without claiming that the root cause has been fixed.
+
 | Situation | Service behavior | Operator action |
 |---|---|---|
-| Temporary Gateway disconnect | Pause entries; bounded reconnect; restore data, repair history and reconcile; never resend unknown dispatch | Watch recovery status. Unchanged valid session authorization can resume only after all checks pass |
+| Temporary Gateway disconnect | Disarm entries; bounded reconnect; restore data, repair history and reconcile; never resend unknown dispatch or liquidate solely because of the outage | Watch recovery status. Existing protection resumes after ownership and fresh data are established; new entries require fresh manual arming |
 | 1100 / 1101 / 1102 / 1300 | Treat lost connectivity/data as a recovery boundary; restore subscriptions as required | Inspect incidents and wait for fresh data/reconciliation; a changed port does not authorize another endpoint |
 | Application restart | Restore emergency state and order monitoring; all new entries disarmed | Verify paper context, reconcile and review a fresh session authorization |
 | Changed login or unresolved order | Invalidate authorization and block entries | Return to the correct paper login; inspect Gateway and Activity. Do not retry an uncertain order |
@@ -69,6 +104,12 @@ Restoration validates inventory, hashes, database integrity, published hashes an
 Both visual strategies and five distinct concurrent symbols must be demonstrated before release acceptance. Time the actual trader workflows after familiarization: template configuration under five minutes; parameter edit/review/publish under two minutes; prepared-session arming and blocker-to-remedy identification under 30 seconds. Automated browser tests establish behavior, not those human task timings.
 
 ## Version and dependency provenance
+
+For the new paired-stop workflow, follow the [OCA breakout guide](OCA_BREAKOUT_GUIDE.md).
+It adds a separate supervised one-share qualification for each direction, native OCA
+entry groups, fresh borrow checks and a non-executing broker credit preview. Unlike
+legacy session resumption, OCA runs require fresh manual arming after disconnect.
+Do not treat simulator results as evidence of Gateway acceptance.
 
 The selected official [IBKR API distribution](https://interactivebrokers.github.io/) is 10.50.2. The selected [Windows offline Gateway](https://www.interactivebrokers.com/en/trading/ibgateway-latest.php) is 10.51.1a. Download scripts reject a changed artifact hash. File hashes and the verified installer signature are recorded in `PAPER_DEPENDENCIES.json`; actual paper handshake and market-data capacity still require operator trials.
 

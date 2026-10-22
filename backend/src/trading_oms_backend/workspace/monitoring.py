@@ -91,6 +91,8 @@ def validate_configuration(token, destination, heartbeat):
         raise ValueError("Enter a valid Telegram bot token.")
     if not re.fullmatch(r"-?[0-9]{1,20}", destination):
         raise ValueError("Enter the numeric Telegram destination.")
+    if not heartbeat:
+        return
     parsed = urlparse(heartbeat)
     if (
         parsed.scheme != "https"
@@ -120,10 +122,7 @@ class Monitoring:
 
     def status(self):
         try:
-            configured = all(
-                self.vault.read(key)
-                for key in ("telegram_token", "telegram_chat", "healthchecks_url")
-            )
+            configured = all(self.vault.read(key) for key in ("telegram_token", "telegram_chat"))
         except ValueError:
             configured = False
         return {
@@ -154,9 +153,9 @@ class Monitoring:
         token, destination, heartbeat = (
             self.vault.read(k) for k in ("telegram_token", "telegram_chat", "healthchecks_url")
         )
-        if not token or not destination or not heartbeat:
+        if not token or not destination or (channel == "healthchecks" and not heartbeat):
             raise ValueError("Configure monitoring credentials before sending a test.")
-        validate_configuration(token, destination, heartbeat)
+        validate_configuration(token, destination, heartbeat or "")
         with httpx.Client(
             timeout=8, follow_redirects=False, transport=self.transport, trust_env=False
         ) as client:
@@ -234,7 +233,11 @@ class Monitoring:
                 self.store.event(
                     "notification.delivery", {"passed": passed, "attempt": item["attempts"]}
                 )
-            if clock >= self.next_heartbeat and self.healthy():
+            if (
+                clock >= self.next_heartbeat
+                and self.healthy()
+                and self.vault.read("healthchecks_url")
+            ):
                 self.next_heartbeat = clock + 30
                 passed = self.deliver("healthchecks")
                 self.store.put(

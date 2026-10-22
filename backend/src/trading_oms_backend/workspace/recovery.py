@@ -15,12 +15,14 @@ from .graph import canonical
 from .store import Conflict, Connection, Store, now
 
 
-def backup_bundle(store: Store, directory: Path):
+def backup_bundle(store: Store, directory: Path, *, environment="paper"):
+    if environment not in {"paper", "live_crypto_simulation"}:
+        raise Conflict("Unsupported backup environment.")
     directory.mkdir(parents=True, exist_ok=True)
     identity = uuid.uuid4().hex
     temporary = directory / f"backup-{identity}.pending"
     final = directory / f"paper-{now()[:10]}-{identity[:8]}.zip"
-    manifest = {"schema": 1, "environment": "paper", "created_at": now(), "files": {}}
+    manifest = {"schema": 1, "environment": environment, "created_at": now(), "files": {}}
     with tempfile.TemporaryDirectory(prefix="oms-backup-") as staging:
         database = store.backup(Path(staging))
         files = [(database, "workspace.sqlite3", database.stat().st_size)]
@@ -58,12 +60,12 @@ def backup_bundle(store: Store, directory: Path):
                     raise Conflict("A market-data capture failed its checksum before backup.")
                 manifest["files"][name] = checksum.hexdigest()
             archive.writestr("manifest.json", canonical(manifest))
-    validate_bundle(temporary)
+    validate_bundle(temporary, environment=environment)
     temporary.replace(final)
     return final
 
 
-def validate_bundle(path: Path):
+def validate_bundle(path: Path, *, environment="paper"):
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)) or "manifest.json" not in names:
@@ -71,7 +73,7 @@ def validate_bundle(path: Path):
         if sum(info.file_size for info in archive.infolist()) > 64 * 1024**3:
             raise Conflict("Backup exceeds the supported restore size.")
         manifest = json.loads(archive.read("manifest.json"))
-        if manifest.get("schema") != 1 or manifest.get("environment") != "paper":
+        if manifest.get("schema") != 1 or manifest.get("environment") != environment:
             raise Conflict("Backup format or environment is unsupported.")
         if set(names) != set(manifest["files"]) | {"manifest.json"}:
             raise Conflict("Backup file inventory differs from its manifest.")

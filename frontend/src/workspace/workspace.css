@@ -271,6 +271,12 @@ details p {
   color: var(--green);
   border-color: color-mix(in srgb, var(--green) 25%, transparent);
 }
+
+.ws-run-status .ws-badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .ws-badge.warning {
   background: var(--amber-bg);
   color: var(--amber);
@@ -653,9 +659,7 @@ details p {
   padding: 0 22px 16px;
 }
 .ws-data-list > div {
-  display: grid;
-  grid-template-columns: 60px 1fr auto;
-  gap: 8px;
+  display: block;
   padding: 13px 0;
   border-top: 1px solid var(--subtle);
 }
@@ -723,6 +727,9 @@ details p {
 }
 .ws-check.blocked > svg {
   color: var(--amber);
+}
+.ws-check.waiting > svg {
+  color: var(--muted);
 }
 .ws-check > div {
   flex: 1;
@@ -1299,6 +1306,22 @@ details p {
   flex-direction: column;
   gap: 5px;
   padding: 0 8px 22px;
+}
+.ws-library-record {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.ws-library-record > input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+}
+.ws-library-record > button {
+  flex: 1;
+  min-width: 0;
 }
 .ws-library-item {
   border: 1px solid transparent;
@@ -2286,4 +2309,34 @@ details p {
   display: block;
   color: var(--muted);
   font-size: 12px;
+}
+/* Quote timestamps and history progress remain distinct from feed readiness. */
+.ws-market-detail {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ws-quote-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+.ws-quote-grid dd {
+  margin: 5px 0;
+  font-variant-numeric: tabular-nums;
+}
+.ws-quote-grid small {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.ws-virtual td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
+}
+.ws-virtual .ws-spacer td {
+  border: 0;
 }

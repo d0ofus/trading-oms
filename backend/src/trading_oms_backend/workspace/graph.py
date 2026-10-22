@@ -36,6 +36,14 @@ def number(value: Any) -> Decimal:
 
 CATALOG = [
     {
+        "kind": "paired_stop",
+        "label": "Previous minute OCA entries",
+        "group": "Trade plan",
+        "inputs": {},
+        "output": "boolean",
+        "defaults": {},
+    },
+    {
         "kind": "field",
         "label": "Market value",
         "group": "Market",
@@ -185,6 +193,13 @@ CATALOG = [
         "defaults": {},
     },
 ]
+CATALOG.append(
+    {
+        **next(spec for spec in CATALOG if spec["kind"] == "paired_stop"),
+        "kind": "long_breakout",
+        "label": "Previous-minute long-only breakout",
+    }
+)
 SPECS = {spec["kind"]: spec for spec in CATALOG}
 DEFAULT_SETTINGS = {
     "symbol": "AAPL",
@@ -278,6 +293,139 @@ class Compiled:
         return {**outputs, "values": values}
 
     def explain(self) -> list[dict]:
+        def money_limit(key):
+            value = self.document["settings"].get(key)
+            return "no monetary ceiling" if value is None else f"USD {value}"
+
+        if self.document["schema_version"] == 9:
+            source = self.document["settings"]["signal_source"]
+            return [
+                {
+                    "node": "long",
+                    "kind": "entry",
+                    "text": f"Use {source} for live signals and matching history. "
+                    "Wait for a complete live minute beginning after authorization; "
+                    "a fresh price strictly above its unrounded high during the next minute "
+                    "submits one paper base-quantity BUY MKT/IOC. Equality does not trigger.",
+                },
+                {
+                    "node": "long",
+                    "kind": "stop",
+                    "text": "Protect actual fill VWAP at 99%, rounded toward entry. "
+                    "Broker-held bid/ask stops or explicitly approved local bid-triggered "
+                    "limit exits are pinned in the run. The trigger distance is not a "
+                    "guaranteed loss limit.",
+                },
+                {
+                    "node": "long",
+                    "kind": "sizing",
+                    "text": "Explicit funded base-currency quantity; published notional: "
+                    f"{money_limit('notional')}; planned stop risk: {money_limit('risk')}. "
+                    "Partial fills become the trade; no top-ups. Pause after completion "
+                    "or a terminal zero-fill entry.",
+                },
+                {
+                    "node": "long",
+                    "kind": "session",
+                    "text": "Use current qualified FX broker intervals. Request the session exit "
+                    f"{self.document['settings']['exit_before_close']} minutes before close; "
+                    "carry an unresolved exit intent across closure without claiming a fill.",
+                },
+            ]
+
+        if self.document["schema_version"] in (7, 8) and any(
+            n["kind"] == "long_breakout" for n in self.ordered
+        ):
+            return [
+                {
+                    "node": "long",
+                    "kind": "entry",
+                    "text": (
+                        "After arming, wait for a new complete eligible live minute. "
+                        "A subsequent fresh Last crossing its high submits one paper "
+                        "share-based market buy."
+                    ),
+                },
+                {
+                    "node": "long",
+                    "kind": "stop",
+                    "text": (
+                        "Protect confirmed fills at 99% of actual average entry, "
+                        "rounded toward entry. "
+                        "Broker-held or explicitly acknowledged local protection "
+                        "is pinned when preparing the run."
+                    ),
+                },
+                {
+                    "node": "long",
+                    "kind": "sizing",
+                    "text": (
+                        f"Published notional: {money_limit('notional')}; "
+                        + (
+                            "approved legal share quantity. "
+                            if self.document["schema_version"] == 8
+                            else "smallest legal quantity for qualification. "
+                        )
+                        + "Partial fills count as the trade. "
+                        "Pause after closing or a terminal zero-fill entry."
+                    ),
+                },
+            ]
+        if any(n["kind"] == "long_breakout" for n in self.ordered):
+            return [
+                {
+                    "node": "long",
+                    "kind": "entry",
+                    "text": (
+                        "Monitor the previous complete live minute high. A subsequent fresh "
+                        "Last crossing submits one paper USD cash-budget market buy, IOC. No "
+                        "short branch."
+                    ),
+                },
+                {
+                    "node": "long",
+                    "kind": "stop",
+                    "text": (
+                        "Locally monitor 99% of actual entry VWAP. A fresh stop breach "
+                        "requests a market sell, IOC. Protection cannot execute while the "
+                        "application or connection is unavailable."
+                    ),
+                },
+                {
+                    "node": "long",
+                    "kind": "sizing",
+                    "text": (
+                        "Initially supervised with a $25 ceiling. Partial fills count as the "
+                        "trade. Pause after closing; fresh manual arming is required."
+                    ),
+                },
+            ]
+        if any(n["kind"] == "paired_stop" for n in self.ordered):
+            return [
+                {
+                    "node": "pair",
+                    "kind": "entry",
+                    "text": "Buy stop-market at the previous completed live minute high; "
+                    "short sell "
+                    "stop-market at its low. First fill cancels the opposite entry. Refresh "
+                    "each minute only after confirmed cancellation and reconciliation.",
+                },
+                {
+                    "node": "pair",
+                    "kind": "stop",
+                    "text": "Fixed 1% protection from actual average entry: 99% for longs, "
+                    "101% for "
+                    "shorts, rounded toward entry. Stop-market slippage can exceed 1%.",
+                },
+                {
+                    "node": "pair",
+                    "kind": "sizing",
+                    "text": "Reserve both pending branches under the combined risk and "
+                    "notional limits. "
+                    "Pause after one completed trade; re-arm manually. Existing "
+                    "session exits apply.",
+                },
+            ]
         text: dict[str, str] = {}
         explanations = []
         for node in self.ordered:
@@ -358,17 +506,21 @@ class Compiled:
             }
         )
         size = (
-            f"up to {settings['shares']} fixed shares"
+            (
+                "the fixed stock quantity selected when preparing the run"
+                if self.document["schema_version"] in (7, 8)
+                else f"up to {settings.get('quantity', settings.get('shares'))} fixed units"
+            )
             if settings["sizing"] == "fixed"
-            else "whole shares sized from the planned stop risk"
+            else "units sized from the planned stop risk"
         )
         explanations.append(
             {
                 "node": "settings",
                 "kind": "sizing",
                 "text": (
-                    f"Use {size}, within ${settings['risk']} planned stop risk "
-                    f"and ${settings['notional']} notional. "
+                    f"Use {size}; planned stop risk: {money_limit('risk')}; "
+                    f"notional: {money_limit('notional')}. "
                     "Session qualification can impose tighter limits."
                     " Entry requires a false-to-true transition after warm-up, "
                     "at most once per candle."
@@ -381,8 +533,21 @@ class Compiled:
 def compile_graph(raw: dict) -> Compiled:
     if not isinstance(raw, dict) or set(raw) - {"nodes", "edges", "settings", "schema_version"}:
         raise GraphError("Unsupported strategy document.")
-    if raw.get("schema_version") != 3:
-        raise GraphError("Strategy schema version must be 3.")
+    version = raw.get("schema_version")
+    if type(version) is int and version == 9:
+        from .fx_strategies import compile_fx
+
+        return compile_fx(raw)
+    if type(version) is int and version in (7, 8):
+        from .stock_strategies import compile_stock
+
+        return compile_stock(raw)
+    if type(version) is int and version == 6:
+        from .reusable import compile_reusable
+
+        return compile_reusable(raw)
+    if type(version) is not int or version not in (3, 4, 5):
+        raise GraphError("Strategy schema version must be 3, 4 or 5.")
     nodes, edges = raw.get("nodes"), raw.get("edges")
     if (
         not isinstance(nodes, list)
@@ -393,9 +558,42 @@ def compile_graph(raw: dict) -> Compiled:
         raise GraphError("Use between 1 and 100 blocks and at most 200 connections.")
     if not isinstance(raw.get("settings", {}), dict):
         raise GraphError("Strategy settings must be named fields.")
-    settings = {**DEFAULT_SETTINGS, **raw.get("settings", {})}
-    if set(settings) != set(DEFAULT_SETTINGS):
+    defaults = dict(DEFAULT_SETTINGS)
+    crypto = version == 4 or (
+        version == 5 and raw.get("settings", {}).get("instrument_profile") == "paxos_crypto"
+    )
+    if version == 5:
+        defaults.update(
+            instrument_profile="us_equity", entry_timeout=60, max_entries=1, evaluation="bar_close"
+        )
+    if crypto:
+        defaults.pop("shares")
+        defaults.update(instrument_profile="paxos_crypto", quantity="0.001", symbol="BTC")
+    settings = {**defaults, **raw.get("settings", {})}
+    if set(settings) != set(defaults):
         raise GraphError("Unsupported strategy setting.")
+    if crypto:
+        if settings["instrument_profile"] != "paxos_crypto" or settings["symbol"] not in {
+            "BTC",
+            "ETH",
+        }:
+            raise GraphError("Crypto simulation supports BTC or ETH on PAXOS in USD.")
+        if not isinstance(settings["quantity"], str) or not 0 < number(settings["quantity"]) <= 10:
+            raise GraphError(
+                "Use a positive decimal quantity up to 10; notional and risk caps also apply."
+            )
+        settings["quantity"] = str(number(settings["quantity"]))
+    if version == 5 and (
+        settings["instrument_profile"] not in {"us_equity", "paxos_crypto"}
+        or settings["timeframe"] != 60
+        or settings["evaluation"] != "bar_close"
+        or settings["entry_timeout"] != 60
+        or settings["max_entries"] != 1
+    ):
+        raise GraphError(
+            "Paired stops require 1-minute closed candles, a 60-second lifetime "
+            "and one trade per authorization."
+        )
     if not re.fullmatch(r"[A-Z][A-Z0-9. -]{0,14}", str(settings["symbol"])):
         raise GraphError("Choose a supported US equity symbol.")
     if (
@@ -405,8 +603,8 @@ def compile_graph(raw: dict) -> Compiled:
     ):
         raise GraphError("Unsupported candle, evaluation or sizing mode.")
     for key, low, high in [
-        ("shares", 1, 10),
-        ("entry_timeout", 1, 30),
+        *(([("shares", 1, 10)]) if not crypto else []),
+        ("entry_timeout", 1, 60 if version == 5 else 30),
         ("exit_before_close", 5, 60),
         ("max_entries", 1, 5),
     ]:
@@ -433,6 +631,8 @@ def compile_graph(raw: dict) -> Compiled:
         if set(node) - {"id", "kind", "label", "position", "params"}:
             raise GraphError("Unsupported block property.", key)
         spec = SPECS[kind]
+        if kind == "paired_stop" and version != 5:
+            raise GraphError("Paired stop entries require schema version 5.", key)
         if not isinstance(node.get("params", {}), dict):
             raise GraphError("Block parameters must be named fields.", key)
         params = {**spec["defaults"], **node.get("params", {})}
@@ -485,7 +685,11 @@ def compile_graph(raw: dict) -> Compiled:
     for key, node in lookup.items():
         if set(inputs[key]) != set(SPECS[node["kind"]]["inputs"]):
             raise GraphError("Connect each required input.", key)
-    for kind in ("entry", "stop", "exit", "target"):
+    if version == 5 and (
+        len(lookup) != 1 or next(iter(lookup.values()))["kind"] != "paired_stop" or edges
+    ):
+        raise GraphError("Use one paired-stop block; its entry and 1% protection plan is fixed.")
+    for kind in () if version == 5 else ("entry", "stop", "exit", "target"):
         count = sum(n["kind"] == kind for n in lookup.values())
         if count > 1 or (kind in ("entry", "stop") and count != 1):
             raise GraphError(
@@ -501,7 +705,7 @@ def compile_graph(raw: dict) -> Compiled:
             raise GraphError("Circular connections cannot execute.")
         ordered.extend(remaining.pop(key) for key in available)
     document = {
-        "schema_version": 3,
+        "schema_version": version,
         "settings": settings,
         "nodes": list(lookup.values()),
         "edges": edges,
@@ -515,6 +719,17 @@ def compile_graph(raw: dict) -> Compiled:
         "edges": sorted(edges, key=canonical),
     }
     return Compiled(document, ordered, inputs, digest(semantic))
+
+
+def crypto_copy(document, symbol="BTC"):
+    """Explicit conversion; the source document and its published hash are untouched."""
+    import copy
+
+    result = copy.deepcopy(document)
+    result["schema_version"] = 5 if document.get("schema_version") == 5 else 4
+    result["settings"].pop("shares", None)
+    result["settings"].update(instrument_profile="paxos_crypto", quantity="0.001", symbol=symbol)
+    return compile_graph(result).document
 
 
 def templates() -> list[dict]:
@@ -617,4 +832,23 @@ def templates() -> list[dict]:
                 moving_edges,
             ),
         ]
+    ] + [
+        {
+            "id": "previous-minute-oca",
+            "name": "Previous 1-minute candle — OCA breakout",
+            "description": "Opposing stop-market entries, fixed 1% protection, "
+            "one trade then pause.",
+            "document": {
+                "schema_version": 5,
+                "settings": {
+                    **DEFAULT_SETTINGS,
+                    "instrument_profile": "us_equity",
+                    "evaluation": "bar_close",
+                    "entry_timeout": 60,
+                    "max_entries": 1,
+                },
+                "nodes": [node("pair", "paired_stop", 160, 100)],
+                "edges": [],
+            },
+        }
     ]

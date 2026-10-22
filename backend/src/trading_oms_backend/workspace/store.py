@@ -161,8 +161,11 @@ class Store:
         ):
             raise ValueError("Use a strategy document containing settings, nodes and connections.")
         if any(
-            not isinstance(v, (str, int, float)) or isinstance(v, bool)
-            for v in document["settings"].values()
+            (not isinstance(v, (str, int, float)) or isinstance(v, bool))
+            and not (
+                document.get("schema_version") in (8, 9) and k in {"risk", "notional"} and v is None
+            )
+            for k, v in document["settings"].items()
         ):
             raise ValueError("Strategy settings require text or numeric values.")
         kinds = {item["kind"] for item in CATALOG}
@@ -198,8 +201,25 @@ class Store:
             raise ValueError("Use a strategy name of 1–100 characters.")
         if len(canonical(document)) > 100_000:
             raise ValueError("Strategy is too large.")
+        if document.get("schema_version") == 8 and not self.get("migration", "paper_stock_v2"):
+            self.backup(self.directory / "backups")
+            self.put(
+                "migration",
+                "paper_stock_v2",
+                {"backed_up_at": now(), "historical_versions_unchanged": True},
+            )
+        if document.get("schema_version") == 9 and not self.get("migration", "paper_fx_v1"):
+            self.backup(self.directory / "backups")
+            self.put(
+                "migration",
+                "paper_fx_v1",
+                {"backed_up_at": now(), "historical_versions_unchanged": True},
+            )
         key = key or uuid.uuid4().hex
         with self.transaction() as db:
+            from .library import require_available
+
+            require_available(self, db, key)
             old = self.read(db, "draft", key)
             revision = old["revision"] if old else 0
             if revision != expected:
@@ -218,6 +238,9 @@ class Store:
 
     def publish(self, key, expected):
         with self.transaction() as db:
+            from .library import require_available
+
+            require_available(self, db, key)
             draft = self.read(db, "draft", key)
             if not draft or draft["revision"] != expected:
                 raise Conflict("Reload the latest draft before publishing.")
@@ -274,23 +297,42 @@ class Store:
                     run = json.loads(row["payload"])
                     run["armed"] = False
                     run["state"] = "paused"
+                    run["authorization_status"] = "revoked"
                     self.write(db, "run", row["id"], run)
             self.append(
                 db, "emergency.activated" if active else "emergency.cleared", {"active": active}
             )
 
     def reserve_order(self, key, payload, run_id, next_id, reservation=None):
-        payload_hash = digest(payload)
+        from .oca import LEG_OFFSETS, is_pair
+
+        payload = dict(payload)
+        if is_pair(payload) and reservation is None:
+            raise Conflict("A paired entry requires a combined risk reservation.")
+        if (
+            payload.get("execution") in {"crypto_breakout", "fx_breakout"}
+            and payload.get("purpose") == "entry"
+            and reservation is None
+        ):
+            raise Conflict("A currency paper entry requires a cash and stop-risk reservation.")
+        if reservation is not None and payload.get("conid"):
+            reservation = {**reservation, "conid": payload["conid"]}
         with self.transaction() as db:
             row = db.execute("SELECT * FROM outbox WHERE id=?", (key,)).fetchone()
             if row:
-                if row["hash"] != payload_hash:
+                if is_pair(payload) and "leg_ids" not in payload:
+                    payload["leg_ids"] = json.loads(row["payload"])["leg_ids"]
+                if row["hash"] != digest(payload):
                     raise Conflict("Order identity already belongs to a different payload.")
                 return {**dict(row), "created": False}
             if payload.get("purpose", "entry") == "entry" and (
                 self.read(db, "safety", "emergency") or {}
             ).get("active"):
                 raise Conflict("Emergency stop blocks new entries.")
+            if payload.get("purpose", "entry") == "entry" and (
+                self.read(db, "run", run_id) or {}
+            ).get("archived"):
+                raise Conflict("Archived runs cannot create new entries.")
             if reservation is not None:
                 from .graph import number
 
@@ -302,22 +344,125 @@ class Store:
                     for r in db.execute("SELECT payload FROM documents WHERE kind='reservation'")
                 ]
                 active = [r for r in existing if r.get("active")]
-                if any(r["symbol"] == reservation["symbol"] for r in active):
-                    raise Conflict("This symbol already has reserved entry or position capacity.")
+                for existing_reservation in active:
+                    owner = self.read(db, "run", existing_reservation.get("run_id", "")) or {}
+                    existing_conid = existing_reservation.get("conid", owner.get("conid"))
+                    conid = reservation.get("conid")
+                    if (existing_conid and conid and existing_conid == conid) or (
+                        (not existing_conid or not conid)
+                        and existing_reservation["symbol"] == reservation["symbol"]
+                    ):
+                        raise Conflict(
+                            "This contract already has reserved entry or position capacity."
+                        )
+                approved_plan = (run.get("binding") or {}).get("execution_plan") or {}
+                from .credit import validate_reservation
+
+                if approved_plan.get("funding_policy") != reservation.get("funding_policy"):
+                    raise Conflict("Reservation funding policy differs from the approved binding.")
+                validate_reservation(db, self, reservation)
+                modern = approved_plan.get("risk_policy") == "paper_stock_v2"
+                if modern and (
+                    payload.get(
+                        "fx_plan" if approved_plan.get("family") == "spot_fx" else "stock_plan"
+                    )
+                    != approved_plan
+                    or payload.get("approved_sizing") != run["binding"]["sizing"]
+                    or payload.get("risk_limits") != run["limits"]
+                    or reservation.get("risk_policy") != "paper_stock_v2"
+                    or run.get("limits", {}).get("risk_policy") != "paper_stock_v2"
+                ):
+                    raise Conflict("Reservation must match the authorized paper stock policy.")
                 if (
                     len(active) >= 5
-                    or sum(number(r["risk"]) for r in active) + number(reservation["risk"]) > 50
-                    or sum(number(r["notional"]) for r in active) + number(reservation["notional"])
-                    > 5000
+                    or not modern
+                    and (
+                        sum(number(r["risk"]) for r in active) + number(reservation["risk"]) > 50
+                        or sum(number(r["notional"]) for r in active)
+                        + number(reservation["notional"])
+                        > 5000
+                    )
                 ):
                     raise Conflict("Shared paper risk capacity is exhausted.")
+                if payload.get("fx_plan"):
+                    if run.get("entries", 0) or run.get("authorization_status") != "authorized":
+                        raise Conflict(
+                            "This FX authorization has already consumed its entry or is suspended."
+                        )
+                    for currency, requested in (
+                        {}
+                        if reservation.get("funding_policy")
+                        else reservation["currency_reserves"]
+                    ).items():
+                        outstanding = sum(
+                            number(
+                                r.get("currency_reserves", {}).get(
+                                    currency,
+                                    r.get("native_funds", 0)
+                                    if r.get("currency") == currency
+                                    else 0,
+                                )
+                            )
+                            for r in active
+                        )
+                        if outstanding + number(requested) > number(
+                            reservation["funding_snapshot"][currency]
+                        ):
+                            raise Conflict("Concurrent reservations exceed usable currency funds.")
+                    if not self.read(db, "fx_ledger", "baseline"):
+                        self.write(db, "fx_ledger", "baseline", payload["currency_baseline"])
+                    protection = {
+                        "run_id": run_id,
+                        "entry_id": key,
+                        "quantity": "0",
+                        "stop": payload["stop"],
+                        "type": payload["protection_type"],
+                        "state": "awaiting_fill",
+                    }
+                    self.write(db, "fx_protection", run_id, protection)
+                    self.append(db, "fx.protection.planned", protection)
+                    run.update(
+                        entries=run.get("entries", 0) + 1, state="entry_working", last_signal=now()
+                    )
+                    self.write(db, "run", run_id, run)
+                    self.append(
+                        db,
+                        "authorization.consumed",
+                        {
+                            "run_id": run_id,
+                            "authorization_id": run["authorization_id"],
+                            "order_id": key,
+                        },
+                    )
                 self.write(
                     db, "reservation", key, {**reservation, "active": True, "run_id": run_id}
                 )
                 self.append(db, "risk.reserved", {"id": key, **reservation})
+            if payload.get("execution") == "crypto_breakout" and payload.get("purpose") == "entry":
+                plan = {
+                    "run_id": run_id,
+                    "entry_id": key,
+                    "quantity": "0",
+                    "type": "locally_monitored",
+                    "stop": payload["stop"],
+                    "stop_ratio": "0.99",
+                }
+                self.write(db, "crypto_protection", run_id, plan)
+                self.append(db, "crypto.protection.planned", plan)
+            high_water = self.read(db, "allocator", "orders") or {}
             broker_id = max(
-                next_id, db.execute("SELECT COALESCE(MAX(broker_id),0)+3 FROM outbox").fetchone()[0]
+                next_id,
+                high_water.get("next_id", 0),
+                db.execute("SELECT COALESCE(MAX(broker_id),0)+3 FROM outbox").fetchone()[0],
             )
+            if is_pair(payload):
+                payload["leg_ids"] = {
+                    name: broker_id + offset for name, offset in LEG_OFFSETS.items()
+                }
+            self.write(
+                db, "allocator", "orders", {"next_id": broker_id + (4 if is_pair(payload) else 3)}
+            )
+            payload_hash = digest(payload)
             db.execute(
                 "INSERT INTO outbox VALUES(?,?,?,?,?,?,?)",
                 (key, payload_hash, canonical(payload), run_id, "reserved", broker_id, now()),
@@ -327,7 +472,58 @@ class Store:
                 "order.intent.reserved",
                 {"id": key, "run_id": run_id, "payload": payload, "broker_id": broker_id},
             )
-            return {"id": key, "broker_id": broker_id, "state": "reserved", "created": True}
+            signal = self.read(db, "signal_outcome", run_id)
+            if (
+                payload.get("purpose", "entry") == "entry"
+                and signal
+                and signal.get("authorization_id") == run.get("authorization_id")
+                and not signal.get("order_id")
+            ):
+                signal.update(
+                    order_id=key,
+                    state="checking",
+                    updated_at=now(),
+                    detail="Entry allocated; validating dispatch.",
+                )
+                self.write(db, "signal_outcome", run_id, signal)
+                self.append(db, "signal.outcome", signal)
+            if is_pair(payload):
+                self.write(
+                    db,
+                    "oca_group",
+                    key,
+                    {
+                        "id": key,
+                        "run_id": run_id,
+                        "state": "reserved",
+                        "winner": None,
+                        "candle": payload["candle"],
+                        "leg_ids": payload["leg_ids"],
+                        "authorization_id": run["authorization_id"],
+                        "protection": "pending",
+                        "counted": False,
+                        "created_at": now(),
+                    },
+                )
+            return {
+                "id": key,
+                "broker_id": broker_id,
+                "state": "reserved",
+                "created": True,
+                **({"leg_ids": payload["leg_ids"]} if is_pair(payload) else {}),
+            }
+
+    def allocate_broker_id(self, next_id):
+        """Reserve a non-reusable ID for a non-executing broker credit preview."""
+        with self.transaction() as db:
+            broker_id = max(
+                next_id,
+                (self.read(db, "allocator", "orders") or {}).get("next_id", 0),
+                db.execute("SELECT COALESCE(MAX(broker_id),0)+4 FROM outbox").fetchone()[0],
+            )
+            self.write(db, "allocator", "orders", {"next_id": broker_id + 1})
+            self.append(db, "broker.preview.id.allocated", {"broker_id": broker_id})
+            return broker_id
 
     def transition(self, key, state, observation):
         with self.transaction() as db:
@@ -418,6 +614,7 @@ class Store:
                 reservation = self.read(db, "reservation", key)
                 if (
                     not run
+                    or run.get("archived")
                     or not run.get("armed")
                     or run.get("expires_at", "") <= now()
                     or not reservation
@@ -433,9 +630,24 @@ class Store:
                 raise Conflict("Order cannot be dispatched again. Reconciliation is required.")
             self.append(db, "order.dispatch.started", {"id": key})
 
-    def orders(self):
+    def display_runs(self):
         with self.connect() as db:
-            rows = db.execute("SELECT * FROM outbox ORDER BY created_at DESC").fetchall()
+            rows = db.execute(
+                "SELECT payload FROM documents WHERE kind='run' AND "
+                "(json_extract(payload,'$.armed')=1 OR "
+                "CAST(json_extract(payload,'$.position') AS REAL)!=0) "
+                "UNION SELECT payload FROM (SELECT payload FROM documents WHERE kind='run' "
+                "AND COALESCE(json_extract(payload,'$.archived'),0)=0 "
+                "ORDER BY rowid DESC LIMIT 50)"
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def orders(self, active_only=False):
+        with self.connect() as db:
+            where = " WHERE state NOT IN ('filled','cancelled','rejected')" if active_only else ""
+            rows = db.execute(
+                "SELECT * FROM outbox" + where + " ORDER BY created_at DESC"
+            ).fetchall()
         return [{**dict(r), "payload": json.loads(r["payload"])} for r in rows]
 
     def verify(self):

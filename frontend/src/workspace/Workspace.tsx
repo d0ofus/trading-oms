@@ -1,7 +1,14 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { AuditSearch } from "./AuditSearch";
+import { useDeskSelection } from "./useDeskSelection";
+import { protectionStatus } from "./protectionStatus";
+import { ArchiveRuns } from "./ArchiveRuns";
+import { IncidentPanel } from "./IncidentPanel";
+import { WorkspaceBuild, WorkspaceClock } from "./WorkspaceStatus";
+import { RecordHistory } from "./RecordHistory";
+import { PrepareRun, PreparationForm } from "./PrepareRun";
+import { ContractSearch } from "./ContractSearch";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { AuditHistory } from "./AuditHistory";
 import { ReplayCompare } from "./ReplayCompare";
-import { useForm } from "react-hook-form";
 import {
   Activity,
   ArrowUpRight,
@@ -29,12 +36,12 @@ import {
   localTime,
   money,
   preference,
+  policyLabel,
   readPreference,
   titleCase,
   type ArmPreview,
   type Dataset,
   type Draft,
-  type Event,
   type Json,
   type Order,
   type Replay,
@@ -45,8 +52,9 @@ import {
 import { Badge, Empty, Grid, Modal, Panel, Readiness } from "./components";
 import { Studio } from "./Studio";
 import { ArmReview } from "./ArmReview";
-import { RiskSettings, chosenProfile } from "./RiskSettings";
+import { RiskSettings, chosenProfile, type RiskProfile } from "./RiskSettings";
 import { OrderInspector } from "./OrderInspector";
+import { MarketDataDetails } from "./MarketData";
 import { LegacyHistory } from "./LegacyHistory";
 import "./workspace.css";
 
@@ -89,11 +97,25 @@ const runState: Record<string, string> = {
   position_open: "Position open",
   exiting: "Exiting",
   paused: "Paused",
+  suspended: "Suspended · automatic recovery",
   recovery_required: "Recovery required",
   completed: "Completed",
 };
 
+function runTone(run: Run) {
+  if (
+    run.state === "recovery_required" ||
+    run.signal_outcome?.state === "uncertain"
+  )
+    return "danger";
+  if (["blocked", "broker_rejected"].includes(run.signal_outcome?.state ?? ""))
+    return "warning";
+  if (run.signal_outcome?.state === "checking") return "neutral";
+  return run.armed ? "success" : "neutral";
+}
+
 export function Workspace() {
+  const selection = useDeskSelection();
   const [path, setPath] = useState(() =>
     nav.some((item) => item.path === window.location.pathname)
       ? window.location.pathname
@@ -101,6 +123,7 @@ export function Workspace() {
   );
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [network, setNetwork] = useState("loading");
+  const [environmentMode, setEnvironmentMode] = useState("paper");
   const [auth, setAuth] = useState(true);
   const [theme, setTheme] = useState(() => readPreference("theme", "dark"));
   const [toast, setToast] = useState<{
@@ -108,8 +131,9 @@ export function Workspace() {
     error: boolean;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [preparing, setPreparing] = useState<Version | null>(null);
+  const [preparedReview, setPreparedReview] = useState<ArmPreview | null>(null);
   const [clearEmergency, setClearEmergency] = useState(false);
-  const [clock, setClock] = useState(new Date().toISOString());
   const notify = useCallback(
     (message: string, error = false) => setToast({ message, error }),
     [],
@@ -118,22 +142,49 @@ export function Workspace() {
     window.history.pushState(null, "", target);
     setPath(target);
   }, []);
-  const refresh = useCallback(async () => {
-    try {
-      const state = await api<Snapshot>("/paper/session");
-      setSnapshot(state);
-      setNetwork("online");
-      setAuth(true);
-    } catch (error) {
-      setNetwork("offline");
-      if ((error as ApiError).status === 401) setAuth(false);
-    }
+  const refreshPending = useRef<Promise<void> | null>(null);
+  const refreshController = useRef<AbortController | null>(null);
+  const refresh = useCallback(() => {
+    if (refreshPending.current) return refreshPending.current;
+    const controller = new AbortController();
+    refreshController.current = controller;
+    const pending = api<Snapshot>(
+      "/workspace/overview",
+      "GET",
+      undefined,
+      controller.signal,
+    )
+      .then((state) => {
+        if (!controller.signal.aborted) {
+          setSnapshot(state);
+          setNetwork("online");
+          setAuth(true);
+        }
+      })
+      .catch((error: ApiError) => {
+        if (!controller.signal.aborted) {
+          setNetwork("offline");
+          if (error.status === 401) setAuth(false);
+        }
+      })
+      .finally(() => {
+        refreshPending.current = null;
+      });
+    refreshPending.current = pending;
+    return pending;
   }, []);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | undefined;
+    let interval: ReturnType<typeof setTimeout> | undefined;
     let alive = true;
     async function start() {
+      try {
+        const response = await fetch("/healthz");
+        const health = await response.json();
+        if (alive) setEnvironmentMode(health.mode);
+      } catch {
+        /* Session readiness reports unavailable service. */
+      }
       const parameters = new URLSearchParams(window.location.hash.slice(1));
       const token = parameters.get("pair");
       if (token) {
@@ -145,8 +196,12 @@ export function Workspace() {
         }
       }
       if (!alive) return;
-      await refresh();
-      interval = setInterval(() => void refresh(), 2000);
+      async function poll() {
+        if (!alive) return;
+        if (!document.hidden) await refresh();
+        if (alive) interval = setTimeout(() => void poll(), 2000);
+      }
+      await poll();
     }
     void start();
     const back = () =>
@@ -158,7 +213,8 @@ export function Workspace() {
     window.addEventListener("popstate", back);
     return () => {
       alive = false;
-      clearInterval(interval);
+      clearTimeout(interval);
+      refreshController.current?.abort();
       window.removeEventListener("popstate", back);
     };
   }, [refresh, notify]);
@@ -166,13 +222,6 @@ export function Workspace() {
     window.document.documentElement.dataset.theme = theme;
     preference("theme", theme);
   }, [theme]);
-  useEffect(() => {
-    const interval = setInterval(
-      () => setClock(new Date().toISOString()),
-      1000,
-    );
-    return () => clearInterval(interval);
-  }, []);
   useEffect(() => {
     if (!toast || toast.error) return;
     const timer = setTimeout(() => setToast(null), 6000);
@@ -190,43 +239,26 @@ export function Workspace() {
       setBusy(false);
     }
   }
-  async function createRun(version: Version) {
-    const contract = snapshot?.contracts.find(
-      (item) => item.symbol === version.document.settings.symbol,
-    );
-    if (!contract) {
-      notify(
-        "Resolve this strategy’s symbol in Settings before preparing a paper run.",
-        true,
-      );
-      navigate("/settings");
-      return;
-    }
-    try {
-      await api("/runs", "POST", {
-        strategy_id: version.strategy_id,
-        version: version.version,
-        conid: contract.conid,
-      });
-      await refresh();
-      notify("Run prepared. Review readiness and explicitly arm its session.");
-      navigate("/desk");
-    } catch (error) {
-      notify((error as Error).message, true);
-    }
+  function createRun(version: Version) {
+    setPreparing(version);
   }
+  const crypto = (snapshot?.mode ?? environmentMode) === "simulation";
   const current = nav.find((item) => item.path === path) ?? nav[0];
   const critical =
-    snapshot?.incidents.filter((incident) => !incident.resolved) ?? [];
+    snapshot?.incidents.filter(
+      (incident) =>
+        !incident.resolved &&
+        incident.severity === "critical" &&
+        incident.actionable !== false,
+    ) ?? [];
+  const armedRuns = snapshot?.runs.filter((r) => r.armed && !r.archived) ?? [];
+  const selectedRuns =
+    snapshot?.runs.filter(
+      (r) => !r.archived && selection.selected.includes(r.id),
+    ) ?? [];
+  const statusRuns = selectedRuns.length ? selectedRuns : armedRuns;
   const dataFresh =
-    !!snapshot?.data.length &&
-    snapshot.data.every(
-      (data) =>
-        data.live &&
-        data.warm &&
-        data.received_at &&
-        Date.now() - new Date(data.received_at).getTime() <= 15000,
-    );
+    statusRuns.length > 0 && statusRuns.every((r) => r.required_inputs?.ready);
 
   return (
     <div className="ws-app">
@@ -251,8 +283,14 @@ export function Workspace() {
           </span>
         </a>
         <div className="ws-environment">
-          <Badge tone="paper">PAPER ENVIRONMENT</Badge>
-          <span>Local workspace · US equities</span>
+          <Badge tone="paper">
+            {crypto ? "SIMULATION ENVIRONMENT" : "PAPER ENVIRONMENT"}
+          </Badge>
+          <span>
+            {crypto
+              ? "Live Paxos data · local fills"
+              : "IBKR contracts · Paper execution"}
+          </span>
         </div>
         <nav aria-label="Main navigation">
           {nav.map((item) => (
@@ -278,8 +316,14 @@ export function Workspace() {
           <div className="ws-scope">
             <ShieldCheck size={18} />
             <div>
-              <strong>Paper execution only</strong>
-              <span>Long-only stocks & ETFs</span>
+              <strong>
+                {crypto ? "Local simulated execution" : "Paper execution only"}
+              </strong>
+              <span>
+                {crypto
+                  ? "BTC & ETH · fractional units"
+                  : "Equities and PAXOS crypto"}
+              </span>
             </div>
           </div>
           <button
@@ -290,16 +334,22 @@ export function Workspace() {
             {theme === "dark" ? "light" : "dark"} theme
           </button>
           <p>
-            Internal paper release
+            {crypto ? "Crypto simulation" : "Internal paper release"}
             <br />
-            <span>Supervised qualification</span>
+            <span>
+              {crypto ? "No broker orders" : "Supervised qualification"}
+            </span>
           </p>
         </div>
       </aside>
       <div className="ws-shell">
         <header className="ws-topbar">
           <div className="ws-top-status">
-            <Badge tone="paper">Paper</Badge>
+            <Badge tone="paper">
+              {crypto
+                ? "Simulation — live Paxos data — local fills"
+                : "IBKR Paper"}
+            </Badge>
             <Badge
               tone={
                 network === "online" && snapshot?.connection === "connected"
@@ -315,19 +365,22 @@ export function Workspace() {
             <Badge
               tone={dataFresh && network === "online" ? "success" : "neutral"}
             >
-              Data {dataFresh && network === "online" ? "current" : "not ready"}
+              {statusRuns.length
+                ? `Run inputs ${dataFresh && network === "online" ? "current" : "waiting"}`
+                : "Select a run to check inputs"}
             </Badge>
             <Badge
               tone={
-                snapshot?.entry_permission && network === "online"
+                armedRuns.length > 0 && network === "online"
                   ? "success"
-                  : "warning"
+                  : "neutral"
               }
             >
-              Entries{" "}
-              {snapshot?.entry_permission && network === "online"
-                ? "eligible for authorization"
-                : "blocked"}
+              {network !== "online"
+                ? "Authorization status unavailable"
+                : armedRuns.length
+                  ? `${armedRuns.length} armed run${armedRuns.length === 1 ? "" : "s"}`
+                  : "No runs armed"}
             </Badge>
           </div>
           <div className="ws-top-actions">
@@ -369,7 +422,9 @@ export function Workspace() {
             </div>
             <div className="ws-session-label">
               <span className="ws-dot" />
-              US regular session · Exchange calendar
+              {crypto
+                ? "24/7 crypto data · UTC daily sessions"
+                : "Session policy follows the selected contract"}
             </div>
           </div>
           {network === "offline" && auth && (
@@ -384,6 +439,23 @@ export function Workspace() {
                 </span>
               </div>
               <button onClick={() => void refresh()}>Retry connection</button>
+            </div>
+          )}
+          {snapshot?.migration?.pending && path !== "/settings" && (
+            <div className="ws-banner warning" role="status">
+              <CircleAlert size={18} />
+              <div>
+                <strong>
+                  Execution disabled until workspace migration completes
+                </strong>
+                <span>
+                  You can browse now and connect paper Gateway later in
+                  Settings.
+                </span>
+              </div>
+              <button onClick={() => navigate("/settings")}>
+                Open migration setup
+              </button>
             </div>
           )}
           {critical.length > 0 && path !== "/activity" && (
@@ -407,9 +479,14 @@ export function Workspace() {
           {!auth ? (
             <Panel title="Open an authenticated local session">
               <Empty title="Use the workspace launcher">
-                Run <code>.\scripts\start-paper.ps1</code> on this PC. The
-                launcher opens a private, one-time local pairing link. No broker
-                password belongs in this application.
+                Run{" "}
+                <code>
+                  {crypto
+                    ? ".\\scripts\\start-crypto-sim.ps1"
+                    : ".\\scripts\\start-paper.ps1"}
+                </code>{" "}
+                on this PC. The launcher opens a private, one-time local pairing
+                link. No broker password belongs in this application.
               </Empty>
             </Panel>
           ) : network === "loading" ? (
@@ -419,11 +496,13 @@ export function Workspace() {
           ) : path === "/studio" ? (
             <Studio
               contracts={snapshot?.contracts ?? []}
+              simulation={crypto}
               notify={notify}
               createRun={(version) => void createRun(version)}
             />
           ) : path === "/desk" ? (
             <Desk
+              selection={selection}
               snapshot={snapshot}
               navigate={navigate}
               refresh={refresh}
@@ -453,12 +532,39 @@ export function Workspace() {
               ? "Local service connected"
               : "Local service unavailable"}
           </span>
-          <div>
-            <span>Exchange: {exchangeTime(clock)}</span>
-            <span>Local: {localTime(clock)}</span>
-          </div>
+          <WorkspaceClock />
+          <WorkspaceBuild build={snapshot?.build} />
         </footer>
       </div>
+      <ArmReview
+        selectRuns={selection.selectRuns}
+        preview={preparedReview}
+        contracts={snapshot?.contracts ?? []}
+        connection={snapshot?.connection}
+        setPreview={setPreparedReview}
+        notify={notify}
+        refresh={refresh}
+        navigate={navigate}
+      />
+      {preparing && (
+        <PrepareRun
+          version={preparing}
+          connection={snapshot?.connection}
+          simulation={crypto}
+          contracts={snapshot?.contracts ?? []}
+          close={() => setPreparing(null)}
+          notify={notify}
+          prepared={async (run) => {
+            selection.selectRuns([run.id]);
+            await refresh();
+            setPreparedReview(
+              await api<ArmPreview>("/runs/arm-preview", "POST", {
+                ids: [run.id],
+              }),
+            );
+          }}
+        />
+      )}
       {toast && (
         <div
           className={`ws-toast ${toast.error ? "error" : ""}`}
@@ -508,35 +614,67 @@ export function Workspace() {
 }
 
 function Desk({
+  selection,
   snapshot,
   navigate,
   refresh,
   notify,
 }: {
+  selection: ReturnType<typeof useDeskSelection>;
   snapshot: Snapshot | null;
   navigate: (path: string) => void;
   refresh: () => Promise<void>;
   notify: (message: string, error?: boolean) => void;
 }) {
-  const [selected, setSelected] = useState<string[]>(() =>
-    readPreference("desk.selected", []),
-  );
-  const [detail, setDetail] = useState<string | null>(() =>
-    readPreference("desk.detail", null),
-  );
+  const { selected, setSelected, detail, setDetail, selectRuns } = selection;
+  const reviewRequest = useRef<AbortController | null>(null);
+  const selectionKey = selected.join(",");
+  useEffect(() => {
+    const hidden = () => {
+      if (document.hidden) reviewRequest.current?.abort();
+    };
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      reviewRequest.current?.abort();
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, [selectionKey]);
   const [preview, setPreview] = useState<ArmPreview | null>(null);
   const [orderIdentity, setOrderIdentity] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPreparation, setShowPreparation] = useState(false);
+  const [archiveIds, setArchiveIds] = useState<string[] | null>(null);
   const [strategies, setStrategies] = useState<Draft[]>([]);
   const [strategy, setStrategy] = useState("");
+  const [published, setPublished] = useState<Version | null>(null);
+  const [preparationError, setPreparationError] = useState("");
+  useEffect(() => {
+    setPublished(null);
+    setPreparationError("");
+    const draft = strategies.find((item) => item.id === strategy);
+    if (!showPreparation || !draft) return;
+    const controller = new AbortController();
+    void api<Version>(
+      `/strategies/${draft.id}/versions/${draft.published_version}`,
+      "GET",
+      undefined,
+      controller.signal,
+    )
+      .then((value) => {
+        if (!controller.signal.aborted) setPublished(value);
+      })
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) setPreparationError(error.message);
+      });
+    return () => controller.abort();
+  }, [strategy, strategies, showPreparation]);
   const [closeRun, setCloseRun] = useState<Run | null>(null);
   const [checksExpanded, setChecksExpanded] = useState(false);
-  const runs = snapshot?.runs ?? [];
-  useEffect(() => {
-    preference("desk.selected", selected);
-    preference("desk.detail", detail);
-  }, [selected, detail]);
+  const [historicalRun, setHistoricalRun] = useState<Run | null>(null);
+  const runs =
+    historicalRun && !snapshot?.runs.some((run) => run.id === historicalRun.id)
+      ? [...(snapshot?.runs ?? []), historicalRun]
+      : (snapshot?.runs ?? []);
   async function action(path: string, body?: unknown) {
     setBusy(true);
     try {
@@ -549,28 +687,79 @@ function Desk({
     }
   }
   async function review() {
+    reviewRequest.current?.abort();
+    const request = new AbortController();
+    reviewRequest.current = request;
     setBusy(true);
     try {
-      setPreview(
-        await api<ArmPreview>("/runs/arm-preview", "POST", {
-          ids: selected,
-          profile_id: chosenProfile().id,
-          profile_version: chosenProfile().version,
-        }),
+      const stockSelection = selected.every(
+        (id) => runs.find((r) => r.id === id)?.binding?.execution_plan,
       );
+      const profiles = (
+        await api<RiskProfile[]>(
+          "/risk-profiles",
+          "GET",
+          undefined,
+          request.signal,
+        )
+      ).filter(
+        (p) =>
+          (p.stock_units !== undefined) === stockSelection &&
+          (p.risk_policy === "paper_stock_v2") ===
+            selected.every(
+              (id) =>
+                runs.find((r) => r.id === id)?.binding?.execution_plan
+                  ?.risk_policy === "paper_stock_v2",
+            ),
+      );
+      const chosen = chosenProfile();
+      const current =
+        profiles.find(
+          (p) =>
+            p.id === chosen.id &&
+            p.version === chosen.version &&
+            p.daily_loss === undefined,
+        ) ??
+        profiles
+          .filter((p) => p.id === chosen.id && p.daily_loss === undefined)
+          .sort((a, b) => b.version - a.version)[0];
+      const value = await api<ArmPreview>(
+        "/runs/arm-preview",
+        "POST",
+        {
+          ids: selected,
+          profile_id: current?.id ?? "smoke",
+          profile_version: current?.version ?? null,
+        },
+        request.signal,
+      );
+      if (!request.signal.aborted) setPreview(value);
     } catch (error) {
-      notify((error as Error).message, true);
+      if (!request.signal.aborted) notify((error as Error).message, true);
     } finally {
-      setBusy(false);
+      if (reviewRequest.current === request) setBusy(false);
     }
   }
   const run = runs.find((item) => item.id === detail);
   const blocking = snapshot?.checks.filter((check) => !check.passed) ?? [];
   const positionCount =
-    snapshot?.positions.filter((position) => Number(position.quantity) > 0)
+    snapshot?.positions.filter((position) => Number(position.quantity) !== 0)
       .length ?? 0;
   return (
     <>
+      {archiveIds && (
+        <ArchiveRuns
+          ids={archiveIds}
+          notify={notify}
+          refresh={refresh}
+          close={() => {
+            setArchiveIds(null);
+            setSelected([]);
+            setHistoricalRun(null);
+          }}
+        />
+      )}
+
       <div className="ws-metrics">
         <div>
           <span>Session readiness</span>
@@ -591,7 +780,7 @@ function Desk({
           <span>Armed strategies</span>
           <strong>
             {runs.filter((item) => item.armed).length}
-            <small> / 5 capacity</small>
+            <small> / {snapshot?.mode === "simulation" ? 2 : 5} capacity</small>
           </strong>
           <span className="ws-muted">Bounded session authorization</span>
         </div>
@@ -599,16 +788,33 @@ function Desk({
           <span>Owned positions</span>
           <strong>
             {positionCount}
-            <small> / 5 capacity</small>
+            <small> / {snapshot?.mode === "simulation" ? 2 : 5} capacity</small>
           </strong>
           <span className="ws-muted">
-            {runs.some((item) => Number(item.position) > 0 && !item.protected)
+            {runs.some(
+              (item) =>
+                Number(item.position) > 0 &&
+                !item.protected &&
+                !["checking", "exit_pending"].includes(
+                  item.protection_verification?.state ?? "",
+                ),
+            )
               ? "Protection needs attention"
-              : "Protection checked on reconciliation"}
+              : runs.some(
+                    (item) =>
+                      Number(item.position) > 0 &&
+                      item.protection_verification?.state === "checking",
+                  )
+                ? "Checking broker protection"
+                : "Protection checked on reconciliation"}
           </span>
         </div>
         <div>
-          <span>Broker gross exposure</span>
+          <span>
+            {snapshot?.mode === "simulation"
+              ? "Simulated gross exposure"
+              : "Broker gross exposure"}
+          </span>
           <strong>{money(snapshot?.account_facts.GrossPositionValue)}</strong>
           <span className="ws-muted">$5,000 account ceiling</span>
         </div>
@@ -642,6 +848,12 @@ function Desk({
               Prepare a run
             </button>
             <button
+              disabled={!selected.length || selected.length > 50 || busy}
+              onClick={() => setArchiveIds([...selected])}
+            >
+              Archive selected
+            </button>
+            <button
               className="ws-primary"
               disabled={!selected.length || busy}
               onClick={() => void review()}
@@ -668,6 +880,7 @@ function Desk({
                   <input
                     type="checkbox"
                     aria-label={`Select ${row.original.name} ${row.original.symbol}`}
+                    disabled={row.original.archived}
                     checked={selected.includes(row.original.id)}
                     onClick={(event) => event.stopPropagation()}
                     onChange={(event) =>
@@ -688,6 +901,12 @@ function Desk({
                   <div className="ws-table-primary">
                     <strong>{row.original.name}</strong>
                     <small>Published v{row.original.version}</small>
+                    {row.original.binding?.execution_plan && (
+                      <small>
+                        {policyLabel(row.original)} |{" "}
+                        {row.original.id.slice(0, 8)}
+                      </small>
+                    )}
                   </div>
                 ),
               },
@@ -697,18 +916,13 @@ function Desk({
                 header: "State",
                 size: 200,
                 cell: ({ row }) => (
-                  <Badge
-                    tone={
-                      row.original.state === "recovery_required"
-                        ? "danger"
-                        : row.original.armed
-                          ? "success"
-                          : "neutral"
-                    }
-                  >
-                    {runState[row.original.state] ??
-                      titleCase(row.original.state)}
-                  </Badge>
+                  <span className="ws-run-status">
+                    <Badge tone={runTone(row.original)}>
+                      {row.original.display_state ??
+                        runState[row.original.state] ??
+                        titleCase(row.original.state)}
+                    </Badge>
+                  </span>
                 ),
               },
               {
@@ -717,7 +931,7 @@ function Desk({
                 size: 100,
                 cell: ({ row }) => (
                   <span className="ws-number">
-                    {row.original.position} shares
+                    {row.original.position} units
                   </span>
                 ),
               },
@@ -766,69 +980,86 @@ function Desk({
       <div className="ws-desk-bottom">
         <Panel
           title="Positions & protection"
-          caption="Owned executions compared with broker positions."
+          caption={
+            snapshot?.mode === "simulation"
+              ? "Owned executions compared with the durable local ledger."
+              : runs.some(
+                    (r) => r.binding?.execution_plan?.family === "spot_fx",
+                  )
+                ? "Owned executions compared with broker positions and real currency balances."
+                : "Owned executions compared with broker positions."
+          }
         >
           {positionCount ? (
             snapshot?.positions
-              .filter((item) => Number(item.quantity) > 0)
+              .filter((item) => Number(item.quantity) !== 0)
               .map((position) => {
                 const owner = runs.find((item) => item.id === position.run_id);
+                const verification = owner?.protection_verification;
+                const protection = verification
+                  ? protectionStatus(
+                      verification,
+                      owner?.protection_type === "locally_monitored",
+                    )
+                  : null;
                 return (
                   <div className="ws-position" key={position.run_id}>
                     <div>
                       <strong>{position.symbol}</strong>
                       <span>
-                        {position.quantity} shares · {owner?.name}
+                        {Number(position.quantity) < 0 ? "Short" : "Long"} ·{" "}
+                        {Math.abs(Number(position.quantity))}{" "}
+                        {owner?.binding?.execution_plan?.family === "spot_fx"
+                          ? owner.binding.contract.symbol
+                          : "units"}{" "}
+                        · {owner?.name}
                       </span>
                     </div>
-                    <Badge tone={owner?.protected ? "success" : "danger"}>
-                      {owner?.protected
-                        ? "Protection verified"
-                        : "Protection requires review"}
-                    </Badge>
+                    <div>
+                      <Badge
+                        tone={
+                          protection?.tone ??
+                          (owner?.protected ? "success" : "danger")
+                        }
+                      >
+                        {protection?.label ??
+                          (owner?.protected
+                            ? "Protection verified"
+                            : "Protection requires review")}
+                      </Badge>
+                      {verification?.reasons.map((reason) => (
+                        <small key={reason}>{reason}</small>
+                      ))}
+                      {verification?.state === "active" &&
+                        verification.broker_status && (
+                          <small>
+                            SELL {position.quantity} {owner?.symbol} · Stop{" "}
+                            {verification.stop} · {verification.broker_status}
+                          </small>
+                        )}
+                    </div>
                     <button onClick={() => owner && setCloseRun(owner)}>
-                      Close owned position
+                      {Number(position.quantity) < 0
+                        ? "Buy to cover"
+                        : "Close owned position"}
                     </button>
                   </div>
                 );
               })
           ) : (
             <Empty title="No owned positions">
-              Positions appear after confirmed executions. Broker values are
-              never replaced with sample holdings.
+              Positions appear after confirmed executions and reconciliation.
             </Empty>
           )}
         </Panel>
         <Panel
           title="Market data"
-          caption="Last known trade values and their source timestamps."
+          caption="Last, bid and ask with timestamps and historical warm-up progress."
         >
           {snapshot?.data.length ? (
             <div className="ws-data-list">
               {snapshot.data.map((data) => (
-                <div key={data.conid}>
-                  <strong>{data.symbol}</strong>
-                  <span className="ws-number">{money(data.price)}</span>
-                  <Badge
-                    tone={
-                      data.received_at &&
-                      Date.now() - new Date(data.received_at).getTime() <
-                        15000 &&
-                      data.warm
-                        ? "success"
-                        : "warning"
-                    }
-                  >
-                    {!data.warm
-                      ? "Warming up"
-                      : data.received_at &&
-                          Date.now() - new Date(data.received_at).getTime() <
-                            15000
-                        ? "Current"
-                        : "Stale"}
-                  </Badge>
-                  <small>{localTime(data.source_at)}</small>
-                </div>
+                <MarketDataDetails key={data.conid} data={data} />
               ))}
             </div>
           ) : (
@@ -848,8 +1079,93 @@ function Desk({
       </div>
       <Panel
         title="Orders & executions"
-        caption="A request remains pending until the broker confirms its outcome."
+        caption="A request remains pending until the execution provider confirms its outcome."
       >
+        {snapshot?.outage?.active && (
+          <div role="status" className="ws-banner">
+            Recovery in progress. Positions are retained; local protection may
+            be suspended. New entries require fresh review.
+          </div>
+        )}
+        {[
+          ...(snapshot?.crypto_triggers ?? []),
+          ...(snapshot?.stock_triggers ?? []),
+        ].map((trigger) => (
+          <div key={trigger.run_id} aria-label="Long-only trigger status">
+            <strong>Previous-minute long-only breakout</strong>
+            <p>
+              {titleCase(trigger.state)} | High {trigger.high ?? "unavailable"}{" "}
+              | Candle {localTime(trigger.candle)}
+            </p>
+            {trigger.reason && <p>{trigger.reason}</p>}
+          </div>
+        ))}
+        {[
+          ...(snapshot?.local_protection ?? []).map((p) => ({
+            ...p,
+            type: "locally_monitored",
+            currency: "USD",
+            price_scale: "1",
+          })),
+          ...(snapshot?.stock_protection ?? []),
+          ...(snapshot?.fx_protection ?? []),
+        ].map((plan) => (
+          <div key={plan.run_id} aria-label="Local protection status">
+            <strong>
+              {plan.type === "broker_held"
+                ? "Broker-held protection"
+                : "Locally monitored protection"}
+            </strong>
+            <p>
+              {titleCase(plan.status)} | {plan.quantity}{" "}
+              {"base_currency" in plan ? plan.base_currency : "units"} | Entry{" "}
+              {plan.average
+                ? "family" in plan && plan.family === "spot_fx"
+                  ? `${plan.average} ${plan.currency} per ${plan.base_currency}`
+                  : money(plan.average, plan.currency, plan.price_scale)
+                : "awaiting fill"}{" "}
+              | Stop{" "}
+              {"family" in plan && plan.family === "spot_fx"
+                ? `${plan.stop} ${plan.currency} per ${plan.base_currency}`
+                : money(plan.stop, plan.currency, plan.price_scale)}{" "}
+              {plan.currency}
+            </p>
+            {plan.type === "locally_monitored" && (
+              <p>
+                This stop cannot execute while the application or connection is
+                unavailable.
+              </p>
+            )}
+          </div>
+        ))}
+        {snapshot?.oca_groups?.map((group) => (
+          <div
+            key={group.id}
+            className="ws-position"
+            aria-label="OCA group status"
+          >
+            <div>
+              <strong>
+                OCA · {titleCase(group.state)}
+                {group.winner
+                  ? ` · ${titleCase(group.winner)}`
+                  : " · Awaiting direction"}
+              </strong>
+              <span>
+                Candle {localTime(group.candle)} · Protection:{" "}
+                {titleCase(group.protection)}
+              </span>
+              {group.average && (
+                <span>
+                  Average fill{" "}
+                  {money(group.average, group.currency, group.price_scale)} ·
+                  Fixed stop{" "}
+                  {money(group.stop, group.currency, group.price_scale)}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
         {snapshot?.orders.length ? (
           <Grid<Order>
             onSelect={(order) => setOrderIdentity(order.id)}
@@ -865,7 +1181,10 @@ function Desk({
               {
                 id: "purpose",
                 header: "Purpose",
-                accessorFn: (row) => titleCase(row.payload.purpose ?? "entry"),
+                accessorFn: (row) =>
+                  row.payload.execution === "oca_breakout"
+                    ? "OCA entry pair"
+                    : titleCase(row.payload.purpose ?? "entry"),
               },
               {
                 accessorKey: "state",
@@ -876,26 +1195,46 @@ function Desk({
                       row.original.state === "unknown" ? "danger" : "neutral"
                     }
                   >
-                    {titleCase(row.original.state)}
+                    {row.original.diagnostics?.rejection
+                      ? "Broker rejected"
+                      : (row.original.diagnostics?.status_label ??
+                        titleCase(row.original.state))}
                   </Badge>
                 ),
               },
               {
                 id: "quantity",
                 header: "Quantity",
-                accessorFn: (row) => row.payload.quantity,
+                accessorFn: (row) =>
+                  row.payload.cash_quantity
+                    ? `${money(row.payload.cash_quantity)} budget`
+                    : row.payload.quantity,
               },
               {
                 id: "limit",
-                header: "Limit",
+                header: "Entry price",
                 accessorFn: (row) => row.payload.limit,
-                cell: ({ row }) => money(row.original.payload.limit),
+                cell: ({ row }) =>
+                  row.original.payload.prices
+                    ? `Buy ${money(row.original.payload.prices.long_entry, row.original.payload.currency, row.original.payload.price_scale)} / Short ${money(row.original.payload.prices.short_entry, row.original.payload.currency, row.original.payload.price_scale)}`
+                    : money(
+                        row.original.payload.limit,
+                        row.original.payload.currency,
+                        row.original.payload.price_scale,
+                      ),
               },
               {
                 id: "stop",
                 header: "Protective stop",
                 accessorFn: (row) => row.payload.stop,
-                cell: ({ row }) => money(row.original.payload.stop),
+                cell: ({ row }) =>
+                  row.original.payload.prices
+                    ? "1% from actual fill"
+                    : money(
+                        row.original.payload.stop,
+                        row.original.payload.currency,
+                        row.original.payload.price_scale,
+                      ),
               },
               {
                 accessorKey: "created_at",
@@ -947,12 +1286,14 @@ function Desk({
           <p>
             {run.symbol} · Published v{run.version}
           </p>
-          <Badge tone={run.armed ? "success" : "neutral"}>
-            {runState[run.state] ?? run.state}
-          </Badge>
+          <div className="ws-run-status">
+            <Badge tone={runTone(run)}>
+              {run.display_state ?? runState[run.state] ?? run.state}
+            </Badge>
+          </div>
           <dl>
             <dt>Position</dt>
-            <dd>{run.position} shares</dd>
+            <dd>{run.position} units</dd>
             <dt>Planned stop risk</dt>
             <dd>{money(run.risk)}</dd>
             <dt>Session ends</dt>
@@ -962,39 +1303,97 @@ function Desk({
             <dt>Protection</dt>
             <dd>
               {Number(run.position)
-                ? run.protected
-                  ? "Verified at reconciliation"
-                  : "Requires recovery"
-                : "Required before entry"}
+                ? run.protection_verification
+                  ? protectionStatus(
+                      run.protection_verification,
+                      run.protection_type === "locally_monitored",
+                    ).label
+                  : run.protected
+                    ? "Verified at reconciliation"
+                    : "Requires recovery"
+                : run.binding?.execution_plan &&
+                    run.protection_type === "broker_held"
+                  ? "Protection plan approved; stop submitted for confirmed fills."
+                  : run.binding?.execution_plan
+                    ? "Local protection plan selected; monitors confirmed fills."
+                    : "Required before entry"}
+              {run.protection_verification?.reasons.map((reason) => (
+                <p key={reason}>{reason}</p>
+              ))}
             </dd>
           </dl>
           {run.blocking_reason && (
             <div className="ws-banner warning">{run.blocking_reason}</div>
           )}
           <h3>Current rule values</h3>
-          <p className="ws-muted">
-            Last evaluated values. A missing value means the input has not
-            warmed up; it is not zero.
-          </p>
-          {snapshot?.evaluations?.[run.id]?.length ? (
+          {run.signal_progress && (
             <dl>
-              {snapshot.evaluations[run.id].map((item) => (
-                <Fragment key={item.node}>
-                  <dt>{item.label}</dt>
-                  <dd>
-                    {item.value === null ? "Not available" : String(item.value)}
-                  </dd>
-                </Fragment>
-              ))}
+              <dt>Reference minute</dt>
+              <dd>
+                {localTime(run.signal_progress.reference_candle ?? undefined)}
+              </dd>
+              <dt>Reference high</dt>
+              <dd>
+                {run.signal_progress.reference_high ??
+                  "Waiting for a complete live minute"}
+              </dd>
+              <dt>Current {run.signal_progress.source}</dt>
+              <dd>{run.signal_progress.price}</dd>
+              <dt>Price strictly above reference high</dt>
+              <dd>
+                {run.signal_progress.above_high == null
+                  ? "Waiting"
+                  : String(run.signal_progress.above_high)}
+              </dd>
             </dl>
-          ) : (
-            <p className="ws-muted">Waiting for qualified market data.</p>
+          )}
+          {run.signal_outcome && (
+            <section aria-label="Latest signal outcome">
+              <h3>Latest signal outcome</h3>
+              <p>{run.signal_outcome.detail}</p>
+              {run.signal_outcome.last_reason && (
+                <p>Last entry check: {run.signal_outcome.last_reason}</p>
+              )}
+              <p className="ws-muted">
+                {localTime(run.signal_outcome.updated_at)}
+              </p>
+              {run.signal_outcome.rejection && (
+                <p>
+                  IBKR {run.signal_outcome.rejection.code}:{" "}
+                  {run.signal_outcome.rejection.detail}
+                </p>
+              )}
+            </section>
+          )}
+          {!run.signal_progress && (
+            <>
+              <p className="ws-muted">
+                Last evaluated values. A missing value means the input has not
+                warmed up; it is not zero.
+              </p>
+              {snapshot?.evaluations?.[run.id]?.length ? (
+                <dl>
+                  {snapshot.evaluations[run.id].map((item) => (
+                    <Fragment key={item.node}>
+                      <dt>{item.label}</dt>
+                      <dd>
+                        {item.value === null
+                          ? "Not available"
+                          : String(item.value)}
+                      </dd>
+                    </Fragment>
+                  ))}
+                </dl>
+              ) : (
+                <p className="ws-muted">Waiting for qualified market data.</p>
+              )}
+            </>
           )}
           <button
-            disabled={!run.armed || busy}
+            disabled={!run.armed || busy || run.archived}
             onClick={() => void action(`/runs/${run.id}/disarm`)}
           >
-            Disarm strategy
+            {run.archived ? "Archived run" : "Disarm strategy"}
           </button>
           <p className="ws-muted">
             Disarming cancels remaining entries. Position monitoring and
@@ -1005,12 +1404,23 @@ function Desk({
           </button>
         </aside>
       )}
+      <RecordHistory
+        selectOrder={setOrderIdentity}
+        selectRun={(run) => {
+          setHistoricalRun(run);
+          setDetail(run.id);
+        }}
+      />
       <OrderInspector
         identity={orderIdentity}
         close={() => setOrderIdentity(null)}
       />
+
       <ArmReview
+        selectRuns={selectRuns}
         preview={preview}
+        contracts={snapshot?.contracts ?? []}
+        connection={snapshot?.connection}
         setPreview={setPreview}
         notify={notify}
         refresh={refresh}
@@ -1020,7 +1430,7 @@ function Desk({
         open={showPreparation}
         onOpenChange={setShowPreparation}
         title="Prepare a strategy run"
-        description="Choose an immutable version. The symbol and limits come from its published configuration."
+        description="Choose a published strategy, then bind its immutable rules and limits to an exact resolved contract."
       >
         {strategies.length ? (
           <>
@@ -1032,8 +1442,17 @@ function Desk({
               >
                 {strategies.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name} · {item.document.settings.symbol} · v
-                    {item.published_version}
+                    {item.name} ·{" "}
+                    {item.document.schema_version === 9
+                      ? "Reusable FX"
+                      : [7, 8].includes(item.document.schema_version)
+                        ? "Reusable stock"
+                        : item.document.nodes.some(
+                              (n) => n.kind === "long_breakout",
+                            )
+                          ? "Legacy crypto"
+                          : item.document.settings.symbol || "Legacy"}{" "}
+                    · v{item.published_version}
                   </option>
                 ))}
               </select>
@@ -1042,52 +1461,32 @@ function Desk({
               Preparing a run starts data warm-up. It does not authorize order
               submission.
             </p>
-            <div className="ws-modal-actions">
-              <button onClick={() => setShowPreparation(false)}>Cancel</button>
-              <button
-                className="ws-primary"
-                disabled={busy || !strategy}
-                onClick={async () => {
-                  const draft = strategies.find((item) => item.id === strategy);
-                  if (!draft) return;
-                  setBusy(true);
-                  try {
-                    const published = await api<Version>(
-                      `/strategies/${draft.id}/versions/${draft.published_version}`,
-                    );
-                    const contract = snapshot?.contracts.find(
-                      (item) =>
-                        item.symbol === published.document.settings.symbol,
-                    );
-                    if (!contract) {
-                      notify(
-                        "Resolve this strategy’s symbol in Settings first.",
-                        true,
-                      );
-                      setBusy(false);
-                      return;
-                    }
-                    setBusy(true);
-                    void api("/runs", "POST", {
-                      strategy_id: draft.id,
-                      version: draft.published_version,
-                      conid: contract.conid,
-                    })
-                      .then(async () => {
-                        setShowPreparation(false);
-                        await refresh();
-                      })
-                      .catch((error: Error) => notify(error.message, true))
-                      .finally(() => setBusy(false));
-                  } catch (error) {
-                    notify((error as Error).message, true);
-                    setBusy(false);
-                  }
+            {preparationError && <p role="alert">{preparationError}</p>}
+            {published && published.strategy_id === strategy ? (
+              <PreparationForm
+                connection={snapshot?.connection}
+                key={`${published.strategy_id}:${published.version}`}
+                version={published}
+                contracts={snapshot?.contracts ?? []}
+                close={() => setShowPreparation(false)}
+                prepared={async (run) => {
+                  selectRuns([run.id]);
+                  await refresh();
+                  setPreview(
+                    await api<ArmPreview>("/runs/arm-preview", "POST", {
+                      ids: [run.id],
+                    }),
+                  );
                 }}
-              >
-                Prepare run
-              </button>
-            </div>
+                notify={notify}
+                simulation={snapshot?.mode === "simulation"}
+              />
+            ) : (
+              !preparationError && (
+                <p role="status">Loading immutable published version?</p>
+              )
+            )}
+            <button onClick={() => setShowPreparation(false)}>Cancel</button>
           </>
         ) : (
           <Empty
@@ -1113,13 +1512,17 @@ function Desk({
         onOpenChange={(open) => {
           if (!open) setCloseRun(null);
         }}
-        title="Close an owned paper position"
+        title={
+          closeRun && Number(closeRun.position) < 0
+            ? "Buy to cover an owned short position"
+            : "Close an owned position"
+        }
         description="The engine rechecks ownership and broker state. The existing protective order remains in its OCA group while the exit request is pending."
       >
         {closeRun && (
           <>
             <p>
-              {closeRun.symbol} · {closeRun.position} shares · {closeRun.name}
+              {closeRun.symbol} · {closeRun.position} units · {closeRun.name}
             </p>
             <div className="ws-modal-actions">
               <button onClick={() => setCloseRun(null)}>Keep position</button>
@@ -1149,10 +1552,11 @@ function Settings({
   refresh: () => Promise<void>;
   notify: (message: string, error?: boolean) => void;
 }) {
-  const form = useForm<{ symbol: string; paper: boolean }>({
-    defaultValues: { symbol: "AAPL", paper: false },
-  });
+  const crypto = snapshot?.mode === "simulation";
   const [busy, setBusy] = useState(false);
+  const [subscriptionDependencies, setSubscriptionDependencies] = useState<
+    ApiError["dependencies"]
+  >([]);
   const [token, setToken] = useState("");
   const [chat, setChat] = useState("");
   const [heartbeat, setHeartbeat] = useState("");
@@ -1166,6 +1570,7 @@ function Settings({
   }, []);
   async function action(path: string, body?: unknown) {
     setBusy(true);
+    if (path === "/market-data/unsubscribe") setSubscriptionDependencies([]);
     try {
       const result = await api<Record<string, Json>>(path, "POST", body);
       await refresh();
@@ -1176,6 +1581,8 @@ function Settings({
       );
       return result;
     } catch (error) {
+      if (path === "/market-data/unsubscribe" && error instanceof ApiError)
+        setSubscriptionDependencies(error.dependencies);
       notify((error as Error).message, true);
     } finally {
       setBusy(false);
@@ -1186,7 +1593,11 @@ function Settings({
       <div className="ws-setup-intro">
         <div>
           <Badge tone="paper">FIRST-RUN SETUP & DAILY READINESS</Badge>
-          <h2>Prepare your paper environment</h2>
+          <h2>
+            {crypto
+              ? "Prepare your crypto simulation"
+              : "Prepare your paper environment"}
+          </h2>
           <p>
             Connect once, verify your data, then review a bounded session from
             the Trading Desk. Broker credentials stay inside IB Gateway.
@@ -1199,13 +1610,31 @@ function Settings({
           title="1. Connect Gateway"
           caption="A dedicated local paper connection."
         >
+          {snapshot?.migration?.pending && (
+            <div className="ws-banner warning" role="status">
+              <div>
+                <strong>
+                  {snapshot.migration.status === "checking"
+                    ? "Checking workspace migration"
+                    : "Workspace migration pending"}
+                </strong>
+                <p>{snapshot.migration.detail}</p>
+                <p>
+                  You can browse the app and edit strategies while Gateway is
+                  closed. Execution stays disabled. When ready, sign in to the
+                  paper Gateway and click Connect paper Gateway. After the check
+                  succeeds, paper context is verified automatically.
+                </p>
+              </div>
+            </div>
+          )}
           <dl className="ws-facts">
             <dt>Application</dt>
             <dd>IB Gateway · official offline build</dd>
             <dt>Endpoint</dt>
             <dd>127.0.0.1 · port 4002</dd>
             <dt>API client</dt>
-            <dd>71 · dedicated to this workspace</dd>
+            <dd>{crypto ? 72 : 71} · dedicated to this workspace</dd>
             <dt>Login context</dt>
             <dd>
               {snapshot?.attested
@@ -1224,9 +1653,9 @@ function Settings({
                 Restrict trusted clients to localhost. Keep the port private.
               </li>
               <li>
-                For initial diagnostics, keep the API read-only. Disable
-                read-only only for the explicitly authorized supervised paper
-                execution trial.
+                {crypto
+                  ? "Keep Read-Only API enabled. This workspace uses Gateway only for data; all orders and protection are local simulations."
+                  : "For initial diagnostics, keep the API read-only. Disable read-only only for the explicitly authorized supervised paper execution trial."}
               </li>
               <li>
                 Use the pinned SDK installer and the compatible Gateway build
@@ -1237,114 +1666,63 @@ function Settings({
           <div className="ws-inline-actions">
             <button
               className="ws-primary"
-              disabled={busy || snapshot?.connection === "connected"}
-              onClick={() => void action("/paper/session/connect")}
+              disabled={
+                busy ||
+                snapshot?.connection === "connected" ||
+                snapshot?.migration?.status === "checking"
+              }
+              onClick={() => void action("/workspace/session/connect")}
             >
               <Cable size={16} />
-              {snapshot?.connection === "connected"
-                ? "Gateway connected"
-                : "Connect paper Gateway"}
+              {snapshot?.migration?.status === "checking"
+                ? "Checking migration…"
+                : snapshot?.connection === "connected"
+                  ? "Gateway connected"
+                  : "Connect paper Gateway"}
             </button>
             <button
               disabled={busy || !snapshot?.attested}
-              onClick={() => void action("/paper/session/reconcile")}
+              onClick={() => void action("/workspace/session/reconcile")}
             >
               <RefreshCw size={15} />
-              Reconcile
+              Recheck
             </button>
           </div>
-          <form
-            onSubmit={form.handleSubmit((values) => {
-              if (values.paper)
-                void action("/paper/session/attest", { confirmed: true });
-            })}
-          >
-            <label className="ws-checkbox">
-              <input type="checkbox" {...form.register("paper")} />I verified
-              the paper login in Gateway on this PC.
-            </label>
-            <button
-              type="submit"
-              disabled={busy || snapshot?.connection !== "connected"}
-            >
-              Verify paper context
-            </button>
-          </form>
+          <p>
+            Paper context is verified automatically from the broker handshake.
+            Reconciliation refreshes automatically; Recheck remains available
+            for diagnostics.
+          </p>
         </Panel>
         <Panel
           title="2. Verify market data"
-          caption="Resolve a US equity contract and verify actual entitlements."
+          caption={
+            crypto
+              ? "Resolve BTC or ETH on PAXOS and verify live data."
+              : "Search IBKR contracts across asset classes and verify account data entitlements."
+          }
         >
-          <form
-            className="ws-inline-form"
-            onSubmit={form.handleSubmit(
-              (values) =>
-                void action(
-                  `/market-data/resolve?symbol=${encodeURIComponent(values.symbol)}`,
-                ),
-            )}
-          >
-            <label>
-              Stock or ETF symbol
-              <input
-                {...form.register("symbol", {
-                  required: true,
-                  pattern: /^[A-Za-z][A-Za-z0-9. -]{0,14}$/,
-                })}
-                placeholder="e.g. AAPL"
-                autoCapitalize="characters"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={busy || snapshot?.connection !== "connected"}
-            >
-              Find symbol
-            </button>
-          </form>
-          {form.formState.errors.symbol && (
-            <p className="ws-field-error">
-              Enter a supported stock or ETF symbol.
-            </p>
-          )}
-          <div className="ws-contracts">
-            {snapshot?.contracts.length ? (
-              snapshot.contracts.map((contract) => {
-                const subscribed = snapshot.data.some(
-                  (item) => item.conid === contract.conid,
-                );
-                return (
-                  <div key={contract.conid}>
-                    <div>
-                      <strong>{contract.symbol}</strong>
-                      <span>
-                        {contract.name} · {contract.exchange}
-                      </span>
-                    </div>
-                    <button
-                      disabled={subscribed || busy}
-                      onClick={() =>
-                        void action("/market-data/subscribe", {
-                          conid: contract.conid,
-                        })
+          <ContractSearch snapshot={snapshot} busy={busy} action={action} />
+          {subscriptionDependencies.length > 0 && (
+            <div role="alert">
+              <strong>This subscription is currently needed:</strong>
+              <ul>
+                {subscriptionDependencies.map((dependency, index) => (
+                  <li key={`${dependency.code}-${index}`}>
+                    {dependency.run_name ? `${dependency.run_name}: ` : ""}
+                    {dependency.detail}{" "}
+                    <a
+                      href={
+                        dependency.action === "activity" ? "/activity" : "/desk"
                       }
                     >
-                      {subscribed ? "Subscribed" : "Subscribe & warm up"}
-                    </button>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="ws-muted">
-                Resolved contracts will appear here after Gateway responds.
-              </p>
-            )}
-          </div>
-          <p className="ws-muted">
-            Each symbol needs Last ticks and current bid/ask data. Relative
-            volume requires ten complete reference sessions. Historical
-            downloads do not trigger entries.
-          </p>
+                      Inspect {dependency.run_name ?? "current operations"}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {snapshot?.data.map((data) => (
             <div className="ws-inline-actions" key={data.conid}>
               <strong>{data.symbol}</strong>
@@ -1352,7 +1730,9 @@ function Settings({
                 {data.live ? "Live entitlement" : "Data entitlement pending"}
               </Badge>
               <Badge tone={data.warm ? "success" : "neutral"}>
-                {data.warm ? "History loaded" : "Warming up"}
+                {data.history_loaded
+                  ? "History downloaded"
+                  : "Downloading history"}
               </Badge>
               <button
                 disabled={busy}
@@ -1365,7 +1745,7 @@ function Settings({
             </div>
           ))}
         </Panel>
-        <RiskSettings notify={notify} />
+        <RiskSettings notify={notify} simulation={crypto} />
         <Panel
           title="4. Configure monitoring"
           caption="Secrets are stored in Windows Credential Manager."
@@ -1411,7 +1791,7 @@ function Settings({
                 />
               </label>
               <label className="ws-span-all">
-                Healthchecks ping URL
+                Healthchecks ping URL (optional)
                 <input
                   type="password"
                   autoComplete="off"
@@ -1421,10 +1801,7 @@ function Settings({
                 />
               </label>
             </div>
-            <button
-              type="submit"
-              disabled={busy || !token || !chat || !heartbeat}
-            >
+            <button type="submit" disabled={busy || !token || !chat}>
               Save monitoring credentials
             </button>
           </form>
@@ -1468,6 +1845,32 @@ function Settings({
         title="5. Review readiness"
         caption="Server-authoritative checks identify what blocks entry permission."
       >
+        <Panel
+          title="Account diagnostics"
+          caption="Daily P/L is informational and never blocks entries."
+        >
+          <p>
+            Daily P/L:{" "}
+            <strong>
+              {snapshot?.pnl?.currency
+                ? money(snapshot.pnl.value ?? undefined, snapshot.pnl.currency)
+                : "Unavailable currency"}
+            </strong>{" "}
+            - {snapshot?.pnl?.status ?? "unavailable"}
+          </p>
+          <small>Last updated {localTime(snapshot?.pnl?.received_at)}</small>
+          {snapshot?.pnl?.diagnostic && <p>{snapshot.pnl.diagnostic}</p>}
+          <p>{snapshot?.reconciliation?.detail}</p>
+          {snapshot?.currency_positions?.map((position) => (
+            <p key={position.conid}>
+              {position.symbol}/{position.currency}: {position.quantity} -{" "}
+              {position.exchange} currency position
+            </p>
+          ))}
+          {snapshot?.simulation_assumptions?.map((item) => (
+            <p key={item}>{item}</p>
+          ))}
+        </Panel>
         <Readiness checks={snapshot?.checks ?? []} />
       </Panel>
       <Panel
@@ -1531,17 +1934,26 @@ function Testing({
   }, [notify]);
   useEffect(() => {
     if (!strategy) return;
-    let current = true;
-    void api<Version[]>(`/strategies/${strategy}/versions`).then((items) => {
-      if (current) {
-        setVersions(items);
-        setVersion(items[0]?.version ?? 0);
-      }
-    });
-    return () => {
-      current = false;
-    };
-  }, [strategy]);
+    setVersions([]);
+    setVersion(0);
+    const controller = new AbortController();
+    void api<Version[]>(
+      `/strategies/${strategy}/versions`,
+      "GET",
+      undefined,
+      controller.signal,
+    )
+      .then((items) => {
+        if (!controller.signal.aborted) {
+          setVersions(items);
+          setVersion(items[0]?.version ?? 0);
+        }
+      })
+      .catch((error: Error) => {
+        if (!controller.signal.aborted) notify(error.message, true);
+      });
+    return () => controller.abort();
+  }, [strategy, notify]);
   async function importDataset(file: File) {
     setBusy(true);
     try {
@@ -1743,7 +2155,7 @@ function Testing({
               <strong>{money(result.realized_pnl)}</strong>
               <span>
                 {result.open_position
-                  ? `${result.open_position.quantity} shares still open`
+                  ? `${result.open_position.quantity} units still open`
                   : "No open simulated position"}
               </span>
             </div>
@@ -1767,7 +2179,7 @@ function Testing({
                     );
                 }}
               >
-                Prepare paper run <ArrowUpRight size={14} />
+                Prepare a run <ArrowUpRight size={14} />
               </button>
             }
           >
@@ -1878,144 +2290,11 @@ function ActivityView({
   notify: (message: string, error?: boolean) => void;
   refresh: () => Promise<void>;
 }) {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [selected, setSelected] = useState<Event | null>(null);
-  const [streaming, setStreaming] = useState(false);
-  useEffect(() => {
-    const stream = new EventSource("/api/events/stream");
-    stream.onopen = () => setStreaming(true);
-    stream.onerror = () => setStreaming(false);
-    stream.addEventListener("journal", (message) => {
-      const event = JSON.parse((message as MessageEvent<string>).data) as Event;
-      setEvents((items) =>
-        items.some((item) => item.sequence === event.sequence)
-          ? items
-          : [...items, event].slice(-5000),
-      );
-    });
-    return () => stream.close();
-  }, []);
   return (
     <>
-      <Panel
-        title="Incidents & recovery"
-        caption="A connected Gateway does not clear a protection or reconciliation problem."
-      >
-        {snapshot?.incidents.some((incident) => !incident.resolved) ? (
-          snapshot.incidents
-            .filter((incident) => !incident.resolved)
-            .map((incident) => (
-              <div className="ws-incident" key={incident.id}>
-                <CircleAlert size={20} />
-                <div>
-                  <strong>{titleCase(incident.id)}</strong>
-                  <p>{incident.detail}</p>
-                  <small>{localTime(incident.timestamp)}</small>
-                </div>
-                <button
-                  onClick={() => {
-                    void api(
-                      `/operations/incidents/${incident.id}/review`,
-                      "POST",
-                    )
-                      .then(async () => {
-                        await refresh();
-                        notify("Incident review completed.");
-                      })
-                      .catch((error: Error) => notify(error.message, true));
-                  }}
-                >
-                  Review resolution
-                </button>
-              </div>
-            ))
-        ) : (
-          <div className="ws-all-clear">
-            <CheckCircle2 size={20} />
-            <div>
-              <strong>No recorded critical incidents</strong>
-              <p>Readiness checks still apply before any new authorization.</p>
-            </div>
-          </div>
-        )}
-      </Panel>
-      <Panel
-        title="Audit history"
-        caption="Append-only events with resumable streaming. Select a record for details."
-        action={
-          <Badge tone={streaming ? "success" : "warning"}>
-            {streaming ? "Event stream connected" : "Stream reconnecting"}
-          </Badge>
-        }
-      >
-        <AuditSearch select={setSelected} />
-        <Grid<Event>
-          name="activity"
-          rows={events}
-          rowId={(row) => String(row.sequence)}
-          onSelect={setSelected}
-          selected={selected ? String(selected.sequence) : undefined}
-          columns={[
-            { accessorKey: "sequence", header: "Sequence", size: 95 },
-            {
-              accessorKey: "timestamp",
-              header: "Time",
-              size: 220,
-              cell: ({ row }) => localTime(row.original.timestamp),
-            },
-            {
-              accessorKey: "type",
-              header: "Event",
-              size: 270,
-              cell: ({ row }) =>
-                titleCase(row.original.type.replaceAll(".", " ")),
-            },
-            {
-              id: "summary",
-              header: "Details",
-              size: 400,
-              accessorFn: (row) =>
-                String(
-                  row.payload.reason ??
-                    row.payload.detail ??
-                    row.payload.name ??
-                    (row.payload.ready !== undefined
-                      ? `Ready: ${row.payload.ready}`
-                      : "Recorded in event ledger"),
-                ),
-            },
-          ]}
-        />
-      </Panel>
+      <IncidentPanel snapshot={snapshot} notify={notify} refresh={refresh} />
+      <AuditHistory />
       <LegacyHistory notify={notify} />
-      <Modal
-        open={!!selected}
-        onOpenChange={(open) => {
-          if (!open) setSelected(null);
-        }}
-        title={
-          selected
-            ? titleCase(selected.type.replaceAll(".", " "))
-            : "Event details"
-        }
-        description={
-          selected
-            ? `${localTime(selected.timestamp)} · Event ${selected.sequence}`
-            : ""
-        }
-      >
-        {selected && (
-          <>
-            <p>
-              This record is immutable. Its payload is available for operational
-              diagnosis.
-            </p>
-            <pre className="ws-event-payload">
-              {JSON.stringify(selected.payload, null, 2)}
-            </pre>
-          </>
-        )}
-      </Modal>
     </>
   );
 }
